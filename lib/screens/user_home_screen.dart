@@ -12,13 +12,13 @@ class UserHomeScreen extends StatefulWidget {
 }
 
 class _UserHomeScreenState extends State<UserHomeScreen> {
-  int _currentIndex = 0; // 0=الرئيسية, 1=الخبراء, 2=كاميرا, 3=ملفي
+  int _currentIndex = 0;
 
   final List<Widget> _pages = const [
     _ReportsDashboard(),
     SpecialistListScreen(),
     _CameraPlaceholder(),
-    _ProfilePlaceholder(),
+    _UserProfilePage(),
   ];
 
   @override
@@ -42,8 +42,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           leading: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Image.asset('assets/images/logo.png',
-                errorBuilder: (_, __, ___) => const Icon(Icons.eco,
-                    color: Color(0xFF16A34A))),
+                errorBuilder: (_, __, ___) =>
+                const Icon(Icons.eco, color: Color(0xFF16A34A))),
           ),
           actions: [
             IconButton(
@@ -83,7 +83,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         children: [
           _navItem(0, Icons.home_outlined, 'الرئيسية'),
           _navItem(1, Icons.chat_bubble_outline, 'الخبراء'),
-          const SizedBox(width: 48), // مكان الـ FAB
+          const SizedBox(width: 48),
           _navItem(3, Icons.person_outline, 'ملفي'),
         ],
       ),
@@ -98,9 +98,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon,
-              color: isSelected
-                  ? const Color(0xFF16A34A)
-                  : Colors.grey[400],
+              color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
               size: 24),
           Text(label,
               style: TextStyle(
@@ -112,6 +110,734 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       ),
     );
   }
+}
+
+// ─── صفحة البروفايل ───────────────────────────────────────────
+class _UserProfilePage extends StatefulWidget {
+  const _UserProfilePage();
+
+  @override
+  State<_UserProfilePage> createState() => _UserProfilePageState();
+}
+
+class _UserProfilePageState extends State<_UserProfilePage> {
+  String _name = '';
+  String _email = '';
+  bool _loading = true;
+  int _tabIndex = 0; // 0=الكل, 1=صحية, 2=مريضة
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (!mounted) return;
+      setState(() {
+        _name  = doc.data()?['username'] ?? doc.data()?['fullName'] ?? '';
+        _email = FirebaseAuth.instance.currentUser?.email ?? '';
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    await AuthService().signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SplashScreen()),
+          (_) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return _loading
+        ? const Center(
+        child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+        : StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('reports')
+          .where('userId', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final allReports = snapshot.data?.docs
+            .map((d) => {
+          'id': d.id,
+          ...d.data() as Map<String, dynamic>
+        })
+            .toList() ??
+            [];
+
+        final total    = allReports.length;
+        final shared   = allReports.where((r) => r['isShared'] == true).length;
+        final healthy  = allReports.where((r) => r['status'] == 'healthy').length;
+        final diseased = allReports.where((r) => r['status'] == 'diseased').length;
+        final avgConf  = total == 0
+            ? 0
+            : (allReports.fold<num>(
+            0, (s, r) => s + (r['confidence'] ?? 0)) /
+            total)
+            .round();
+
+        // فلترة حسب التاب
+        final filtered = _tabIndex == 0
+            ? allReports
+            : _tabIndex == 1
+            ? allReports.where((r) => r['status'] == 'healthy').toList()
+            : allReports.where((r) => r['status'] == 'diseased').toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ── هيدر البروفايل ───────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16A34A),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      _name.isNotEmpty ? _name[0].toUpperCase() : 'م',
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF16A34A)),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _name.isNotEmpty ? _name : 'المستخدم',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _email,
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined,
+                        color: Colors.white, size: 20),
+                    onPressed: () => _showEditDialog(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── الإحصائيات ───────────────────────────
+            Row(
+              children: [
+                _statBox('$shared', 'مشاركة', Colors.orange),
+                const SizedBox(width: 8),
+                _statBox('$healthy', 'نباتات سليمة', Colors.green),
+                const SizedBox(width: 8),
+                _statBox('$avgConf%', 'متوسط الدقة', Colors.blue),
+                const SizedBox(width: 8),
+                _statBox('$total', 'إجمالي التقارير', Colors.purple),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── تابات الفلترة ─────────────────────────
+            const Text('تقاريري',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF166534))),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _tabChip(0, 'الكل ($total)'),
+                const SizedBox(width: 8),
+                _tabChip(1, 'صحية ($healthy)'),
+                const SizedBox(width: 8),
+                _tabChip(2, 'مريضة ($diseased)'),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // ── قائمة التقارير ────────────────────────
+            if (snapshot.connectionState == ConnectionState.waiting)
+              const Center(child: CircularProgressIndicator())
+            else if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Text('لا توجد تقارير',
+                      style: TextStyle(
+                          color: Colors.grey[500], fontSize: 14)),
+                ),
+              )
+            else
+              ...filtered.map((r) => _reportListItem(r, context)),
+
+            const SizedBox(height: 16),
+
+            // ── أزرار ────────────────────────────────
+            OutlinedButton.icon(
+              onPressed: () => _showDeleteDialog(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                minimumSize: const Size(double.infinity, 46),
+              ),
+              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              label: const Text('حذف الحساب',
+                  style: TextStyle(color: Colors.red)),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: _logout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFCC0000),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                minimumSize: const Size(double.infinity, 46),
+              ),
+              icon: const Icon(Icons.logout,
+                  color: Colors.white, size: 18),
+              label: const Text('تسجيل الخروج',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'حذف الحساب',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.red),
+          ),
+          content: const Text(
+            'هل أنت متأكد من حذف حسابك؟ سيتم حذف جميع بياناتك بشكل نهائي ولا يمكن التراجع.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid != null) {
+                    // حذف بيانات Firestore
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(uid)
+                        .delete();
+                    await FirebaseFirestore.instance
+                        .collection('accounts')
+                        .doc(uid)
+                        .delete();
+                    // حذف الحساب من Firebase Auth
+                    await FirebaseAuth.instance.currentUser?.delete();
+                  }
+                  if (!mounted) return;
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SplashScreen()),
+                        (_) => false,
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('حدث خطأ: \$e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('حذف',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog() {
+    final nameController  = TextEditingController(text: _name);
+    final emailController = TextEditingController(text: _email);
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'تعديل المعلومات الشخصية',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF14532D)),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  textDirection: TextDirection.rtl,
+                  decoration: InputDecoration(
+                    labelText: 'الاسم',
+                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF16A34A), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  textDirection: TextDirection.ltr,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'البريد الإلكتروني',
+                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.email_outlined,
+                        color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF16A34A), width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                  setDialogState(() => saving = true);
+                  try {
+                    final uid =
+                        FirebaseAuth.instance.currentUser?.uid;
+                    final newName  = nameController.text.trim();
+                    final newEmail = emailController.text.trim();
+
+                    if (uid != null) {
+                      // تحديث الاسم في Firestore
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(uid)
+                          .update({
+                        'username': newName,
+                        'email': newEmail,
+                      });
+                      // تحديث في accounts أيضاً
+                      await FirebaseFirestore.instance
+                          .collection('accounts')
+                          .doc(uid)
+                          .update({
+                        'username': newName,
+                        'email': newEmail,
+                      });
+                      // إذا تغيّر الإيميل أرسل رابط تأكيد
+                      if (newEmail != _email) {
+                        await FirebaseAuth.instance.currentUser
+                            ?.verifyBeforeUpdateEmail(newEmail);
+                      }
+                    }
+
+                    if (!mounted) return;
+                    setState(() {
+                      _name  = newName;
+                      _email = newEmail;
+                    });
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(newEmail != _email
+                            ? 'تم الحفظ ✓  |  تحقق من إيميلك الجديد'
+                            : 'تم حفظ التعديلات بنجاح ✓'),
+                        backgroundColor: const Color(0xFF16A34A),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  } catch (e) {
+                    setDialogState(() => saving = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('حدث خطأ: \$e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: saving
+                    ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                    : const Text('حفظ',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statBox(String value, String label, MaterialColor color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.shade50,
+          border: Border.all(color: color.shade200),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(value,
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: color.shade700)),
+            Text(label,
+                textAlign: TextAlign.center,
+                style:
+                TextStyle(fontSize: 10, color: color.shade600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tabChip(int index, String label) {
+    final selected = _tabIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tabIndex = index),
+      child: Container(
+        padding:
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF16A34A)
+              : Colors.white,
+          border: Border.all(
+              color: selected
+                  ? const Color(0xFF16A34A)
+                  : Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : Colors.grey[600]),
+        ),
+      ),
+    );
+  }
+
+  Widget _reportListItem(
+      Map<String, dynamic> r, BuildContext context) {
+    final isHealthy = r['status'] == 'healthy';
+    final imageUrl = r['plantImage'] ?? '';
+    return GestureDetector(
+      onTap: () => _showReportDetails(context, r),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE8E8E8)),
+        ),
+        child: Row(
+          children: [
+            // صورة
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(imageUrl,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      _imgPlaceholder(60))
+                  : _imgPlaceholder(60),
+            ),
+            const SizedBox(width: 12),
+            // معلومات
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(r['plantName'] ?? '',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isHealthy
+                              ? Colors.green
+                              : Colors.red,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isHealthy ? 'صحي' : 'مريض',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(r['diagnosis'] ?? '',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          border:
+                          Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text('AI  ${r['confidence'] ?? 0}%',
+                            style:
+                            const TextStyle(fontSize: 10)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(r['date'] ?? '',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500])),
+                      const Spacer(),
+                      if (r['isShared'] == true)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius:
+                            BorderRadius.circular(10),
+                          ),
+                          child: const Text('مشارك',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF16A34A))),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReportDetails(
+      BuildContext context, Map<String, dynamic> r) {
+    final isHealthy = r['status'] == 'healthy';
+    showDialog(
+      context: context,
+      builder: (_) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تفاصيل التقرير'),
+          contentPadding: const EdgeInsets.all(16),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: (r['plantImage'] ?? '').isNotEmpty
+                      ? Image.network(r['plantImage'],
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _imgPlaceholder(160))
+                      : _imgPlaceholder(160),
+                ),
+                const SizedBox(height: 12),
+                _detailRow('🌱 اسم النبات', r['plantName'] ?? ''),
+                _detailRow('🔍 التشخيص', r['diagnosis'] ?? ''),
+                _detailRow('🦠 المرض', r['disease'] ?? ''),
+                _detailRow('💊 العلاج', r['treatment'] ?? ''),
+                _detailRow(
+                    'دقة AI', '${r['confidence'] ?? 0}%'),
+                _detailRow('التاريخ', r['date'] ?? ''),
+                const SizedBox(height: 8),
+                // زر إلغاء المشاركة أو المشاركة
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await FirebaseFirestore.instance
+                          .collection('reports')
+                          .doc(r['id'])
+                          .update({
+                        'isShared': !(r['isShared'] ?? false)
+                      });
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF16A34A),
+                      side: const BorderSide(
+                          color: Color(0xFF16A34A)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius:
+                          BorderRadius.circular(8)),
+                    ),
+                    icon: Icon(
+                      r['isShared'] == true
+                          ? Icons.share
+                          : Icons.share_outlined,
+                      size: 16,
+                    ),
+                    label: Text(r['isShared'] == true
+                        ? 'إلغاء المشاركة'
+                        : 'مشاركة مع المجتمع'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$label: ',
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _imgPlaceholder(double size) => Container(
+    width: size,
+    height: size,
+    color: Colors.grey[200],
+    child: const Icon(Icons.image, color: Colors.grey),
+  );
 }
 
 // ─── صفحة التقارير (الرئيسية) ────────────────────────────────
@@ -126,7 +852,6 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
   final _db = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  Map<String, dynamic>? _selectedReport;
 
   @override
   void dispose() {
@@ -148,7 +873,6 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
             .toList() ??
             [];
 
-        // فلترة البحث
         final filtered = allReports.where((r) {
           final q = _searchQuery.toLowerCase();
           return (r['plantName'] ?? '').toLowerCase().contains(q) ||
@@ -156,13 +880,10 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
               (r['disease'] ?? '').toLowerCase().contains(q);
         }).toList();
 
-        // إحصائيات
-        final total = allReports.length;
-        final healthy =
-            allReports.where((r) => r['status'] == 'healthy').length;
-        final diseased =
-            allReports.where((r) => r['status'] == 'diseased').length;
-        final avgConf = total == 0
+        final total    = allReports.length;
+        final healthy  = allReports.where((r) => r['status'] == 'healthy').length;
+        final diseased = allReports.where((r) => r['status'] == 'diseased').length;
+        final avgConf  = total == 0
             ? 0
             : (allReports.fold<num>(
             0, (s, r) => s + (r['confidence'] ?? 0)) /
@@ -172,7 +893,6 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // ── العنوان ──────────────────────────────────
             const Text('لوحة التقارير',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -180,30 +900,27 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF166534))),
             const SizedBox(height: 4),
-            const Text('استكشف تقارير تشخيص النباتات المشاركة من المجتمع',
+            const Text(
+                'استكشف تقارير تشخيص النباتات المشاركة من المجتمع',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 16),
-
-            // ── الإحصائيات ───────────────────────────────
             Row(
               children: [
-                _StatCard(total.toString(), 'تقرير', Icons.bar_chart,
-                    Colors.blue),
+                _StatCard(total.toString(), 'تقرير',
+                    Icons.bar_chart, Colors.blue),
                 const SizedBox(width: 8),
-                _StatCard(healthy.toString(), 'صحي', Icons.trending_up,
-                    Colors.green),
+                _StatCard(healthy.toString(), 'صحي',
+                    Icons.trending_up, Colors.green),
                 const SizedBox(width: 8),
-                _StatCard(diseased.toString(), 'مريض', Icons.warning_amber,
-                    Colors.red),
+                _StatCard(diseased.toString(), 'مريض',
+                    Icons.warning_amber, Colors.red),
                 const SizedBox(width: 8),
-                _StatCard('$avgConf%', 'دقة', Icons.emoji_events,
-                    Colors.purple),
+                _StatCard('$avgConf%', 'دقة',
+                    Icons.emoji_events, Colors.purple),
               ],
             ),
             const SizedBox(height: 16),
-
-            // ── البحث ────────────────────────────────────
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -225,19 +942,16 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
             if (_searchQuery.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text('${filtered.length} نتيجة',
-                  style:
-                  const TextStyle(fontSize: 12, color: Colors.grey)),
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.grey)),
             ],
             const SizedBox(height: 16),
-
-            // ── التقارير ─────────────────────────────────
             const Text('التقارير المشاركة',
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF166534))),
             const SizedBox(height: 10),
-
             if (snapshot.connectionState == ConnectionState.waiting)
               const Center(child: CircularProgressIndicator())
             else if (filtered.isEmpty)
@@ -267,10 +981,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
                 itemBuilder: (context, index) {
                   final report = filtered[index];
                   return _ReportCard(
-                    report: report,
-                    onTap: () =>
-                        setState(() => _selectedReport = report),
-                  );
+                      report: report, onTap: () {});
                 },
               ),
           ],
@@ -278,14 +989,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
       },
     );
   }
-
-  // ── ديالوج تفاصيل التقرير ────────────────────────────────
-  @override
-  Widget build2(BuildContext context) => const SizedBox();
 }
-
-// في الـ build الرئيسي نستخدم Stack لعرض الديالوج
-// لكن هنا نستخدم showDialog عادي من داخل _ReportCard
 
 // ─── بطاقة إحصائية ───────────────────────────────────────────
 class _StatCard extends StatelessWidget {
@@ -316,8 +1020,8 @@ class _StatCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: color.shade700)),
             Text(label,
-                style:
-                TextStyle(fontSize: 11, color: color.shade600)),
+                style: TextStyle(
+                    fontSize: 11, color: color.shade600)),
           ],
         ),
       ),
@@ -354,7 +1058,6 @@ class _ReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // صورة
             Expanded(
               child: Stack(
                 children: [
@@ -376,7 +1079,9 @@ class _ReportCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isHealthy ? Colors.green : Colors.red,
+                        color: isHealthy
+                            ? Colors.green
+                            : Colors.red,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -389,8 +1094,6 @@ class _ReportCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // معلومات
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
@@ -398,7 +1101,8 @@ class _ReportCard extends StatelessWidget {
                 children: [
                   Text(report['plantName'] ?? '',
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
@@ -409,26 +1113,33 @@ class _ReportCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 6),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: Colors.grey[300]!),
+                          borderRadius:
+                          BorderRadius.circular(10),
                         ),
-                        child: Text('${report['confidence'] ?? 0}%',
-                            style: const TextStyle(fontSize: 10)),
+                        child: Text(
+                            '${report['confidence'] ?? 0}%',
+                            style:
+                            const TextStyle(fontSize: 10)),
                       ),
                       Row(
                         children: [
                           Icon(Icons.visibility,
-                              size: 12, color: Colors.grey[500]),
+                              size: 12,
+                              color: Colors.grey[500]),
                           const SizedBox(width: 2),
                           Text('عرض',
                               style: TextStyle(
-                                  fontSize: 10, color: Colors.grey[500])),
+                                  fontSize: 10,
+                                  color: Colors.grey[500])),
                         ],
                       ),
                     ],
@@ -455,7 +1166,6 @@ class _ReportCard extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // صورة
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: (report['plantImage'] ?? '').isNotEmpty
@@ -463,29 +1173,21 @@ class _ReportCard extends StatelessWidget {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _imgPlaceholder())
+                      errorBuilder: (_, __, ___) =>
+                          _imgPlaceholder())
                       : _imgPlaceholder(),
                 ),
                 const SizedBox(height: 12),
-
-                // اسم النبات
-                _detailCard('🌱 اسم النبات', report['plantName'] ?? '',
-                    Colors.purple),
-
-                // التشخيص
+                _detailCard('🌱 اسم النبات',
+                    report['plantName'] ?? '', Colors.purple),
                 _detailCard(
                   '🔍 التشخيص',
                   report['diagnosis'] ?? '',
                   isHealthy ? Colors.green : Colors.red,
                   extra: report['disease'] ?? '',
                 ),
-
-                // العلاج
-                _detailCard(
-                    '💊 العلاج الموصى به', report['treatment'] ?? '',
-                    Colors.blue),
-
-                // معلومات إضافية
+                _detailCard('💊 العلاج الموصى به',
+                    report['treatment'] ?? '', Colors.blue),
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -493,16 +1195,20 @@ class _ReportCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
                         children: [
                           const Text('تم التشخيص بواسطة',
                               style: TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
+                                  fontSize: 11,
+                                  color: Colors.grey)),
                           Text(report['capturedBy'] ?? '',
-                              style: const TextStyle(fontSize: 13)),
+                              style: const TextStyle(
+                                  fontSize: 13)),
                         ],
                       ),
                       Container(
@@ -510,12 +1216,14 @@ class _ReportCard extends StatelessWidget {
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFF16A34A),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius:
+                          BorderRadius.circular(20),
                         ),
                         child: Text(
                           'دقة: ${report['confidence'] ?? 0}%',
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 12),
+                              color: Colors.white,
+                              fontSize: 12),
                         ),
                       ),
                     ],
@@ -531,11 +1239,12 @@ class _ReportCard extends StatelessWidget {
                   child: Row(
                     children: [
                       const Text('تاريخ التقرير:',
-                          style:
-                          TextStyle(fontSize: 11, color: Colors.grey)),
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey)),
                       const SizedBox(width: 8),
                       Text(report['date'] ?? '',
-                          style: const TextStyle(fontSize: 13)),
+                          style:
+                          const TextStyle(fontSize: 13)),
                     ],
                   ),
                 ),
@@ -553,7 +1262,8 @@ class _ReportCard extends StatelessWidget {
     );
   }
 
-  Widget _detailCard(String title, String content, MaterialColor color,
+  Widget _detailCard(String title, String content,
+      MaterialColor color,
       {String extra = ''}) {
     return Container(
       width: double.infinity,
@@ -577,13 +1287,14 @@ class _ReportCard extends StatelessWidget {
           if (extra.isNotEmpty) ...[
             const SizedBox(height: 4),
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey[300]!),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(extra, style: const TextStyle(fontSize: 11)),
+              child: Text(extra,
+                  style: const TextStyle(fontSize: 11)),
             ),
           ],
         ],
@@ -605,13 +1316,5 @@ class _CameraPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Center(
       child: Text('صفحة الكاميرا',
-          style: TextStyle(fontSize: 18, color: Colors.grey)));
-}
-
-class _ProfilePlaceholder extends StatelessWidget {
-  const _ProfilePlaceholder();
-  @override
-  Widget build(BuildContext context) => const Center(
-      child: Text('صفحة الملف الشخصي',
           style: TextStyle(fontSize: 18, color: Colors.grey)));
 }

@@ -9,41 +9,86 @@ import 'expert_schedule_screen.dart';
 
 class ExpertHomeScreen extends StatefulWidget {
   const ExpertHomeScreen({super.key});
+
   @override
   State<ExpertHomeScreen> createState() => _ExpertHomeScreenState();
 }
 
 class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
+  int _currentIndex = 0;
+  int _profileTabIndex = 0;
+
   String _name = '';
+  String _specialty = '';
+  double _rating = 0.0;
+  int _reviewCount = 0;
+  int _responseTime = 15;
+  int _successRate = 96;
+  int _totalCases = 0;
+  String _education = '';
+  String _experience = '';
+  List<Map<String, dynamic>> _reviews = [];
   bool _loading = true;
-  int _currentIndex = 3;
 
   @override
   void initState() {
     super.initState();
-    _fetchName();
+    _fetchData();
   }
 
-  Future<void> _fetchName() async {
+  Future<void> _fetchData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    final doc = await FirebaseFirestore.instance
-        .collection('specialists')
-        .doc(uid)
-        .get();
-    if (!mounted) return;
-    setState(() {
-      _name = doc.data()?['fullName'] ?? doc.data()?['username'] ?? '';
-      _loading = false;
-    });
+    if (uid == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('specialists')
+          .doc(uid)
+          .get();
+
+      List<Map<String, dynamic>> reviews = [];
+      try {
+        final reviewsSnap = await FirebaseFirestore.instance
+            .collection('specialists')
+            .doc(uid)
+            .collection('reviews')
+            .limit(10)
+            .get();
+        reviews = reviewsSnap.docs.map((e) => e.data()).toList();
+      } catch (_) {}
+
+      if (!mounted) return;
+      final d = doc.data() ?? {};
+      setState(() {
+        _name         = d['fullName'] ?? d['name'] ?? d['username'] ?? '';
+        _specialty    = d['specialty'] ?? (d['specializations'] is List && (d['specializations'] as List).isNotEmpty ? (d['specializations'] as List)[0].toString() : '');
+        _rating       = (d['rating'] is num) ? (d['rating'] as num).toDouble() : 0.0;
+        _reviewCount  = d['reviewCount'] ?? 0;
+        _responseTime = (d['responseTime'] is num) ? (d['responseTime'] as num).toInt() : 15;
+        _successRate  = (d['successRate'] is num) ? (d['successRate'] as num).toInt() : 96;
+        _totalCases   = (d['totalCases'] is num) ? (d['totalCases'] as num).toInt() : 0;
+        _education    = d['education'] ?? '';
+        _experience   = (d['experience'] != null) ? d['experience'].toString() : '';
+        _reviews      = reviews;
+        _loading      = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
-  List<Widget> get _pages => [
-    _ProfilePage(name: _name),
-    const ExpertScheduleScreen(),
-    const _ChatsPage(),
-    const RequestsScreen(),
-  ];
+  Future<void> _logout() async {
+    await AuthService().signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SplashScreen()),
+          (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,41 +106,41 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               fontSize: 20,
             ),
           ),
-          leading: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Image.asset(
-              'assets/images/logo.png',
-              errorBuilder: (_, __, ___) =>
-              const Icon(Icons.eco, color: Color(0xFF16A34A)),
-            ),
-          ),
+          automaticallyImplyLeading: false,
           backgroundColor: Colors.white,
           elevation: 1,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: Color(0xFF16A34A)),
-              onPressed: () async {
-                await AuthService().signOut();
-                if (!mounted) return;
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SplashScreen()),
-                      (_) => false,
-                );
-              },
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Image.asset(
+                'assets/images/logo.png',
+                height: 36,
+                errorBuilder: (_, __, ___) =>
+                const Icon(Icons.eco, color: Color(0xFF16A34A)),
+              ),
             ),
           ],
         ),
         body: _loading
             ? const Center(
-            child: CircularProgressIndicator(
-                color: Color(0xFF16A34A)))
-            : _pages[_currentIndex],
+            child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+            : _buildBody(),
         bottomNavigationBar: _buildBottomNav(),
       ),
     );
   }
 
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0: return _buildProfileTab();
+      case 1: return const ExpertScheduleScreen();
+      case 2: return const _ChatsPage();
+      case 3: return const RequestsScreen();
+      default: return const SizedBox();
+    }
+  }
+
+  // ── Bottom Nav ────────────────────────────────────────────────
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -133,22 +178,16 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
-            size: 26,
-          ),
+          Icon(icon,
+              color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
+              size: 26),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight:
-              isSelected ? FontWeight.bold : FontWeight.normal,
-              color:
-              isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
+              )),
           const SizedBox(height: 2),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -163,6 +202,417 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       ),
     );
   }
+
+  // ── تاب الملف الشخصي ─────────────────────────────────────────
+  Widget _buildProfileTab() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildProfileHeader(),
+          _buildStatsRow(),
+          _buildTabBar(),
+          _profileTabIndex == 0
+              ? _buildInfoContent()
+              : _profileTabIndex == 1
+              ? _buildReportsContent()
+              : _buildReviewsContent(),
+          const SizedBox(height: 24),
+          _buildLogoutButton(),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── Header أخضر ──────────────────────────────────────────────
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF16A34A), Color(0xFF14532D)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+      child: Row(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFF14532D),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                _name.isNotEmpty ? _name[0].toUpperCase() : 'خ',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _name.isNotEmpty ? 'د. $_name' : 'د. الخبير',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                if (_specialty.isNotEmpty)
+                  Text(_specialty,
+                      style: const TextStyle(
+                          color: Color(0xFFBBF7D0), fontSize: 12)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ...List.generate(5, (i) => Icon(
+                      i < _rating.floor()
+                          ? Icons.star
+                          : i < _rating
+                          ? Icons.star_half
+                          : Icons.star_border,
+                      color: const Color(0xFFFBBF24),
+                      size: 13,
+                    )),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${_rating.toStringAsFixed(1)} ($_reviewCount تقييم)',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _headerChip(Icons.chat_bubble_outline, 'غير متاح'),
+                    const SizedBox(width: 8),
+                    _headerChip(Icons.location_on_outlined, 'موقع'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF15803D),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  // ── إحصائيات ─────────────────────────────────────────────────
+  Widget _buildStatsRow() {
+    final hasStats = _totalCases > 0;
+    if (!hasStats) return const SizedBox.shrink();
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          _statItem('$_responseTime دقيقة', 'متوسط الرد'),
+          _vDivider(),
+          _statItem('$_successRate%', 'نسبة النجاح'),
+          _vDivider(),
+          _statItem('$_totalCases', 'حالة تم حلها'),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String value, String label) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF14532D))),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _vDivider() =>
+      Container(width: 1, height: 32, color: const Color(0xFFE5E7EB));
+
+  // ── Tab Bar ───────────────────────────────────────────────────
+  Widget _buildTabBar() {
+    const tabs = ['المعلومات', 'التقارير (0)', 'التقييمات'];
+    return Container(
+      color: Colors.white,
+      child: Row(
+        children: List.generate(tabs.length, (i) {
+          final selected = _profileTabIndex == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _profileTabIndex = i),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: selected
+                          ? const Color(0xFF16A34A)
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                child: Text(tabs[i],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: selected
+                          ? const Color(0xFF16A34A)
+                          : Colors.grey,
+                    )),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ── محتوى المعلومات ──────────────────────────────────────────
+  Widget _buildInfoContent() {
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        if (_specialty.isNotEmpty)
+          _sectionCard(
+            title: 'التخصصات',
+            child: Text(_specialty,
+                style: const TextStyle(
+                    fontSize: 13, color: Colors.black87)),
+          ),
+        const SizedBox(height: 12),
+        if (_education.isNotEmpty || _experience.isNotEmpty)
+          _sectionCard(
+            title: 'المعلومات المهنية',
+            child: Column(
+              children: [
+                if (_education.isNotEmpty) ...[
+                  _infoItem(Icons.school_outlined, _education),
+                  const SizedBox(height: 10),
+                ],
+                if (_experience.isNotEmpty)
+                  _infoItem(Icons.work_outline, _experience),
+              ],
+            ),
+          ),
+        if (_education.isEmpty &&
+            _experience.isEmpty &&
+            _specialty.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text('لم يتم إضافة معلومات بعد',
+                  style: TextStyle(
+                      color: Colors.grey[500], fontSize: 14)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _infoItem(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF16A34A), size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(
+                  fontSize: 13, color: Colors.black87, height: 1.5)),
+        ),
+      ],
+    );
+  }
+
+  // ── محتوى التقارير ───────────────────────────────────────────
+  Widget _buildReportsContent() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Text('لا توجد تقارير حالياً',
+            style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+      ),
+    );
+  }
+
+  // ── محتوى التقييمات ──────────────────────────────────────────
+  Widget _buildReviewsContent() {
+    if (_reviews.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text('لا توجد تقييمات بعد',
+              style:
+              TextStyle(color: Colors.grey[500], fontSize: 14)),
+        ),
+      );
+    }
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        ..._reviews.map((r) => _reviewCard(r)),
+      ],
+    );
+  }
+
+  Widget _reviewCard(Map<String, dynamic> r) {
+    final rating = (r['rating'] ?? 5).toInt();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFFDCFCE7),
+                child: Text(
+                  (r['userName'] ?? 'م')[0],
+                  style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(r['userName'] ?? 'مستخدم',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Colors.black87)),
+                    Row(
+                      children: List.generate(
+                        5,
+                            (i) => Icon(
+                          i < rating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: const Color(0xFFFBBF24),
+                          size: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if ((r['comment'] ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(r['comment'],
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black54,
+                    height: 1.4)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionCard({required String title, required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          onPressed: _logout,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFCC0000),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
+          ),
+          icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+          label: const Text('تسجيل الخروج',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── صفحة المحادثات ───────────────────────────────────────────
@@ -172,7 +622,6 @@ class _ChatsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = FirebaseFirestore.instance;
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: StreamBuilder<QuerySnapshot>(
@@ -181,16 +630,13 @@ class _ChatsPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final chats = snapshot.data?.docs ?? [];
-
           if (chats.isEmpty) {
             return const Center(
               child: Text('لا توجد محادثات',
                   style: TextStyle(color: Colors.grey, fontSize: 16)),
             );
           }
-
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: chats.length,
@@ -202,7 +648,6 @@ class _ChatsPage extends StatelessWidget {
               final time = data['time'] ?? '';
               final unread = data['unread'] ?? 0;
               final online = data['online'] ?? false;
-
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,
@@ -220,8 +665,7 @@ class _ChatsPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border:
-                    Border.all(color: const Color(0xFFbbf7d0)),
+                    border: Border.all(color: const Color(0xFFbbf7d0)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -240,8 +684,7 @@ class _ChatsPage extends StatelessWidget {
                             child: Text(
                               userName.isNotEmpty ? userName[0] : '؟',
                               style: const TextStyle(
-                                  color: Color(0xFF15803d),
-                                  fontSize: 18),
+                                  color: Color(0xFF15803d), fontSize: 18),
                             ),
                           ),
                           if (online)
@@ -283,8 +726,7 @@ class _ChatsPage extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(lastMessage,
                                 style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600]),
+                                    fontSize: 13, color: Colors.grey[600]),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis),
                           ],
@@ -295,11 +737,9 @@ class _ChatsPage extends StatelessWidget {
                         CircleAvatar(
                           radius: 11,
                           backgroundColor: const Color(0xFF16A34A),
-                          child: Text(
-                            '$unread',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 11),
-                          ),
+                          child: Text('$unread',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 11)),
                         ),
                       ],
                     ],
@@ -309,58 +749,6 @@ class _ChatsPage extends StatelessWidget {
             },
           );
         },
-      ),
-    );
-  }
-}
-
-// ─── صفحة الملف الشخصي ───────────────────────────────────────
-class _ProfilePage extends StatelessWidget {
-  final String name;
-  const _ProfilePage({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: RichText(
-                textAlign: TextAlign.right,
-                text: TextSpan(
-                  style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF14532D)),
-                  children: [
-                    const TextSpan(text: 'مرحباً '),
-                    TextSpan(
-                      text: name,
-                      style:
-                      const TextStyle(color: Color(0xFF16A34A)),
-                    ),
-                    const TextSpan(text: ' !'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'لوحة تحكم الخبير',
-                textAlign: TextAlign.right,
-                style: TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
