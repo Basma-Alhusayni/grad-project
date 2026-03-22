@@ -6,7 +6,6 @@ import 'splash_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
-
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
@@ -23,22 +22,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _fetchAdminData();
   }
 
-  // Fetch admin data from Firestore and sync email with Firebase Auth
   Future<void> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     await user.reload();
     final authEmail = FirebaseAuth.instance.currentUser?.email ?? '';
-
     final doc = await FirebaseFirestore.instance
         .collection('admins')
         .doc(user.uid)
         .get();
-
     final firestoreEmail = doc.data()?['email'] ?? '';
-
-    // If email in Auth differs from Firestore, update Firestore
     if (authEmail.isNotEmpty && authEmail != firestoreEmail) {
       await FirebaseFirestore.instance
           .collection('admins')
@@ -49,16 +42,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           .doc(user.uid)
           .update({'email': authEmail});
     }
-
     if (!mounted) return;
     setState(() {
-      _name  = doc.data()?['username'] ?? '';
+      _name = doc.data()?['username'] ?? '';
       _email = authEmail.isNotEmpty ? authEmail : firestoreEmail;
       _loading = false;
     });
   }
 
-  // Sign out and navigate to splash screen
   Future<void> _logout() async {
     await AuthService().signOut();
     if (!mounted) return;
@@ -98,10 +89,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
           ],
         ),
-        // Show loading indicator while fetching data
         body: _loading
             ? const Center(
-            child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+            child: CircularProgressIndicator(
+                color: Color(0xFF16A34A)))
             : _currentIndex == 0
             ? _buildHomeTab()
             : _currentIndex == 1
@@ -139,7 +130,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Home Tab ──────────────────────────────────────────────────
+  // ── Home Tab ────────────────────────────────────────────────
   Widget _buildHomeTab() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -177,17 +168,106 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
           ),
+          const SizedBox(height: 24),
+          // Quick stats
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('specialist_requests')
+                .snapshots(),
+            builder: (context, snapshot) {
+              final docs = snapshot.data?.docs ?? [];
+              final pending =
+                  docs.where((d) => (d.data() as Map)['status'] == 'pending').length;
+              final approved =
+                  docs.where((d) => (d.data() as Map)['status'] == 'approved').length;
+              final rejected =
+                  docs.where((d) => (d.data() as Map)['status'] == 'rejected').length;
+              return Row(
+                children: [
+                  _statCard('$pending', 'طلبات معلقة', Colors.orange,
+                      Icons.pending_actions),
+                  const SizedBox(width: 12),
+                  _statCard('$approved', 'تمت الموافقة', Colors.green,
+                      Icons.check_circle_outline),
+                  const SizedBox(width: 12),
+                  _statCard('$rejected', 'مرفوضة', Colors.red,
+                      Icons.cancel_outlined),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
-  // ── Requests Tab - streams pending specialist requests ────────
+  Widget _statCard(
+      String value, String label, MaterialColor color, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.shade200),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color.shade600, size: 28),
+            const SizedBox(height: 6),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color.shade700)),
+            Text(label,
+                textAlign: TextAlign.center,
+                style:
+                TextStyle(fontSize: 11, color: color.shade600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Requests Tab ────────────────────────────────────────────
   Widget _buildRequestsTab() {
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              labelColor: const Color(0xFF16A34A),
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: const Color(0xFF16A34A),
+              tabs: const [
+                Tab(text: 'معلقة'),
+                Tab(text: 'موافق عليها'),
+                Tab(text: 'مرفوضة'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _requestsList('pending'),
+                _requestsList('approved'),
+                _requestsList('rejected'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _requestsList(String status) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('specialist_requests')
-          .where('status', isEqualTo: 'pending')
+          .where('status', isEqualTo: status)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -196,8 +276,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               CircularProgressIndicator(color: Color(0xFF16A34A)));
         }
         final docs = snapshot.data?.docs ?? [];
-
-        // Show empty state if no pending requests
         if (docs.isEmpty) {
           return Center(
             child: Column(
@@ -206,9 +284,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Icon(Icons.inbox_outlined,
                     size: 64, color: Colors.grey[300]),
                 const SizedBox(height: 12),
-                const Text('لا توجد طلبات معلقة',
-                    style:
-                    TextStyle(color: Colors.grey, fontSize: 15)),
+                Text(
+                  status == 'pending'
+                      ? 'لا توجد طلبات معلقة'
+                      : status == 'approved'
+                      ? 'لا توجد طلبات موافق عليها'
+                      : 'لا توجد طلبات مرفوضة',
+                  style:
+                  const TextStyle(color: Colors.grey, fontSize: 15),
+                ),
               ],
             ),
           );
@@ -219,15 +303,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final docId = docs[index].id;
-            return _buildRequestCard(data, docId);
+            return _buildRequestCard(data, docId, status);
           },
         );
       },
     );
   }
 
-  // Build a single request card with approve/reject buttons
-  Widget _buildRequestCard(Map<String, dynamic> data, String docId) {
+  Widget _buildRequestCard(
+      Map<String, dynamic> data, String docId, String status) {
+    final statusColor = status == 'pending'
+        ? Colors.orange
+        : status == 'approved'
+        ? Colors.green
+        : Colors.red;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -237,7 +327,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
       child: Column(
         children: [
-          // Card header with applicant info
+          // Card header
           Container(
             padding: const EdgeInsets.all(14),
             decoration: const BoxDecoration(
@@ -279,10 +369,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ],
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border:
+                    Border.all(color: statusColor.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    status == 'pending'
+                        ? 'معلق'
+                        : status == 'approved'
+                        ? 'موافق عليه'
+                        : 'مرفوض',
+                    style:
+                    TextStyle(fontSize: 11, color: statusColor),
+                  ),
+                ),
               ],
             ),
           ),
-          // Card details: certificates and experience
+          // Details
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -292,57 +401,89 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 const SizedBox(height: 8),
                 _requestRow(Icons.history_edu_outlined, 'الخبرة',
                     data['experience'] ?? '—'),
+                // Show rejection reason if rejected
+                if (status == 'rejected' &&
+                    (data['rejectionReason'] ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('سبب الرفض:',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(data['rejectionReason'],
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          // Approve and reject action buttons
-          Padding(
-            padding:
-            const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _approveRequest(data, docId),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
+          // Action buttons (only for pending)
+          if (status == 'pending')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () =>
+                          _approveRequest(data, docId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.check,
+                          color: Colors.white, size: 16),
+                      label: const Text('قبول',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 13)),
                     ),
-                    icon: const Icon(Icons.check,
-                        color: Colors.white, size: 16),
-                    label: const Text('قبول',
-                        style: TextStyle(
-                            color: Colors.white, fontSize: 13)),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _rejectRequest(docId),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFCC0000),
-                      side: const BorderSide(color: Color(0xFFCC0000)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _showRejectDialog(data, docId),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFCC0000),
+                        side: const BorderSide(
+                            color: Color(0xFFCC0000)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.close,
+                          color: Color(0xFFCC0000), size: 16),
+                      label: const Text('رفض',
+                          style: TextStyle(
+                              color: Color(0xFFCC0000),
+                              fontSize: 13)),
                     ),
-                    icon: const Icon(Icons.close,
-                        color: Color(0xFFCC0000), size: 16),
-                    label: const Text('رفض',
-                        style: TextStyle(
-                            color: Color(0xFFCC0000), fontSize: 13)),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  // Helper row widget for displaying request details
   Widget _requestRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,104 +507,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Approve Request ───────────────────────────────────────────
+  // ── Approve Request ──────────────────────────────────────────
   Future<void> _approveRequest(
       Map<String, dynamic> data, String docId) async {
-    final email    = data['email'] ?? '';
-    final fullName = data['fullName'] ?? '';
-
-    try {
-      String uid = '';
-
-      // Check if an account with this email already exists in Firestore
-      final existingAccount = await FirebaseFirestore.instance
-          .collection('accounts')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (existingAccount.docs.isNotEmpty) {
-        // Account exists - update role to specialist
-        uid = existingAccount.docs.first.id;
-        await FirebaseFirestore.instance
-            .collection('accounts')
-            .doc(uid)
-            .update({
-          'role': 'specialist',
-          'status': 'active',
-          'username': fullName,
-        });
-      } else {
-        // Account does not exist - create a new Firebase Auth account
-        final password =
-            'Bio${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}!';
-        final cred = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        uid = cred.user!.uid;
-        await FirebaseFirestore.instance
-            .collection('accounts')
-            .doc(uid)
-            .set({
-          'accountId': uid,
-          'role': 'specialist',
-          'status': 'active',
-          'email': email,
-          'username': fullName,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      // Save or update specialist profile in Firestore
-      await FirebaseFirestore.instance
-          .collection('specialists')
-          .doc(uid)
-          .set({
-        'specialistId': uid,
-        'accountId': uid,
-        'email': email,
-        'fullName': fullName,
-        'certificates': data['certificates'] ?? '',
-        'experience': data['experience'] ?? '',
-        'rating': 0.0,
-        'reviewCount': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Mark the request as approved
-      await FirebaseFirestore.instance
-          .collection('specialist_requests')
-          .doc(docId)
-          .update({'status': 'approved', 'specialistId': uid});
-
-      // Send password reset email so specialist can set their password
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'تم قبول $fullName ✓  |  تم إرسال رابط الدخول على إيميله'),
-          backgroundColor: const Color(0xFF16A34A),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // ── Reject Request ────────────────────────────────────────────
-  Future<void> _rejectRequest(String docId) async {
-    // Show confirmation dialog before rejecting
+    // Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -471,12 +518,39 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
-          title: const Text('تأكيد الرفض',
+          title: const Text('تأكيد القبول',
               style: TextStyle(
                   color: Color(0xFF14532D),
                   fontWeight: FontWeight.bold)),
-          content:
-          const Text('هل أنت متأكد من رفض هذا الطلب؟'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                  'هل تريد قبول طلب ${data['fullName'] ?? ''}؟'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.email_outlined,
+                      color: Color(0xFF16A34A), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتم إرسال رابط تعيين كلمة المرور إلى بريده الإلكتروني تلقائياً',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF166534)),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -486,10 +560,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFCC0000),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8))),
-              child: const Text('رفض',
+                backgroundColor: const Color(0xFF16A34A),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('قبول',
                   style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -499,27 +574,276 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     if (confirm != true) return;
 
-    // Update request status to rejected
-    await FirebaseFirestore.instance
-        .collection('specialist_requests')
-        .doc(docId)
-        .update({'status': 'rejected'});
+    // Show loading
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(
+              color: Color(0xFF16A34A)),
+        ),
+      );
+    }
+
+    final err = await AuthService().approveSpecialistRequest(
+      requestData: data,
+      requestDocId: docId,
+    );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم رفض الطلب'),
-        backgroundColor: Colors.orange,
+    Navigator.pop(context); // Close loading dialog
+
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('حدث خطأ: $err'),
+        backgroundColor: Colors.red,
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '✅ تم قبول ${data['fullName'] ?? ''} | تم إرسال رابط تعيين كلمة المرور إلى بريده'),
+          backgroundColor: const Color(0xFF16A34A),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  // ── Reject Dialog ────────────────────────────────────────────
+  void _showRejectDialog(Map<String, dynamic> data, String docId) {
+    final reasonController = TextEditingController();
+    String? reasonError;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Row(children: [
+              const Icon(Icons.cancel_outlined,
+                  color: Color(0xFFCC0000), size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'رفض طلب ${data['fullName'] ?? ''}',
+                  style: const TextStyle(
+                      color: Color(0xFF14532D),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
+                ),
+              ),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Applicant info
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                    Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: const Color(0xFFDCFCE7),
+                        child: Text(
+                          (data['fullName'] ?? 'خ')[0],
+                          style: const TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(data['fullName'] ?? '',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
+                            Text(data['email'] ?? '',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'سبب الرفض *',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF374151)),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 4,
+                  textDirection: TextDirection.rtl,
+                  onChanged: (v) {
+                    setDialogState(() {
+                      reasonError =
+                      v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText:
+                    'مثال: الشهادات المقدمة غير كافية، أو الخبرة غير مناسبة...',
+                    hintStyle: TextStyle(
+                        fontSize: 12, color: Colors.grey[400]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                          color: reasonError != null
+                              ? Colors.red
+                              : Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                          color: reasonError != null
+                              ? Colors.red
+                              : Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFCC0000), width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                    errorText: reasonError,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Row(children: [
+                    Icon(Icons.email_outlined,
+                        color: Colors.orange, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'سيتم إرسال سبب الرفض إلى بريد المتقدم تلقائياً',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    setDialogState(
+                            () => reasonError = 'سبب الرفض مطلوب');
+                    return;
+                  }
+
+                  Navigator.pop(ctx);
+
+                  // Show loading
+                  if (mounted) {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(
+                        child: CircularProgressIndicator(
+                            color: Color(0xFF16A34A)),
+                      ),
+                    );
+                  }
+
+                  final err =
+                  await AuthService().rejectSpecialistRequest(
+                    requestDocId: docId,
+                    expertEmail: data['email'] ?? '',
+                    expertName: data['fullName'] ?? '',
+                    rejectionReason: reason,
+                  );
+
+                  if (!mounted) return;
+                  Navigator.pop(context); // close loading
+
+                  if (err != null && err.contains('فشل إرسال')) {
+                    // Soft warning — Firestore updated but email failed
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(err),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  } else if (err != null) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(
+                      content: Text('حدث خطأ: $err'),
+                      backgroundColor: Colors.red,
+                    ));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '❌ تم رفض طلب ${data['fullName'] ?? ''} | '
+                              'تم إرسال سبب الرفض إلى بريده الإلكتروني',
+                        ),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFCC0000),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.close,
+                    color: Colors.white, size: 16),
+                label: const Text('رفض الطلب',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // ── Profile Tab ───────────────────────────────────────────────
+  // ── Profile Tab ──────────────────────────────────────────────
   Widget _buildProfileTab() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Profile avatar and name
           Container(
             width: double.infinity,
             color: Colors.white,
@@ -548,14 +872,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text('مدير النظام',
-                    style:
-                    TextStyle(fontSize: 13, color: Colors.grey)),
+                    style: TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),
           ),
           const SizedBox(height: 12),
-
-          // Personal information card
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -576,7 +897,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87)),
-                      // Edit button opens edit dialog
                       GestureDetector(
                         onTap: _showEditDialog,
                         child: const Row(
@@ -625,57 +945,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          // System information card
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  child: Text('معلومات النظام',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87)),
-                ),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                          child: _buildSystemInfoItem(
-                              label: 'آخر تحديث',
-                              value: '2024-11-18')),
-                      Expanded(
-                          child: _buildSystemInfoItem(
-                              label: 'إصدار التطبيق',
-                              value: '1.0.0')),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(
-                      right: 16, left: 16, bottom: 14),
-                  child: _buildSystemInfoItem(
-                      label: 'حالة النظام', value: 'نشط'),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 24),
-
-          // Logout button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
@@ -705,9 +975,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Edit Dialog - update name and email in Firestore and Auth ─
   void _showEditDialog() {
-    final nameController  = TextEditingController(text: _name);
+    final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
     bool saving = false;
 
@@ -779,14 +1048,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     : () async {
                   setDialogState(() => saving = true);
                   try {
-                    final uid = FirebaseAuth
-                        .instance.currentUser?.uid;
-                    final newName =
-                    nameController.text.trim();
+                    final uid =
+                        FirebaseAuth.instance.currentUser?.uid;
+                    final newName = nameController.text.trim();
                     final newEmail =
                     emailController.text.trim();
                     if (uid != null) {
-                      // Save name and email to admins collection
                       await FirebaseFirestore.instance
                           .collection('admins')
                           .doc(uid)
@@ -794,7 +1061,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         'username': newName,
                         'email': newEmail,
                       });
-                      // Save name and email to accounts collection
                       await FirebaseFirestore.instance
                           .collection('accounts')
                           .doc(uid)
@@ -802,7 +1068,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         'username': newName,
                         'email': newEmail,
                       });
-                      // Send email verification if email changed
                       if (newEmail != _email) {
                         await FirebaseAuth.instance.currentUser
                             ?.verifyBeforeUpdateEmail(newEmail);
@@ -810,28 +1075,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     }
                     if (!mounted) return;
                     setState(() {
-                      _name  = newName;
+                      _name = newName;
                       _email = newEmail;
                     });
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(newEmail != _email
-                            ? 'تم الحفظ ✓  |  تحقق من إيميلك الجديد'
-                            : 'تم حفظ التعديلات بنجاح ✓'),
-                        backgroundColor:
-                        const Color(0xFF16A34A),
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(const SnackBar(
+                      content:
+                      Text('تم حفظ التعديلات بنجاح ✓'),
+                      backgroundColor: Color(0xFF16A34A),
+                    ));
                   } catch (e) {
                     setDialogState(() => saving = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('حدث خطأ: \$e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -855,7 +1110,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // Helper widget for displaying a labeled info row
   Widget _buildInfoRow({
     required String label,
     required String value,
@@ -863,7 +1117,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     required Color iconColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Expanded(
@@ -883,23 +1138,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Icon(icon, color: iconColor, size: 22),
         ],
       ),
-    );
-  }
-
-  // Helper widget for displaying a system info item
-  Widget _buildSystemInfoItem(
-      {required String label, required String value}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style:
-            const TextStyle(fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 3),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 14, color: Colors.black87)),
-      ],
     );
   }
 }

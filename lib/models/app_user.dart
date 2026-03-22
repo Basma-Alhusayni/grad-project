@@ -9,6 +9,7 @@ class AppUser {
   final String username;
   final String? profileImage;
   final DateTime createdAt;
+  final bool isFirstLogin;
 
   AppUser({
     required this.uid,
@@ -19,6 +20,7 @@ class AppUser {
     required this.username,
     this.profileImage,
     required this.createdAt,
+    this.isFirstLogin = false,
   });
 
   factory AppUser.fromMap(Map<String, dynamic> map, String uid) {
@@ -30,7 +32,10 @@ class AppUser {
       email: map['email'] ?? '',
       username: map['username'] ?? '',
       profileImage: map['profileImage'],
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      createdAt: map['createdAt'] != null
+          ? (map['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      isFirstLogin: map['isFirstLogin'] ?? false,
     );
   }
 
@@ -42,5 +47,6 @@ class AppUser {
     'username': username,
     'profileImage': profileImage,
     'createdAt': Timestamp.fromDate(createdAt),
+    'isFirstLogin': isFirstLogin,
   };
 }

@@ -5,6 +5,8 @@ import 'login_screen.dart';
 import 'user_home_screen.dart';
 import 'expert_home_screen.dart';
 import 'admin_home_screen.dart';
+import 'first_login_screen.dart';
+import 'email_verification_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,32 +23,63 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 2));
-    final user = FirebaseAuth.instance.currentUser;
     if (!mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+
     if (user == null) {
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      _go(const LoginScreen());
       return;
     }
+
+    await user.reload();
+    final refreshed = FirebaseAuth.instance.currentUser!;
+
     final doc = await FirebaseFirestore.instance
         .collection('accounts')
-        .doc(user.uid)
+        .doc(refreshed.uid)
         .get();
+
+    if (!doc.exists) {
+      _go(const LoginScreen());
+      return;
+    }
+
     final role = doc.data()?['role'] ?? 'user';
+    final isFirstLogin = doc.data()?['isFirstLogin'] == true;
+
     if (!mounted) return;
+
+    // Specialist first login → force password change
+    if (role == 'specialist' && isFirstLogin) {
+      _go(const FirstLoginScreen());
+      return;
+    }
+
+    // User or admin not yet verified → go to verification screen
+    if ((role == 'user' || role == 'admin') &&
+        !refreshed.emailVerified) {
+      _go(EmailVerificationScreen(email: refreshed.email ?? ''));
+      return;
+    }
+
     switch (role) {
       case 'admin':
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const AdminHomeScreen()));
+        _go(const AdminHomeScreen());
         break;
       case 'specialist':
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const ExpertHomeScreen()));
+        _go(const ExpertHomeScreen());
         break;
       default:
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const UserHomeScreen()));
+        _go(const UserHomeScreen());
     }
+  }
+
+  void _go(Widget screen) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    );
   }
 
   @override
@@ -57,7 +90,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
             Container(
               width: 130,
               height: 130,
@@ -77,6 +109,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   child: Image.asset(
                     'assets/images/logo.png',
                     fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.eco,
+                        color: Color(0xFF16A34A),
+                        size: 64),
                   ),
                 ),
               ),
@@ -89,9 +125,11 @@ class _SplashScreenState extends State<SplashScreen> {
                     color: Color(0xFF14532D))),
             const SizedBox(height: 8),
             const Text('حماية نباتاتك بالذكاء الاصطناعي',
-                style: TextStyle(fontSize: 16, color: Color(0xFF16A34A))),
+                style: TextStyle(
+                    fontSize: 16, color: Color(0xFF16A34A))),
             const SizedBox(height: 48),
-            const CircularProgressIndicator(color: Color(0xFF16A34A)),
+            const CircularProgressIndicator(
+                color: Color(0xFF16A34A)),
           ],
         ),
       ),

@@ -23,9 +23,10 @@ class GreenButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF16A34A),
-          disabledBackgroundColor: const Color(0xFF16A34A).withOpacity(0.5),
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          disabledBackgroundColor:
+          const Color(0xFF16A34A).withOpacity(0.5),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
           elevation: 4,
         ),
         child: isLoading
