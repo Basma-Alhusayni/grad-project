@@ -15,6 +15,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   String _name = '';
   String _email = '';
   bool _loading = true;
+  String _searchQuery = '';
+  String _filterStatus = 'all';
 
   @override
   void initState() {
@@ -96,6 +98,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             : _currentIndex == 0
             ? _buildHomeTab()
             : _currentIndex == 1
+            ? _buildUsersTab()
+            : _currentIndex == 2
+            ? _buildSpecialistsTab()
+            : _currentIndex == 3
             ? _buildRequestsTab()
             : _buildProfileTab(),
         bottomNavigationBar: BottomNavigationBar(
@@ -113,6 +119,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: 'الرئيسية',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              label: 'المستخدمين',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              label: 'الخبراء',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_add_outlined),
@@ -230,6 +244,767 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // ── Users management Tab ────────────────────────────────────────────
+  Widget _buildUsersTab() {
+    return Column(
+      children: [
+
+        /// 🔍 Search
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'البحث عن مستخدم...',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() => _searchQuery = value.toLowerCase());
+            },
+          ),
+        ),
+
+        /// 🔢 الإحصائيات (نشط / معطل)
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('accounts').snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox();
+
+            final accounts = snapshot.data!.docs;
+
+            int active =
+                accounts.where((a) => a['status'] == 'active').length;
+
+            int disabled =
+                accounts.where((a) => a['status'] != 'active').length;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _filterStatus = 'active';
+                        });
+                      },
+                      child: _statBox("$active", "مستخدم نشط"),
+                    ),
+                  ),
+
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _filterStatus = 'disabled';
+                        });
+                      },
+                      child: _statBox("$disabled", "مستخدم معطل"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 10),
+
+        /// 👥 List
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final docs = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final name = (data['username'] ?? '').toString().toLowerCase();
+
+                if (!name.contains(_searchQuery)) return false;
+
+                // 🔥 فلترة بالحالة
+                if (_filterStatus == 'all') return true;
+
+                // بنجيب status من accounts
+                return true; // الفلترة الفعلية تصير تحت داخل FutureBuilder
+              }).toList();
+
+              if (docs.isEmpty) {
+                return const Center(child: Text('لا يوجد مستخدمين'));
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final data =
+                  docs[index].data() as Map<String, dynamic>;
+                  final uid = docs[index].id;
+
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('accounts')
+                        .doc(uid)
+                        .get(),
+                    builder: (context, accSnap) {
+
+                      if (!accSnap.hasData) {
+                        return const Center(
+                            child: CircularProgressIndicator());
+                      }
+
+                      final accData =
+                          accSnap.data!.data() as Map<String, dynamic>? ?? {};
+
+                      final status = accData['status'] ?? 'active';
+                      if (_filterStatus == 'active' && status != 'active') {
+                        return const SizedBox();
+                      }
+                      if (_filterStatus == 'disabled' && status == 'active') {
+                        return const SizedBox();
+                      }
+                      /// 🔥 معالجة التاريخ
+                      DateTime? createdAt =
+                      (accData['createdAt'] as Timestamp?)?.toDate();
+
+                      String formattedDate = createdAt != null
+                          ? "${createdAt.day}-${createdAt.month}-${createdAt.year}"
+                          : "";
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+
+                            /// 📄 Info (خليه أول شي)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+
+                                Align(
+                                alignment: Alignment.centerRight,
+                                child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: status == 'active'
+                                              ? Colors.green
+                                              : Colors.grey,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          status == 'active' ? 'نشط' : 'معطل',
+                                          style: const TextStyle(
+                                              color: Colors.white, fontSize: 11),
+                                        ),
+                                      ),
+
+                                      const SizedBox(width: 8),
+
+                                      Text(
+                                        data['username'] ?? '',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                  const SizedBox(height: 6),
+
+                                  Align(
+                                    alignment: Alignment.centerRight, // 👈 مهم
+                                    child: Text(
+                                      data['email'] ?? '',
+                                      style: const TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 4),
+
+                                  Align(
+                                    alignment: Alignment.centerRight, // 👈 مهم
+                                    child: Text(
+                                      "تاريخ الانضمام • $formattedDate",
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            /// 🔘 الثلاث نقاط (آخر شي)
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, color: Colors.grey),
+                              onSelected: (value) {
+                                if (value == 'view') {
+                                  _showUserDetails(data, status, formattedDate);
+                                } else if (value == 'edit') {
+                                  _editUser(uid, data);
+                                } else if (value == 'delete') {
+                                  _deleteUser(uid);
+                                } else if (value == 'toggle') {
+                                  _toggleStatus(uid, status);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'view',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.visibility, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('عرض التفاصيل'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('تعديل'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'toggle',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.block, size: 18),
+                                      SizedBox(width: 8),
+                                      Text(status == 'active' ? 'تعطيل الحساب' : 'تفعيل الحساب'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('حذف المستخدم', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                        );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+  Widget _statBox(String number, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Text(number,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+  void _showUserDetails(
+      Map<String, dynamic> data,
+      String status,
+      String createdAt,
+      ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+
+              /// عنوان
+              const Center(
+                child: Text(
+                  'تفاصيل المستخدم',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              _detailRow('الاسم', data['username']),
+              _detailRow('البريد الإلكتروني', data['email']),
+              _detailRow('تاريخ الانضمام', createdAt),
+              _detailRow('عدد التقارير', '12'), // تقدري تربطينه لاحقاً
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text('حالة الحساب'),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: status == 'active'
+                          ? Colors.green
+                          : Colors.grey,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      status == 'active' ? 'نشط' : 'معطل',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              /// زر إغلاق
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  Widget _detailRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(value ?? ''),
+          Text(title, style: const TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+  void _editUser(String uid, Map<String, dynamic> data) {
+    TextEditingController name =
+    TextEditingController(text: data['username']);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تعديل المستخدم'),
+        content: TextField(controller: name),
+        actions: [
+          TextButton(
+            child: const Text('حفظ'),
+            onPressed: () async {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .update({'username': name.text});
+              Navigator.pop(context);
+            },
+          )
+        ],
+      ),
+    );
+  }
+  void _toggleStatus(String uid, String status) async {
+    await FirebaseFirestore.instance
+        .collection('accounts')
+        .doc(uid)
+        .update({
+      'status': status == 'active' ? 'suspended' : 'active'
+    });
+  }
+  void _deleteUser(String uid) async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .delete();
+  }
+  // ── Specialists management Tab ────────────────────────────────────────────
+  Widget _buildSpecialistsTab() {
+    return Column(
+      children: [
+
+        /// 🔍 Search
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'البحث عن خبير...',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() => _searchQuery = value.toLowerCase());
+            },
+          ),
+        ),
+
+        /// 🔢 الإحصائيات
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('accounts').snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox();
+
+            final accounts = snapshot.data!.docs;
+
+            int active = accounts.where((a) => a['status'] == 'active').length;
+            int disabled = accounts.where((a) => a['status'] != 'active').length;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _filterStatus = 'active'),
+                      child: _statBox("$active", "خبير نشط"),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _filterStatus = 'disabled'),
+                      child: _statBox("$disabled", "خبير معطل"),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 10),
+
+        /// 👥 List
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('specialists').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final docs = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final name = (data['fullName'] ?? '').toString().toLowerCase();
+                return name.contains(_searchQuery);
+              }).toList();
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final uid = data['accountId'];
+
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('accounts')
+                        .doc(uid)
+                        .get(),
+                    builder: (context, accSnap) {
+
+                      if (!accSnap.hasData) return const SizedBox();
+
+                      final accData =
+                          accSnap.data!.data() as Map<String, dynamic>? ?? {};
+
+                      final status = accData['status'] ?? 'active';
+
+                      /// فلترة
+                      if (_filterStatus == 'active' && status != 'active') return const SizedBox();
+                      if (_filterStatus == 'disabled' && status == 'active') return const SizedBox();
+
+                      /// التاريخ
+                      DateTime? createdAt =
+                      (data['createdAt'] as Timestamp?)?.toDate();
+
+                      String formattedDate = createdAt != null
+                          ? "${createdAt.year}-${createdAt.month}-${createdAt.day}"
+                          : "";
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+
+                            const SizedBox(width: 10),
+
+                            /// 📄 Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+
+                                  /// الاسم + الحالة (يمين مضبوط)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: status == 'active'
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            status == 'active' ? 'نشط' : 'معطل',
+                                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                                          ),
+                                        ),
+
+                                        const SizedBox(width: 8),
+
+                                        Text(
+                                          data['fullName'] ?? '',
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 6),
+
+                                  /// الايميل
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      data['email'] ?? '',
+                                      style: const TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 4),
+
+                                  /// التاريخ
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      "تاريخ الانضمام • $formattedDate",
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 6),
+
+                                  /// التقييم
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      "⭐ ${data['rating']}   •   ${data['reviewCount']} مراجعة",
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            /// 🔘 الثلاث نقاط
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert),
+                              onSelected: (value) {
+                                if (value == 'view') {
+                                  _showSpecialistDetails(data, status, formattedDate);
+                                } else if (value == 'delete') {
+                                  _deleteUser(uid);
+                                } else if (value == 'toggle') {
+                                  _toggleStatus(uid, status);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'view',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.visibility),
+                                      SizedBox(width: 8),
+                                      Text('عرض التفاصيل'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'toggle',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.block),
+                                      const SizedBox(width: 8),
+                                      Text(status == 'active'
+                                          ? 'تعطيل الحساب'
+                                          : 'تفعيل الحساب'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('حذف', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+  void _showSpecialistDetails(
+      Map<String, dynamic> data,
+      String status,
+      String createdAt,
+      ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+
+              const Center(
+                child: Text(
+                  'تفاصيل الخبير',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              _detailRow('الاسم', data['fullName']),
+              _detailRow('البريد', data['email']),
+              _detailRow('تاريخ الانضمام', createdAt),
+              _detailRow('عدد الحالات', data['reviewCount'].toString()),
+              _detailRow('التقييم', data['rating'].toString()),
+              _detailRow('الخبرة', data['experience']),
+              _detailRow('الشهادات', data['certificates']),
+
+              const SizedBox(height: 10),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text('حالة الحساب'),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: status == 'active' ? Colors.green : Colors.grey,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      status == 'active' ? 'نشط' : 'معطل',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
   // ── Requests Tab ────────────────────────────────────────────
   Widget _buildRequestsTab() {
     return DefaultTabController(
