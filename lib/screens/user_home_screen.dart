@@ -1,9 +1,12 @@
+import 'package:bioshield/screens/user_reports_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
 import 'specialist_list_screen.dart';
+import 'user_reports_screen.dart';
+import 'user_camera_screen.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -17,7 +20,9 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   final List<Widget> _pages = const [
     _ReportsDashboard(),
     SpecialistListScreen(),
-    _CameraPlaceholder(),
+    //_CameraPlaceholder(),
+    UserCameraScreen(),
+    UserReportsScreen(), //Jumana
     _UserProfilePage(),
   ];
 
@@ -84,7 +89,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           _navItem(0, Icons.home_outlined, 'الرئيسية'),
           _navItem(1, Icons.chat_bubble_outline, 'الخبراء'),
           const SizedBox(width: 48),
-          _navItem(3, Icons.person_outline, 'ملفي'),
+          _navItem(3, Icons.description_outlined, 'تقاريري'),//Jumana
+          _navItem(4, Icons.person_outline, 'ملفي'),
         ],
       ),
     );

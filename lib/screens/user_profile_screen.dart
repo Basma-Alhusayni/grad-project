@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
-import 'user_reports_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -120,70 +119,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               const SizedBox(height: 24),
 
               // ── Stats banner ─────────────────
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(FirebaseAuth.instance.currentUser?.uid)
-                    .collection('reports')
-                    .snapshots(),
-                builder: (context, snap) {
-                  final docs    = snap.data?.docs ?? [];
-                  final total   = docs.length;
-                  final sick    = docs.where((d) =>
-                  (d.data() as Map)['status'] == 'مريض').length;
-                  final healthy = docs.where((d) =>
-                  (d.data() as Map)['status'] == 'سليم').length;
-                  return Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF16A34A), Color(0xFF14532D)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStat('$healthy', 'سليم'),
-                        _buildStat('$sick',    'مريض'),
-                        _buildStat('$total',   'إجمالي'),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
+
+              // Here i deleted
+
 
               // ── Menu items ───────────────────
-              _buildMenuItem(
-                icon: Icons.list_alt_rounded,
-                label: 'تقاريري',
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => Scaffold(
-                    backgroundColor: _green50,
-                    appBar: AppBar(
-                      backgroundColor: Colors.white,
-                      elevation: 1,
-                      centerTitle: true,
-                      leading: IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new,
-                            color: _green600),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      title: const Text('تقارير التشخيص',
-                          style: TextStyle(color: _green900,
-                              fontWeight: FontWeight.bold, fontSize: 18)),
-                    ),
-                    body: const Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: UserReportsScreen(),
-                    ),
-                  ),
-                )),
-              ),
+
+              //Here i deleted
 
               _buildMenuItem(
                 icon: Icons.people_alt_rounded,

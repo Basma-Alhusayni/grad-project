@@ -269,11 +269,11 @@ class _UserCameraScreenState extends State<UserCameraScreen> {
         elevation: 1,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: _green600),
+         icon: const Icon(Icons.arrow_back_ios_new, color: _green600),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('تشخيص النبات',
-            style: TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 18)),
+           style: TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 18)),
       ),
       body: Directionality(textDirection: TextDirection.rtl, child: _buildBody()),
     );
