@@ -176,7 +176,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           _imgPlaceholder(180))
                       : _imgPlaceholder(180),
                 ),
@@ -342,7 +342,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                       height: 150,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           _imgPlaceholder(150))
                       : _imgPlaceholder(150),
                 ),
@@ -490,7 +490,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                             ),
                             Switch(
                               value: _isAvailable,
-                              activeColor: const Color(0xFF16a34a),
+                              activeThumbColor: const Color(0xFF16a34a),
                               onChanged: (v) =>
                                   setState(() => _isAvailable = v),
                             ),
@@ -746,7 +746,7 @@ class _RequestList extends StatelessWidget {
                               height: 120,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   Container(
                                     height: 120,
                                     color: Colors.grey[200],
