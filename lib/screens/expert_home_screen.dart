@@ -115,7 +115,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               child: Image.asset(
                 'assets/images/logo.png',
                 height: 36,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                 const Icon(Icons.eco, color: Color(0xFF16A34A)),
               ),
             ),

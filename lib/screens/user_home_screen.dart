@@ -47,7 +47,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           leading: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Image.asset('assets/images/logo.png',
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                 const Icon(Icons.eco, color: Color(0xFF16A34A))),
           ),
           actions: [
@@ -651,7 +651,7 @@ class _UserProfilePageState extends State<_UserProfilePage> {
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (_, _, _) =>
                       _imgPlaceholder(60))
                   : _imgPlaceholder(60),
             ),
@@ -758,7 +758,7 @@ class _UserProfilePageState extends State<_UserProfilePage> {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           _imgPlaceholder(160))
                       : _imgPlaceholder(160),
                 ),
@@ -1074,7 +1074,7 @@ class _ReportCard extends StatelessWidget {
                         ? Image.network(imageUrl,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (_, _, _) =>
                             _imgPlaceholder())
                         : _imgPlaceholder(),
                   ),
@@ -1179,7 +1179,7 @@ class _ReportCard extends StatelessWidget {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           _imgPlaceholder())
                       : _imgPlaceholder(),
                 ),

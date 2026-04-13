@@ -249,7 +249,7 @@ class _EmailVerificationScreenState
                       : const Icon(Icons.refresh, color: _green600),
                   label: Text(
                     _cooldown > 0
-                        ? 'إعادة الإرسال (${_cooldown}ث)'
+                        ? 'إعادة الإرسال ($_cooldownث)'
                         : 'إعادة إرسال رابط التحقق',
                     style: const TextStyle(
                         color: _green600, fontSize: 14),

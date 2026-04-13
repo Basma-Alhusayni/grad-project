@@ -148,7 +148,7 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         _imgPlaceholder(180),
                   )
                       : _imgPlaceholder(180),
@@ -601,7 +601,7 @@ class _RequestCard extends StatelessWidget {
                     height: 140,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 140,
                       color: Colors.grey[200],
                       child: const Icon(Icons.image,
