@@ -265,54 +265,13 @@ class _UserProfilePageState extends State<_UserProfilePage> {
             const SizedBox(height: 14),
 
             // ── الإحصائيات ───────────────────────────
-            Row(
-              children: [
-                _statBox('$shared', 'مشاركة', Colors.orange),
-                const SizedBox(width: 8),
-                _statBox('$healthy', 'نباتات سليمة', Colors.green),
-                const SizedBox(width: 8),
-                _statBox('$avgConf%', 'متوسط الدقة', Colors.blue),
-                const SizedBox(width: 8),
-                _statBox('$total', 'إجمالي التقارير', Colors.purple),
-              ],
-            ),
 
-            const SizedBox(height: 16),
 
             // ── تابات الفلترة ─────────────────────────
-            const Text('تقاريري',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF166534))),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _tabChip(0, 'الكل ($total)'),
-                const SizedBox(width: 8),
-                _tabChip(1, 'صحية ($healthy)'),
-                const SizedBox(width: 8),
-                _tabChip(2, 'مريضة ($diseased)'),
-              ],
-            ),
-            const SizedBox(height: 12),
+
 
             // ── قائمة التقارير ────────────────────────
-            if (snapshot.connectionState == ConnectionState.waiting)
-              const Center(child: CircularProgressIndicator())
-            else if (filtered.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('لا توجد تقارير',
-                      style: TextStyle(
-                          color: Colors.grey[500], fontSize: 14)),
-                ),
-              )
-            else
-              ...filtered.map((r) => _reportListItem(r, context)),
 
-            const SizedBox(height: 16),
 
             // ── أزرار ────────────────────────────────
             OutlinedButton.icon(
