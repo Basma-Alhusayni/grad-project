@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chat_with_user_screen.dart';
+import 'expert_chat_screen.dart';
 
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
@@ -38,12 +38,11 @@ class _RequestsScreenState extends State<RequestsScreen>
       'status': 'accepted',
     });
 
-    // إنشاء محادثة جديدة
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    await _db.collection('chats').add({
+    final chatRef = await _db.collection('chats').add({
       'userId': request['userId'] ?? '',
       'userName': request['userName'] ?? '',
       'lastMessage': 'تم قبول طلبك',
@@ -76,6 +75,11 @@ class _RequestsScreenState extends State<RequestsScreen>
       ],
     });
 
+    // حفظ chatId في الطلب
+    await _db.collection('requests').doc(request['id']).update({
+      'chatId': chatRef.id,
+    });
+
     if (mounted) {
       setState(() => _selectedRequest = null);
       _showSnack('تم قبول الطلب وإنشاء محادثة مع المستخدم');
@@ -84,8 +88,8 @@ class _RequestsScreenState extends State<RequestsScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ChatWithUserScreen(
-              chatId: request['id'],
+            builder: (_) => ExpertChatScreen(
+              chatId: chatRef.id,
               userName: request['userName'] ?? '',
               isOnline: false,
             ),
@@ -105,7 +109,7 @@ class _RequestsScreenState extends State<RequestsScreen>
 
     _rejectReasonController.clear();
     if (mounted) {
-      Navigator.of(context).pop(); // close reject dialog
+      Navigator.of(context).pop();
       setState(() {
         _selectedRequest = null;
         _requestToReject = null;
@@ -137,7 +141,6 @@ class _RequestsScreenState extends State<RequestsScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // معلومات المستخدم
                 Row(
                   children: [
                     CircleAvatar(
@@ -161,14 +164,13 @@ class _RequestsScreenState extends State<RequestsScreen>
                                 fontSize: 15)),
                         Text(request['date'] ?? '',
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey[500])),
+                                fontSize: 12,
+                                color: Colors.grey[500])),
                       ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-
-                // صورة النبات
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: (request['plantImage'] ?? '').isNotEmpty
@@ -176,28 +178,22 @@ class _RequestsScreenState extends State<RequestsScreen>
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
+                      errorBuilder: (_, __, ___) =>
                           _imgPlaceholder(180))
                       : _imgPlaceholder(180),
                 ),
                 const SizedBox(height: 12),
-
-                // الوصف
                 const Text('الوصف:',
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey)),
+                    style: TextStyle(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 4),
                 Text(request['description'] ?? '',
                     style: const TextStyle(fontSize: 14)),
                 const SizedBox(height: 12),
-
-                // تحليل AI
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFBEB),
-                    border:
-                    Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(
@@ -220,14 +216,11 @@ class _RequestsScreenState extends State<RequestsScreen>
                           child: Text(
                               '⚠️ دقة منخفضة - يحتاج مراجعة خبير',
                               style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.orange)),
+                                  fontSize: 12, color: Colors.orange)),
                         ),
                     ],
                   ),
                 ),
-
-                // سبب الرفض إن وجد
                 if (request['status'] == 'rejected' &&
                     (request['rejectionReason'] ?? '').isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -342,7 +335,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                       height: 150,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
+                      errorBuilder: (_, __, ___) =>
                           _imgPlaceholder(150))
                       : _imgPlaceholder(150),
                 ),
@@ -354,8 +347,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFBEB),
-                    border:
-                    Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -375,8 +367,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                         const Text(
                             '⚠️ دقة منخفضة - يحتاج مراجعة خبير',
                             style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.orange)),
+                                fontSize: 11, color: Colors.orange)),
                     ],
                   ),
                 ),
@@ -402,8 +393,7 @@ class _RequestsScreenState extends State<RequestsScreen>
           ),
           actions: [
             TextButton.icon(
-              style:
-              TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               icon: const Icon(Icons.close, size: 16),
               label: const Text('إلغاء'),
               onPressed: () => Navigator.of(context).pop(),
@@ -421,7 +411,6 @@ class _RequestsScreenState extends State<RequestsScreen>
     );
   }
 
-  // ── Build ───────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -451,19 +440,16 @@ class _RequestsScreenState extends State<RequestsScreen>
 
             return Column(
               children: [
-                // ── التوفر والإحصائيات ──────────────────────
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Column(
                     children: [
-                      // سويتش التوفر
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          border: Border.all(
-                              color: Colors.grey[200]!),
+                          border: Border.all(color: Colors.grey[200]!),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -490,7 +476,7 @@ class _RequestsScreenState extends State<RequestsScreen>
                             ),
                             Switch(
                               value: _isAvailable,
-                              activeThumbColor: const Color(0xFF16a34a),
+                              activeColor: const Color(0xFF16a34a),
                               onChanged: (v) =>
                                   setState(() => _isAvailable = v),
                             ),
@@ -498,28 +484,21 @@ class _RequestsScreenState extends State<RequestsScreen>
                         ),
                       ),
                       const SizedBox(height: 10),
-
-                      // إحصائيات
                       Row(
                         children: [
+                          _StatCard('${pending.length}',
+                              'قيد المراجعة', Colors.orange),
+                          const SizedBox(width: 8),
                           _StatCard(
-                              '${pending.length}',
-                              'قيد المراجعة',
-                              Colors.orange),
+                              '${accepted.length}', 'مقبولة', Colors.green),
                           const SizedBox(width: 8),
-                          _StatCard('${accepted.length}', 'مقبولة',
-                              Colors.green),
-                          const SizedBox(width: 8),
-                          _StatCard('${rejected.length}', 'مرفوضة',
-                              Colors.grey),
+                          _StatCard(
+                              '${rejected.length}', 'مرفوضة', Colors.grey),
                         ],
                       ),
                       const SizedBox(height: 10),
-
-                      // عنوان + badge
                       Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('طلبات الاستشارة',
                               style: TextStyle(
@@ -532,21 +511,17 @@ class _RequestsScreenState extends State<RequestsScreen>
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.orange,
-                                borderRadius:
-                                BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${pending.length} جديد',
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11),
+                                    color: Colors.white, fontSize: 11),
                               ),
                             ),
                         ],
                       ),
                       const SizedBox(height: 8),
-
-                      // تابز
                       TabBar(
                         controller: _tabController,
                         labelColor: const Color(0xFF16a34a),
@@ -562,8 +537,6 @@ class _RequestsScreenState extends State<RequestsScreen>
                     ],
                   ),
                 ),
-
-                // ── قائمة الطلبات ─────────────────────────────
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -597,8 +570,7 @@ class _RequestsScreenState extends State<RequestsScreen>
     height: h,
     width: double.infinity,
     color: Colors.grey[200],
-    child:
-    const Icon(Icons.image, size: 40, color: Colors.grey),
+    child: const Icon(Icons.image, size: 40, color: Colors.grey),
   );
 }
 
@@ -628,8 +600,8 @@ class _StatCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: color.shade700)),
             Text(label,
-                style: TextStyle(
-                    fontSize: 11, color: color.shade600)),
+                style:
+                TextStyle(fontSize: 11, color: color.shade600)),
           ],
         ),
       ),
@@ -717,8 +689,7 @@ class _RequestList extends StatelessWidget {
                                 color: confidence < 50
                                     ? const Color(0xFFFEE2E2)
                                     : const Color(0xFFFEF9C3),
-                                borderRadius:
-                                BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '$confidence% دقة AI',
@@ -733,11 +704,8 @@ class _RequestList extends StatelessWidget {
                         ),
                         Text(req['date'] ?? '',
                             style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500])),
+                                fontSize: 11, color: Colors.grey[500])),
                         const SizedBox(height: 6),
-
-                        // صورة النبات
                         if ((req['plantImage'] ?? '').isNotEmpty)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
@@ -746,31 +714,25 @@ class _RequestList extends StatelessWidget {
                               height: 120,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
-                                  Container(
-                                    height: 120,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.image,
-                                        color: Colors.grey),
-                                  ),
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 120,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image,
+                                    color: Colors.grey),
+                              ),
                             ),
                           ),
                         const SizedBox(height: 6),
-
                         Text(req['description'] ?? '',
-                            style: const TextStyle(
-                                fontSize: 13),
+                            style: const TextStyle(fontSize: 13),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
                         Text(
                           'تشخيص AI: ${req['aiDiagnosis'] ?? ''}',
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.amber),
+                              fontSize: 11, color: Colors.amber),
                         ),
-
-                        // أزرار القبول والرفض
                         if (req['status'] == 'pending' &&
                             onAccept != null &&
                             onReject != null) ...[
@@ -783,15 +745,13 @@ class _RequestList extends StatelessWidget {
                                     foregroundColor: Colors.red,
                                     side: const BorderSide(
                                         color: Colors.red),
-                                    padding:
-                                    const EdgeInsets.symmetric(
+                                    padding: const EdgeInsets.symmetric(
                                         vertical: 6),
                                   ),
                                   icon: const Icon(Icons.close,
                                       size: 14),
                                   label: const Text('رفض',
-                                      style:
-                                      TextStyle(fontSize: 13)),
+                                      style: TextStyle(fontSize: 13)),
                                   onPressed: () => onReject!(req),
                                 ),
                               ),
@@ -801,16 +761,14 @@ class _RequestList extends StatelessWidget {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
                                     const Color(0xFF16a34a),
-                                    padding:
-                                    const EdgeInsets.symmetric(
+                                    padding: const EdgeInsets.symmetric(
                                         vertical: 6),
                                     elevation: 0,
                                   ),
                                   icon: const Icon(Icons.check,
                                       size: 14),
                                   label: const Text('قبول',
-                                      style:
-                                      TextStyle(fontSize: 13)),
+                                      style: TextStyle(fontSize: 13)),
                                   onPressed: () => onAccept!(req),
                                 ),
                               ),

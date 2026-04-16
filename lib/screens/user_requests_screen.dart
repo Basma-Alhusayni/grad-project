@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'chat_with_user_screen.dart';
 
 class UserRequestsScreen extends StatefulWidget {
   const UserRequestsScreen({super.key});
@@ -12,7 +13,6 @@ class UserRequestsScreen extends StatefulWidget {
 class _UserRequestsScreenState extends State<UserRequestsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  Map<String, dynamic>? _selectedRequest;
   final _db = FirebaseFirestore.instance;
   final _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -28,24 +28,17 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
     super.dispose();
   }
 
-  // ── فلترة الطلبات ──────────────────────────────────────────
   List<Map<String, dynamic>> _filter(
       List<Map<String, dynamic>> all, int tabIndex) {
     switch (tabIndex) {
-      case 0:
-        return all;
-      case 1:
-        return all.where((r) => r['status'] == 'pending').toList();
-      case 2:
-        return all.where((r) => r['status'] == 'accepted').toList();
-      case 3:
-        return all.where((r) => r['status'] == 'rejected').toList();
-      default:
-        return all;
+      case 0: return all;
+      case 1: return all.where((r) => r['status'] == 'pending').toList();
+      case 2: return all.where((r) => r['status'] == 'accepted').toList();
+      case 3: return all.where((r) => r['status'] == 'rejected').toList();
+      default: return all;
     }
   }
 
-  // ── badge الحالة ────────────────────────────────────────────
   Widget _statusBadge(String status) {
     switch (status) {
       case 'pending':
@@ -62,11 +55,9 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
     }
   }
 
-  Widget _badge(
-      IconData icon, String label, MaterialColor color, Color bg) {
+  Widget _badge(IconData icon, String label, MaterialColor color, Color bg) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         border: Border.all(color: color.shade300),
@@ -78,270 +69,39 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
           Icon(icon, size: 12, color: color.shade700),
           const SizedBox(width: 4),
           Text(label,
-              style: TextStyle(
-                  fontSize: 11, color: color.shade700)),
+              style: TextStyle(fontSize: 11, color: color.shade700)),
         ],
       ),
     );
   }
 
-  // ── ديالوج التفاصيل ────────────────────────────────────────
-  void _showDetails(Map<String, dynamic> request) {
-    setState(() => _selectedRequest = request);
-    final status = request['status'] ?? '';
-
-    showDialog(
-      context: context,
-      builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تفاصيل الطلب'),
-          contentPadding: const EdgeInsets.all(16),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // معلومات الخبير
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: const Color(0xFFdcfce7),
-                      child: Text(
-                        (request['specialistName'] as String? ?? 'خ')
-                            .isNotEmpty
-                            ? request['specialistName'][0]
-                            : 'خ',
-                        style: const TextStyle(
-                            color: Color(0xFF15803d), fontSize: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                              request['specialistName'] ?? 'خبير',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15)),
-                          Text(request['date'] ?? '',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500])),
-                        ],
-                      ),
-                    ),
-                    _statusBadge(status),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // صورة النبات
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: (request['plantImage'] ?? '').isNotEmpty
-                      ? Image.network(
-                    request['plantImage'],
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        _imgPlaceholder(180),
-                  )
-                      : _imgPlaceholder(180),
-                ),
-                const SizedBox(height: 12),
-
-                // وصف المشكلة
-                const Text('وصف المشكلة:',
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(request['description'] ?? '',
-                      style: const TextStyle(fontSize: 13)),
-                ),
-                const SizedBox(height: 12),
-
-                // تحليل AI
-                if ((request['aiDiagnosis'] ?? '').isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      border: Border.all(
-                          color: const Color(0xFFFDE68A)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('تحليل الذكاء الاصطناعي:',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13)),
-                        const SizedBox(height: 6),
-                        Text(
-                            'التشخيص: ${request['aiDiagnosis']}',
-                            style:
-                            const TextStyle(fontSize: 13)),
-                        if (request['aiConfidence'] != null)
-                          Text(
-                              'مستوى الثقة: ${request['aiConfidence']}%',
-                              style:
-                              const TextStyle(fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // كارد الحالة
-                _statusCard(status, request['rejectionReason']),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _statusCard(String status, String? rejectionReason) {
-    if (status == 'pending') {
-      return _infoCard(
-        icon: Icons.access_time,
-        title: 'طلبك قيد المراجعة',
-        body: 'الخبير يقوم بمراجعة طلبك حالياً. سيتم إشعارك بالقرار قريباً.',
-        color: Colors.orange,
-        bg: const Color(0xFFFFF7ED),
-      );
-    } else if (status == 'accepted') {
-      return _infoCard(
-        icon: Icons.check_circle_outline,
-        title: 'تم قبول طلبك! 🎉',
-        body: 'يمكنك الآن التواصل مع الخبير من صفحة المحادثات للحصول على الاستشارة الكاملة.',
-        color: Colors.green,
-        bg: const Color(0xFFF0FDF4),
-      );
-    } else if (status == 'rejected') {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF2F2),
-          border: Border.all(color: Colors.red.shade200),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.cancel_outlined,
-                    color: Colors.red.shade600, size: 18),
-                const SizedBox(width: 6),
-                Text('تم رفض الطلب',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.red.shade800)),
-              ],
-            ),
-            if ((rejectionReason ?? '').isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('سبب الرفض:',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.red.shade700)),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(rejectionReason!,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.red.shade600)),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Text(
-              'يمكنك محاولة إرسال طلب جديد مع معلومات أكثر وضوحاً.',
-              style: TextStyle(
-                  fontSize: 11, color: Colors.red.shade700),
-            ),
-          ],
+  // ── فتح الشات ──────────────────────────────────────────────
+  void _openChat(Map<String, dynamic> request) {
+    final chatId = request['chatId'] ?? '';
+    if (chatId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لم يتم إنشاء المحادثة بعد',
+              textDirection: TextDirection.rtl),
+          backgroundColor: Colors.orange,
         ),
       );
+      return;
     }
-    return const SizedBox();
-  }
-
-  Widget _infoCard({
-    required IconData icon,
-    required String title,
-    required String body,
-    required MaterialColor color,
-    required Color bg,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border.all(color: color.shade200),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color.shade600, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: color.shade800)),
-                const SizedBox(height: 4),
-                Text(body,
-                    style: TextStyle(
-                        fontSize: 12, color: color.shade700)),
-              ],
-            ),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatWithUserScreen(
+          chatId: chatId,
+          expertName: request['specialistName'] ?? '',
+          expertRating:
+          (request['expertRating'] ?? 0).toDouble(),
+          isOnline: false,
+        ),
       ),
     );
   }
 
-  Widget _imgPlaceholder(double h) => Container(
-    height: h,
-    width: double.infinity,
-    color: Colors.grey[200],
-    child:
-    const Icon(Icons.image, size: 40, color: Colors.grey),
-  );
-
-  // ── Build ───────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -375,10 +135,10 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── الهيدر والإحصائيات ──────────────────────
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding:
+                  const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -393,23 +153,19 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                           style: TextStyle(
                               fontSize: 13, color: Colors.grey)),
                       const SizedBox(height: 12),
-
-                      // إحصائيات
                       Row(
                         children: [
                           _statBox('$pending', 'قيد المراجعة',
                               Colors.orange),
                           const SizedBox(width: 10),
-                          _statBox('$accepted', 'مقبولة',
-                              Colors.green),
+                          _statBox(
+                              '$accepted', 'مقبولة', Colors.green),
                           const SizedBox(width: 10),
-                          _statBox('$rejected', 'مرفوضة',
-                              Colors.red),
+                          _statBox(
+                              '$rejected', 'مرفوضة', Colors.red),
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // تابز
                       TabBar(
                         controller: _tabController,
                         labelColor: const Color(0xFF16a34a),
@@ -427,8 +183,6 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                     ],
                   ),
                 ),
-
-                // ── قائمة الطلبات ─────────────────────────────
                 Expanded(
                   child: snapshot.connectionState ==
                       ConnectionState.waiting
@@ -438,8 +192,7 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                     animation: _tabController,
                     builder: (context, _) {
                       final filtered = _filter(
-                          allRequests,
-                          _tabController.index);
+                          allRequests, _tabController.index);
                       if (filtered.isEmpty) {
                         return _emptyState(
                             _tabController.index);
@@ -448,13 +201,15 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
                         padding: const EdgeInsets.all(16),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
+                          final req = filtered[index];
                           return _RequestCard(
-                            request: filtered[index],
-                            onTap: () => _showDetails(
-                                filtered[index]),
+                            request: req,
                             statusBadge: _statusBadge(
-                                filtered[index]['status'] ??
-                                    ''),
+                                req['status'] ?? ''),
+                            onOpenChat: req['status'] ==
+                                'accepted'
+                                ? () => _openChat(req)
+                                : null,
                           );
                         },
                       );
@@ -469,7 +224,8 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
     );
   }
 
-  Widget _statBox(String value, String label, MaterialColor color) {
+  Widget _statBox(
+      String value, String label, MaterialColor color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -508,8 +264,8 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
           Icon(Icons.info_outline, size: 52, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(labels[tabIndex],
-              style:
-              const TextStyle(color: Colors.grey, fontSize: 15)),
+              style: const TextStyle(
+                  color: Colors.grey, fontSize: 15)),
           const SizedBox(height: 6),
           const Text('يمكنك إرسال طلب استشارة من قائمة الخبراء',
               style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -522,176 +278,198 @@ class _UserRequestsScreenState extends State<UserRequestsScreen>
 // ─── بطاقة الطلب ─────────────────────────────────────────────
 class _RequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
-  final VoidCallback onTap;
   final Widget statusBadge;
+  final VoidCallback? onOpenChat;
 
   const _RequestCard({
     required this.request,
-    required this.onTap,
     required this.statusBadge,
+    this.onOpenChat,
   });
 
   @override
   Widget build(BuildContext context) {
     final status = request['status'] ?? '';
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFbbf7d0)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // هيدر
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFFdcfce7),
-                    child: Text(
-                      (request['specialistName'] as String? ?? 'خ')
-                          .isNotEmpty
-                          ? request['specialistName'][0]
-                          : 'خ',
-                      style: const TextStyle(
-                          color: Color(0xFF15803d), fontSize: 15),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            request['specialistName'] ?? 'خبير',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        Text(request['date'] ?? '',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500])),
-                      ],
-                    ),
-                  ),
-                  statusBadge,
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // صورة
-              if ((request['plantImage'] ?? '').isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    request['plantImage'],
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      height: 140,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image,
-                          color: Colors.grey),
-                    ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFbbf7d0)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // هيدر
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFFdcfce7),
+                  child: Text(
+                    (request['specialistName'] as String? ?? 'خ')
+                        .isNotEmpty
+                        ? request['specialistName'][0]
+                        : 'خ',
+                    style: const TextStyle(
+                        color: Color(0xFF15803d), fontSize: 15),
                   ),
                 ),
-              const SizedBox(height: 8),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(request['specialistName'] ?? 'خبير',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                      Text(request['date'] ?? '',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500])),
+                    ],
+                  ),
+                ),
+                statusBadge,
+              ],
+            ),
+            const SizedBox(height: 10),
 
-              // الوصف
-              Text(request['description'] ?? '',
+            // الوصف
+            if ((request['description'] ?? '').isNotEmpty)
+              Text(request['description'],
                   style: const TextStyle(fontSize: 13),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
 
-              // تشخيص AI
-              if ((request['aiDiagnosis'] ?? '').isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(6),
+            // حالة الطلب
+            const SizedBox(height: 10),
+            if (status == 'pending')
+              _statusInfo(
+                icon: Icons.access_time,
+                title: 'طلبك قيد المراجعة',
+                body: 'الخبير سيراجع طلبك ورسائلك قريباً',
+                color: Colors.orange,
+                bg: const Color(0xFFFFF7ED),
+              )
+            else if (status == 'accepted') ...[
+              _statusInfo(
+                icon: Icons.check_circle_outline,
+                title: 'تم قبول طلبك! 🎉',
+                body: 'يمكنك الآن متابعة المحادثة مع الخبير',
+                color: Colors.green,
+                bg: const Color(0xFFF0FDF4),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    elevation: 0,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline,
-                          size: 14, color: Colors.amber),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'تشخيص AI: ${request['aiDiagnosis']}',
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.amber),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  icon: const Icon(Icons.chat_bubble_outline,
+                      size: 18),
+                  label: const Text('فتح المحادثة',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold)),
+                  onPressed: onOpenChat,
+                ),
+              ),
+            ] else if (status == 'rejected') ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  border: Border.all(
+                      color: Colors.red.shade200),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.cancel_outlined,
+                            color: Colors.red.shade600, size: 16),
+                        const SizedBox(width: 6),
+                        Text('تم رفض الطلب',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.red.shade800)),
+                      ],
+                    ),
+                    if ((request['rejectionReason'] ?? '')
+                        .isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'سبب الرفض: ${request['rejectionReason']}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade700),
                       ),
                     ],
-                  ),
+                  ],
                 ),
-              ],
-
-              // سبب الرفض
-              if (status == 'rejected' &&
-                  (request['rejectionReason'] ?? '').isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
-                    border: Border.all(
-                        color: const Color(0xFFFCA5A5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('سبب الرفض:',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.red)),
-                      Text(request['rejectionReason'],
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-
-              // رسالة القبول
-              if (status == 'accepted') ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    border: Border.all(
-                        color: const Color(0xFF86efac)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '✓ تم قبول طلبك! يمكنك التواصل مع الخبير من صفحة المحادثات',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFF16a34a)),
-                  ),
-                ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _statusInfo({
+    required IconData icon,
+    required String title,
+    required String body,
+    required MaterialColor color,
+    required Color bg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: color.shade200),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color.shade600, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: color.shade800)),
+                const SizedBox(height: 2),
+                Text(body,
+                    style: TextStyle(
+                        fontSize: 11, color: color.shade700)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
