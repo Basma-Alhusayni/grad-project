@@ -7,6 +7,7 @@ import 'splash_screen.dart';
 import 'specialist_list_screen.dart';
 import 'user_reports_screen.dart';
 import 'user_camera_screen.dart';
+import 'package:bioshield/services/image_upload_service.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -589,7 +590,9 @@ class _UserProfilePageState extends State<_UserProfilePage> {
   Widget _reportListItem(
       Map<String, dynamic> r, BuildContext context) {
     final isHealthy = r['status'] == 'healthy';
-    final imageUrl = r['plantImage'] ?? '';
+    //final imageUrl = r['plantImage'] ?? '';
+    final imageUrl = r['imageUrl'] ?? '';//Jumana
+
     return GestureDetector(
       onTap: () => _showReportDetails(context, r),
       child: Container(
@@ -712,8 +715,14 @@ class _UserProfilePageState extends State<_UserProfilePage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: (r['plantImage'] ?? '').isNotEmpty
-                      ? Image.network(r['plantImage'],
+                  child:
+
+                  //(r['plantImage'] ?? '').isNotEmpty
+                      //? Image.network(r['plantImage'],
+
+                  (r['imageUrl'] ?? '').isNotEmpty
+                      ? Image.network(r['imageUrl'],//Jumana
+
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
@@ -809,6 +818,7 @@ class _UserProfilePageState extends State<_UserProfilePage> {
 class _ReportsDashboard extends StatefulWidget {
   const _ReportsDashboard();
 
+
   @override
   State<_ReportsDashboard> createState() => _ReportsDashboardState();
 }
@@ -817,6 +827,26 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
   final _db = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _username = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsername();
+  }
+
+  Future<void> _fetchUsername() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (!mounted) return;
+    setState(() {
+      _username = doc.data()?['username'] ?? 'مستخدم';
+    });
+  }
 
   @override
   void dispose() {
@@ -827,9 +857,9 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _db
-          .collection('reports')
-          .where('isShared', isEqualTo: true)
+      stream: FirebaseFirestore.instance
+          .collection('community_feed')
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         final allReports = snapshot.data?.docs
@@ -858,7 +888,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('لوحة التقارير',
+            /*const Text('لوحة التقارير',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 22,
@@ -870,6 +900,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey)),
             const SizedBox(height: 16),
+
             Row(
               children: [
                 _StatCard(total.toString(), 'تقرير',
@@ -885,6 +916,43 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
                     Icons.emoji_events, Colors.purple),
               ],
             ),
+             */
+
+            // ── Greeting banner ───────────────
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF14532D), Color(0xFF16A34A)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(children: [
+                Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(' مرحبا,ً$_username 👋',
+                          style: const TextStyle(color: Colors.white,
+                              fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      const Text('',
+                          style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    ])),
+                Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.eco_rounded,
+                      color: Colors.white, size: 28),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 20),
+
+
             const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
@@ -1004,7 +1072,8 @@ class _ReportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHealthy = report['status'] == 'healthy';
-    final imageUrl = report['plantImage'] ?? '';
+    //final imageUrl = report['plantImage'] ?? '';
+    final imageUrl = report['imageUrl'] ?? ''; //Jumana
 
     return GestureDetector(
       onTap: () => _showDetails(context),
@@ -1133,8 +1202,14 @@ class _ReportCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: (report['plantImage'] ?? '').isNotEmpty
-                      ? Image.network(report['plantImage'],
+                  child:
+
+                  //(report['plantImage'] ?? '').isNotEmpty
+                      //? Image.network(report['plantImage'],
+
+                  (report['imageUrl'] ?? '').isNotEmpty
+                      ? Image.network(report['imageUrl'],//Jumana
+
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,

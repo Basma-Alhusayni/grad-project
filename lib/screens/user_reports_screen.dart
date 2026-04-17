@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:pdf/widgets.dart' as pw;
+import '../services/image_upload_service.dart';
 
 class UserReportsScreen extends StatefulWidget {
   const UserReportsScreen({super.key});
@@ -90,6 +91,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             'plantType':  data['plantType'] ?? '',
             'icon':       _iconForPlant(data['plantType'] ?? ''),
             'feedDocId':  data['feedDocId'] ?? '',
+            'imageUrl':  data['imageUrl'] ?? '',//Jumana
           };
         }).toList();
 
@@ -108,6 +110,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             .length;
 
         return Column(children: [
+
 
           // ── 4 Stat Cards ────────────────────
           Padding(
@@ -222,6 +225,11 @@ class _ReportCard extends StatelessWidget {
     final sc = isHealthy ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
     final sb = isHealthy ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
     final isShared = (report['feedDocId'] as String).isNotEmpty;
+    final imageUrl = report['imageUrl'] ?? '';//Jumana
+        report['image'] ??
+        report['plantImage'] ??
+            report['ImageUrl']??
+        '';
 
     return GestureDetector(
       onTap: () => Navigator.push(context,
@@ -238,11 +246,27 @@ class _ReportCard extends StatelessWidget {
           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))],
         ),
         child: Row(children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(color: sb, shape: BoxShape.circle),
-            child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26))),
-          ),
+          //Jumana
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+              imageUrl,
+              width: 52,
+              height: 52,
+              fit: BoxFit.cover,
+            )
+                : Container(
+              width: 52,
+              height: 52,
+              color: sb,
+              child: Center(
+                child: Text(report['icon'],
+                    style: const TextStyle(fontSize: 26)),
+              ),
+            ),
+          ),//Jumana
+
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(report['plantName'],
@@ -364,6 +388,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         final ref = await FirebaseFirestore.instance
             .collection('community_feed').add({
           'plantName':  widget.report['plantName'],
+          'ImageUrl':  widget.report['imageUrl'],//Jumana
           'diagnosis':  widget.report['disease'],
           'treatment':  widget.report['treatment'],
           'isHealthy':  _isHealthy,
@@ -506,6 +531,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = widget.report['imageUrl'] ?? '';//Jumana
+
     return Scaffold(
       backgroundColor: _green50,
       appBar: AppBar(
@@ -523,8 +550,24 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         textDirection: TextDirection.rtl,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
+
+
+
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SizedBox(height: 8),
+
+            //Jumana
+            if (imageUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  imageUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            const SizedBox(height: 12),
 
             // ── Status card ──────────────────
             Container(

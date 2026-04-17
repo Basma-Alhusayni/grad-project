@@ -6,6 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:firebase_storage/firebase_storage.dart';
+import '../services/image_upload_service.dart';
+
 enum _ScreenState { camera, processing, result, failure }
 
 class DiagnosisResult {
@@ -122,36 +125,61 @@ class _UserCameraScreenState extends State<UserCameraScreen> {
 
   // ── UPDATED: saves to top-level reports collection ──
   Future<void> _saveReport() async {
-    if (_result == null) return;
+    if (_result == null || _image == null) return;
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // ⭐ رفع الصورة إلى imgbb
+      final imageUrl = await ImageUploadService.uploadImage(_image!);
+
+      if (imageUrl == null) {
+        throw Exception("Image upload failed");
+      }
+
+      // 1️⃣ رفع الصورة إلى Firebase Storage
+     /* final fileName = DateTime.now().millisecondsSinceEpoch.toString();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('reports_images')
+          .child('$fileName.jpg');
+
+      await ref.putFile(_image!);
+
+      // 2️⃣ الحصول على رابط الصورة
+      final imageUrl = await ref.getDownloadURL();*/
+
+      // 3️⃣ حفظ التقرير مع الصورة
       await FirebaseFirestore.instance.collection('reports').add({
-        'userId':              user.uid,
-        'plantName':           _result!.plantName,
-        'diagnosis':           _result!.diagnosis,
-        'treatment':           _result!.treatment,
-        'isHealthy':           _result!.isHealthy,
-        'confidence':          _result!.confidence,
-        'status':              _result!.isHealthy ? 'سليم' : 'مريض',
-        'plantType':           _selectedPlantType,
-        'date':                DateTime.now().toIso8601String().split('T')[0],
-        'createdAt':           FieldValue.serverTimestamp(),
-        'isSharedToCommunity': false,  // ← false by default
-        'feedDocId':           '',     // ← empty until user shares
+        'userId': user.uid,
+        'plantName': _result!.plantName,
+        'diagnosis': _result!.diagnosis,
+        'treatment': _result!.treatment,
+        'isHealthy': _result!.isHealthy,
+        'confidence': _result!.confidence,
+        'status': _result!.isHealthy ? 'سليم' : 'مريض',
+        'plantType': _selectedPlantType,
+        'date': DateTime.now().toIso8601String().split('T')[0],
+        'createdAt': FieldValue.serverTimestamp(),
+
+        // ⭐⭐ الجديد المهم ⭐⭐
+        'imageUrl': imageUrl,
+        'isSharedToCommunity': false,
+        'feedDocId': '',
       });
+
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ تم حفظ التقرير في ملفك الشخصي',
+        content: Text('✅ تم حفظ التقرير مع الصورة',
             textDirection: TextDirection.rtl),
         backgroundColor: Color(0xFF16A34A),
       ));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('❌ حدث خطأ أثناء الحفظ، تأكد من اتصال الإنترنت',
+        content: Text('❌ خطأ في حفظ التقرير',
             textDirection: TextDirection.rtl),
         backgroundColor: Colors.red,
       ));
