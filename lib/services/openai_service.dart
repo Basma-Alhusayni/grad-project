@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 
 class OpenAIService {
+
+  //هنا تحطوا المفتاح 🔴🔴🔴
   static const String _apiKey = '';
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
   static const String _model   = 'gpt-4o-mini';
