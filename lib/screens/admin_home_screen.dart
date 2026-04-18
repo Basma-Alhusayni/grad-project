@@ -67,34 +67,45 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        resizeToAvoidBottomInset: false, // تمت إضافة هذه الخاصية بناءً على طلبك
         backgroundColor: const Color(0xFFF0FDF4),
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 1,
           centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.logout, color: Color(0xFF16A34A)),
-            onPressed: _logout,
-          ),
           title: const Text(
-            'لوحة تحكم الإدارة',
+            'BioShield',
             style: TextStyle(
-              color: Color(0xFF14532D),
+              color: Color(0xFF16A34A),
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 20,
+            ),
+          ),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              'assets/images/logo_without_background.png',
+              errorBuilder: (_, __, ___) =>
+              const Icon(Icons.eco, color: Color(0xFF16A34A)),
             ),
           ),
           actions: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Image.asset('assets/images/logo.png', height: 36),
+            IconButton(
+              icon: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.rotationY(3.1416), // دوران أفقي للأيقونة
+                child: const Icon(
+                  Icons.logout,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+              onPressed: _logout, // استدعاء الدالة المعرفة مسبقاً في الكلاس
             ),
           ],
         ),
         body: _loading
             ? const Center(
-            child: CircularProgressIndicator(
-                color: Color(0xFF16A34A)))
+            child: CircularProgressIndicator(color: Color(0xFF16A34A)))
             : _currentIndex == 0
             ? _buildHomeTab()
             : _currentIndex == 1

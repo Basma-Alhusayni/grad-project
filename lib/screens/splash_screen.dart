@@ -123,10 +123,6 @@ class _SplashScreenState extends State<SplashScreen> {
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF14532D))),
-            const SizedBox(height: 8),
-            const Text('حماية نباتاتك بالذكاء الاصطناعي',
-                style: TextStyle(
-                    fontSize: 16, color: Color(0xFF16A34A))),
             const SizedBox(height: 48),
             const CircularProgressIndicator(
                 color: Color(0xFF16A34A)),

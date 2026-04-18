@@ -321,7 +321,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           Expanded(child: Text(label,
               style: TextStyle(color: color, fontWeight: FontWeight.w600,
                   fontSize: 15, decoration: TextDecoration.none))),
-          Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey[400]),
+          Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
         ]),
       ),
     );

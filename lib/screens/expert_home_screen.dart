@@ -95,29 +95,39 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        resizeToAvoidBottomInset: false, // مضافة لمنع تداخل الكيبورد
         backgroundColor: const Color(0xFFF0FDF4),
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
           centerTitle: true,
           title: const Text(
-            'خبير النباتات',
+            'BioShield',
             style: TextStyle(
-              color: Color(0xFF166534),
+              color: Color(0xFF16A34A),
               fontWeight: FontWeight.bold,
               fontSize: 20,
             ),
           ),
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.white,
-          elevation: 1,
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              'assets/images/logo_without_background.png',
+              errorBuilder: (_, __, ___) =>
+              const Icon(Icons.eco, color: Color(0xFF16A34A)),
+            ),
+          ),
           actions: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 36,
-                errorBuilder: (_, __, ___) =>
-                const Icon(Icons.eco, color: Color(0xFF16A34A)),
+            IconButton(
+              icon: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.rotationY(3.1416),
+                child: const Icon(
+                  Icons.logout,
+                  color: Color(0xFF16A34A),
+                ),
               ),
+              onPressed: _logout,
             ),
           ],
         ),
@@ -148,69 +158,38 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   // ── Bottom Nav ────────────────────────────────────────────────
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(0, Icons.person_outline, 'الملف'),
-              _navItem(1, Icons.calendar_today_outlined, 'الجدول'),
-              _navItem(2, Icons.chat_bubble_outline, 'المحادثات'),
-              _navItem(3, Icons.assignment_outlined, 'الطلبات'),
-            ],
-          ),
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) => setState(() => _currentIndex = index),
+      selectedItemColor: const Color(0xFF16A34A),
+      unselectedItemColor: Colors.grey,
+      backgroundColor: Colors.white,
+      elevation: 8,
+      type: BottomNavigationBarType.fixed,
+      selectedFontSize: 12,
+      unselectedFontSize: 12,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          activeIcon: Icon(Icons.person),
+          label: 'الملف',
         ),
-      ),
-    );
-  }
-
-  Widget _navItem(int index, IconData icon, String label) {
-    final isSelected = _currentIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              color: isSelected
-                  ? const Color(0xFF16A34A)
-                  : Colors.grey[400],
-              size: 26),
-          const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight:
-                isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? const Color(0xFF16A34A)
-                    : Colors.grey[400],
-              )),
-          const SizedBox(height: 2),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 3,
-            width: isSelected ? 20 : 0,
-            decoration: BoxDecoration(
-              color: const Color(0xFF16A34A),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ],
-      ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today_outlined),
+          activeIcon: Icon(Icons.calendar_today),
+          label: 'الجدول',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat_bubble_outline),
+          activeIcon: Icon(Icons.chat_bubble),
+          label: 'المحادثات',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.assignment_outlined),
+          activeIcon: Icon(Icons.assignment),
+          label: 'الطلبات',
+        ),
+      ],
     );
   }
 
@@ -227,8 +206,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               : _profileTabIndex == 1
               ? _buildReportsContent()
               : _buildReviewsContent(),
-          const SizedBox(height: 24),
-          _buildLogoutButton(),
           const SizedBox(height: 24),
         ],
       ),
@@ -308,39 +285,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _headerChip(
-                        Icons.chat_bubble_outline, 'غير متاح'),
-                    const SizedBox(width: 8),
-                    _headerChip(Icons.location_on_outlined, 'موقع'),
-                  ],
-                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _headerChip(IconData icon, String label) {
-    return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF15803D),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 12),
-          const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 11)),
         ],
       ),
     );
@@ -452,17 +399,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               ],
             ),
           ),
-        if (_education.isEmpty &&
-            _experience.isEmpty &&
-            _specialty.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Text('لم يتم إضافة معلومات بعد',
-                  style: TextStyle(
-                      color: Colors.grey[500], fontSize: 14)),
-            ),
-          ),
       ],
     );
   }
@@ -485,24 +421,24 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   }
 
   Widget _buildReportsContent() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return const Padding(
+      padding: EdgeInsets.all(24),
       child: Center(
         child: Text('لا توجد تقارير حالياً',
             style:
-            TextStyle(color: Colors.grey[500], fontSize: 14)),
+            TextStyle(color: Colors.grey, fontSize: 14)),
       ),
     );
   }
 
   Widget _buildReviewsContent() {
     if (_reviews.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
+      return const Padding(
+        padding: EdgeInsets.all(24),
         child: Center(
           child: Text('لا توجد تقييمات بعد',
               style: TextStyle(
-                  color: Colors.grey[500], fontSize: 14)),
+                  color: Colors.grey, fontSize: 14)),
         ),
       );
     }
@@ -603,31 +539,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       ),
     );
   }
-
-  Widget _buildLogoutButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton.icon(
-          onPressed: _logout,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFCC0000),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
-            elevation: 0,
-          ),
-          icon: const Icon(Icons.logout, color: Colors.white, size: 20),
-          label: const Text('تسجيل الخروج',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold)),
-        ),
-      ),
-    );
-  }
 }
 
 // ─── صفحة المحادثات ───────────────────────────────────────────
@@ -673,12 +584,12 @@ class _ChatsPage extends StatelessWidget {
                     builder: (_) => ExpertChatScreen(
                       chatId: chatId,
                       userName: userName,
-                      isOnline: online,
+                      isOnline: online, // تمرير المعامل المطلوب
                     ),
                   ),
                 ),
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 10), // استخدام only بدلاً من .bottom
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,

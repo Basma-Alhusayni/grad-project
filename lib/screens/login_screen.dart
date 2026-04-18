@@ -51,9 +51,6 @@ class LoginScreen extends StatelessWidget {
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF14532D))),
-              const Text('حماية نباتاتك بالذكاء الاصطناعي',
-                  style: TextStyle(
-                      color: Color(0xFF16A34A), fontSize: 14)),
               const Spacer(),
               // Card
               Container(
