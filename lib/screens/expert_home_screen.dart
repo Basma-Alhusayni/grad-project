@@ -144,13 +144,13 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 0:
-        return _buildProfileTab();
-      case 1:
-        return const ExpertScheduleScreen();
-      case 2:
-        return const _ChatsPage();
-      case 3:
         return const RequestsScreen();
+      case 1:
+        return const _ChatsPage();
+      case 2:
+        return const ExpertScheduleScreen();
+      case 3:
+        return _buildProfileTab();
       default:
         return const SizedBox();
     }
