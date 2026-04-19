@@ -13,6 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
   tflite_flutter: ^0.10.4
+  shared_preferences: ^2.2.2
   cloudinary_public: ^0.23.1
   permission_handler: ^11.3.1
   flutter_animate: ^4.5.0

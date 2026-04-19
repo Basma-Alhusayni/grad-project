@@ -149,7 +149,7 @@ class LoginScreen extends StatelessWidget {
                 ]),
               ),
               const Spacer(),
-              const Text('جميع الحقوق محفوظة © 2025 BioShield',
+              const Text('جميع الحقوق محفوظة © 2026 BioShield',
                   style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
             ]),

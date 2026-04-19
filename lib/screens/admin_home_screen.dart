@@ -62,6 +62,88 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+
+  void _showFullImage(String url) {
+    showDialog(
+      context: context,
+      barrierDismissible: true, // يغلق عند الضغط خارج الصورة
+      builder: (_) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // رأس النافذة المنبثقة
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'معاينة الوثيقة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF14532D),
+                        fontSize: 16,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // جسم الصورة
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: InteractiveViewer(
+                      maxScale: 4.0,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 200,
+                            color: const Color(0xFFF3F4F6),
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                            ),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 200,
+                          width: double.infinity,
+                          color: const Color(0xFFFEF2F2),
+                          child: const Icon(Icons.broken_image, color: Colors.red, size: 48),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // زر الإغلاق السفلي
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -1096,8 +1178,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildRequestCard(
-      Map<String, dynamic> data, String docId, String status) {
+  Widget _buildRequestCard(Map<String, dynamic> data, String docId, String status) {
     final statusColor = status == 'pending'
         ? Colors.orange
         : status == 'approved'
@@ -1187,6 +1268,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 const SizedBox(height: 8),
                 _requestRow(Icons.history_edu_outlined, 'الخبرة',
                     data['experience'] ?? '—'),
+                // ─── عرض صور الشهادات (محاذاة لليمين) ───
+                if (data['certificateImages'] != null && (data['certificateImages'] as List).isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  // محاذاة العنوان لليمين
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'الصور المرفقة:',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 90,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      // عكس اتجاه القائمة لتبدأ من اليمين لليسار
+                      itemCount: (data['certificateImages'] as List).length,
+                      itemBuilder: (context, i) {
+                        final imgUrl = data['certificateImages'][i].toString();
+                        return GestureDetector(
+                          onTap: () => _showFullImage(imgUrl),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8), // تغيير الهامش ليكون جهة اليمين
+                            width: 90,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade200),
+                              image: DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 // Show rejection reason if rejected
                 if (status == 'rejected' &&
                     (data['rejectionReason'] ?? '').isNotEmpty) ...[
@@ -1408,6 +1525,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
+            backgroundColor: Colors.white, // خلفية بيضاء بالكامل
+            surfaceTintColor: Colors.white, // لضمان عدم تغير اللون في Material 3
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16)),
             title: Row(children: [
@@ -1424,199 +1543,186 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ]),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Applicant info
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                    Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: const Color(0xFFDCFCE7),
-                        child: Text(
-                          (data['fullName'] ?? 'خ')[0],
-                          style: const TextStyle(
-                              color: Color(0xFF16A34A),
-                              fontWeight: FontWeight.bold),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView( // حل مشكلة التداخل مع لوحة المفاتيح
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // معلومات المتقدم
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: const Color(0xFFDCFCE7),
+                            child: Text(
+                              (data['fullName'] ?? 'خ')[0],
+                              style: const TextStyle(
+                                  color: Color(0xFF16A34A),
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(data['fullName'] ?? '',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14)),
+                                Text(data['email'] ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'سبب الرفض *',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3, // قللت عدد الأسطر قليلاً لتوفير مساحة
+                      textDirection: TextDirection.rtl,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          reasonError =
+                          v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'اكتب سبب الرفض هنا...',
+                        hintStyle: TextStyle(
+                            fontSize: 12, color: Colors.grey[400]),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(data['fullName'] ?? '',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
-                            Text(data['email'] ?? '',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey)),
-                          ],
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFCC0000), width: 2),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'سبب الرفض *',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151)),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: reasonController,
-                  maxLines: 4,
-                  textDirection: TextDirection.rtl,
-                  onChanged: (v) {
-                    setDialogState(() {
-                      reasonError =
-                      v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText:
-                    'مثال: الشهادات المقدمة غير كافية، أو الخبرة غير مناسبة...',
-                    hintStyle: TextStyle(
-                        fontSize: 12, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                          color: reasonError != null
-                              ? Colors.red
-                              : Colors.grey.shade300),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                          color: reasonError != null
-                              ? Colors.red
-                              : Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                          color: Color(0xFFCC0000), width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.all(12),
-                    errorText: reasonError,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: const Color(0xFFFDE68A)),
-                  ),
-                  child: const Row(children: [
-                    Icon(Icons.email_outlined,
-                        color: Colors.orange, size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'سيتم إرسال سبب الرفض إلى بريد المتقدم تلقائياً',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.orange),
+                        contentPadding: const EdgeInsets.all(12),
+                        errorText: reasonError,
                       ),
                     ),
-                  ]),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.email_outlined,
+                            color: Colors.orange, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'سيتم إرسال سبب الرفض إلى بريد المتقدم تلقائياً',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF9A3412)),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء',
-                    style: TextStyle(color: Colors.grey)),
               ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final reason = reasonController.text.trim();
-                  if (reason.isEmpty) {
-                    setDialogState(
-                            () => reasonError = 'سبب الرفض مطلوب');
-                    return;
-                  }
-
-                  Navigator.pop(ctx);
-
-                  // Show loading
-                  if (mounted) {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => const Center(
-                        child: CircularProgressIndicator(
-                            color: Color(0xFF16A34A)),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton( // زر الإلغاء مع إطار
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey.shade300), // الإطار
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                    );
-                  }
+                      child: const Text('إلغاء',
+                          style: TextStyle(color: Colors.black38)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final reason = reasonController.text.trim();
+                        if (reason.isEmpty) {
+                          setDialogState(() => reasonError = 'سبب الرفض مطلوب');
+                          return;
+                        }
 
-                  final err =
-                  await AuthService().rejectSpecialistRequest(
-                    requestDocId: docId,
-                    expertEmail: data['email'] ?? '',
-                    expertName: data['fullName'] ?? '',
-                    rejectionReason: reason,
-                  );
+                        Navigator.pop(ctx);
 
-                  if (!mounted) return;
-                  Navigator.pop(context); // close loading
+                        // إظهار مؤشر التحميل
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const Center(
+                            child: CircularProgressIndicator(
+                                color: Color(0xFF16A34A)),
+                          ),
+                        );
 
-                  if (err != null && err.contains('فشل إرسال')) {
-                    // Soft warning — Firestore updated but email failed
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(err),
-                        backgroundColor: Colors.orange,
-                        duration: const Duration(seconds: 4),
+                        final err = await AuthService().rejectSpecialistRequest(
+                          requestDocId: docId,
+                          expertEmail: data['email'] ?? '',
+                          expertName: data['fullName'] ?? '',
+                          rejectionReason: reason,
+                        );
+
+                        if (!mounted) return;
+                        Navigator.pop(context); // إغلاق مؤشر التحميل
+
+                        if (err != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('حدث خطأ: $err'),
+                            backgroundColor: Colors.red,
+                          ));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('❌ تم رفض طلب ${data['fullName']}'),
+                              backgroundColor: Color(0xFF2D322C),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCC0000),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
                       ),
-                    );
-                  } else if (err != null) {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(
-                      content: Text('حدث خطأ: $err'),
-                      backgroundColor: Colors.red,
-                    ));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '❌ تم رفض طلب ${data['fullName'] ?? ''} | '
-                              'تم إرسال سبب الرفض إلى بريده الإلكتروني',
-                        ),
-                        backgroundColor: Colors.orange,
-                        duration: const Duration(seconds: 4),
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFCC0000),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                icon: const Icon(Icons.close,
-                    color: Colors.white, size: 16),
-                label: const Text('رفض الطلب',
-                    style: TextStyle(color: Colors.white)),
+                      child: const Text('رفض الطلب',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
