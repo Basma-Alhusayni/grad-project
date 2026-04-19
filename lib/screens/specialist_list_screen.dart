@@ -456,12 +456,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen> {
                     const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: Column(
                       children: [
-                        const Text('الخبراء المتخصصون',
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF166534))),
-                        const SizedBox(height: 14),
+                        //خبراء متخصصون
                         Container(
                           decoration: BoxDecoration(
                             color: const Color(0xFFF0FDF4),

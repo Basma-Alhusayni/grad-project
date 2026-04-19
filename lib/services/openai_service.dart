@@ -7,7 +7,7 @@ import 'package:image/image.dart' as img;
 class OpenAIService {
 
   //هنا تحطوا المفتاح 🔴🔴🔴
-  static const String _apiKey = '';
+  static const String _apiKey = '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';
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
   static const String _model   = 'gpt-4o-mini';
   static const Duration _timeout = Duration(seconds: 20);

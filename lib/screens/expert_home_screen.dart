@@ -170,14 +170,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       unselectedFontSize: 12,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'الملف',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today_outlined),
-          activeIcon: Icon(Icons.calendar_today),
-          label: 'الجدول',
+          icon: Icon(Icons.assignment_outlined),
+          activeIcon: Icon(Icons.assignment),
+          label: 'الطلبات',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.chat_bubble_outline),
@@ -185,9 +180,14 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           label: 'المحادثات',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.assignment_outlined),
-          activeIcon: Icon(Icons.assignment),
-          label: 'الطلبات',
+          icon: Icon(Icons.calendar_today_outlined),
+          activeIcon: Icon(Icons.calendar_today),
+          label: 'الجدول',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          activeIcon: Icon(Icons.person),
+          label: 'الملف',
         ),
       ],
     );
