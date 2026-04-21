@@ -4,7 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:http/http.dart' as http;
 
 class UserReportsScreen extends StatefulWidget {
   const UserReportsScreen({super.key});
@@ -14,9 +17,29 @@ class UserReportsScreen extends StatefulWidget {
 
 class _UserReportsScreenState extends State<UserReportsScreen> {
   static const _green600 = Color(0xFF16A34A);
+  static const _green900 = Color(0xFF14532D);
+
   String _filter = 'الكل';
   String _search = '';
   final TextEditingController _searchController = TextEditingController();
+
+  late Stream<QuerySnapshot> _reportsStreamVar;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsStreamVar = _getReportsStream();
+  }
+
+  Stream<QuerySnapshot> _getReportsStream() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Stream.empty();
+    return FirebaseFirestore.instance
+        .collection('reports')
+        .where('userId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
 
   @override
   void dispose() {
@@ -24,7 +47,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
     super.dispose();
   }
 
-  Widget _filterChip(String label, String count) {
+  Widget _filterChip(String label, int count) {
     final active = _filter == label;
     return GestureDetector(
       onTap: () => setState(() => _filter = label),
@@ -47,17 +70,6 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
     );
   }
 
-  // ── UPDATED: query top-level reports collection by userId ──
-  Stream<QuerySnapshot> _reportsStream() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Stream.empty();
-    return FirebaseFirestore.instance
-        .collection('reports')
-        .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
-
   String _iconForPlant(String type) {
     switch (type) {
       case 'vegetables': return '🥬';
@@ -71,11 +83,12 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _reportsStream(),
+      stream: _reportsStreamVar,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: _green600));
         }
+
         final allDocs = snapshot.data?.docs ?? [];
         final allReports = allDocs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
@@ -90,45 +103,35 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             'plantType':  data['plantType'] ?? '',
             'icon':       _iconForPlant(data['plantType'] ?? ''),
             'feedDocId':  data['feedDocId'] ?? '',
+            'details':    data['details'] ?? '',
+            'imageUrl':   data['imageUrl'] ?? '',
           };
         }).toList();
 
         final filtered = allReports.where((r) {
           final matchFilter = _filter == 'الكل' || r['status'] == _filter;
           final matchSearch = _search.isEmpty ||
-              (r['plantName'] as String).contains(_search) ||
-              (r['disease'] as String).contains(_search) ||
-              (r['status'] as String).contains(_search) ||
-              (r['date'] as String).contains(_search);
+              (r['plantName'] as String).toLowerCase().contains(_search.toLowerCase()) ||
+              (r['disease'] as String).toLowerCase().contains(_search.toLowerCase());
           return matchFilter && matchSearch;
         }).toList();
 
-        final sharedCount = allReports
-            .where((r) => (r['feedDocId'] as String).isNotEmpty)
-            .length;
+        final sharedCount = allReports.where((r) => (r['feedDocId'] as String).isNotEmpty).length;
 
         return Column(children: [
-
-          // ── 4 Stat Cards ────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(children: [
-              _StatCard(value: '${allReports.length}', label: 'الكل',
-                  color: const Color(0xFF0284C7), bgColor: const Color(0xFFEFF6FF)),
+              _StatCard(value: '${allReports.length}', label: 'الكل', color: const Color(0xFF0284C7), bgColor: const Color(0xFFEFF6FF)),
               const SizedBox(width: 8),
-              _StatCard(value: '${allReports.where((r) => r['status'] == 'مريض').length}',
-                  label: 'مريضة', color: const Color(0xFFDC2626), bgColor: const Color(0xFFFEF2F2)),
+              _StatCard(value: '${allReports.where((r) => r['status'] == 'مريض').length}', label: 'مريضة', color: const Color(0xFFDC2626), bgColor: const Color(0xFFFEF2F2)),
               const SizedBox(width: 8),
-              _StatCard(value: '${allReports.where((r) => r['status'] == 'سليم').length}',
-                  label: 'صحية', color: const Color(0xFF16A34A), bgColor: const Color(0xFFDCFCE7)),
+              _StatCard(value: '${allReports.where((r) => r['status'] == 'سليم').length}', label: 'صحية', color: const Color(0xFF16A34A), bgColor: const Color(0xFFDCFCE7)),
               const SizedBox(width: 8),
-              _StatCard(value: '$sharedCount', label: 'مشاركة',
-                  color: const Color(0xFF7C3AED), bgColor: const Color(0xFFF3F0FF)),
+              _StatCard(value: '$sharedCount', label: 'مشاركة', color: const Color(0xFF7C3AED), bgColor: const Color(0xFFF3F0FF)),
             ]),
           ),
           const SizedBox(height: 14),
-
-          // ── Search bar ───────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
@@ -146,75 +149,56 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
                       _searchController.clear();
                       setState(() => _search = '');
                     })
-                    : const Icon(Icons.search, color: Color(0xFF16A34A)),
+                    : const Icon(Icons.search, color: _green600),
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _green600, width: 1.5)),
               ),
             ),
           ),
           const SizedBox(height: 10),
-
-          // ── Filter chips ─────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
-              _filterChip('الكل', '${allReports.length}'),
+              _filterChip('الكل', allReports.length),
               const SizedBox(width: 8),
-              _filterChip('مريض', '${allReports.where((r) => r['status'] == 'مريض').length}'),
+              _filterChip('مريض', allReports.where((r) => r['status'] == 'مريض').length),
               const SizedBox(width: 8),
-              _filterChip('سليم', '${allReports.where((r) => r['status'] == 'سليم').length}'),
-              if (_search.isNotEmpty) ...[
-                const Spacer(),
-                Text('${filtered.length} / ${allReports.length}',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-              ],
+              _filterChip('سليم', allReports.where((r) => r['status'] == 'سليم').length),
             ]),
           ),
           const SizedBox(height: 12),
-
-          // ── Reports list ────────────────────
           Expanded(
             child: filtered.isEmpty
-                ? Center(child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
-                  const SizedBox(height: 12),
-                  Text('لا توجد تقارير بعد',
-                      style: TextStyle(color: Colors.grey[500],
-                          fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('قم بتشخيص نبات لتظهر تقاريرك هنا',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-                ]))
+                ? _buildEmptyState()
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: filtered.length,
-              itemBuilder: (_, i) => _ReportCard(report: filtered[i]),
+              itemBuilder: (_, i) => _ReportCard(report: filtered[i], key: ValueKey(filtered[i]['id'])),
             ),
           ),
         ]);
       },
     );
   }
+
+  Widget _buildEmptyState() {
+    return Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 12),
+          Text('لا توجد نتائج', style: TextStyle(color: Colors.grey[500], fontSize: 15, fontWeight: FontWeight.bold)),
+        ]));
+  }
 }
 
-// ═══════════════════════════════════════════════
-//  REPORT CARD
-// ═══════════════════════════════════════════════
 class _ReportCard extends StatelessWidget {
   final Map<String, dynamic> report;
-  const _ReportCard({required this.report});
+  const _ReportCard({super.key, required this.report});
 
   @override
   Widget build(BuildContext context) {
@@ -222,65 +206,38 @@ class _ReportCard extends StatelessWidget {
     final sc = isHealthy ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
     final sb = isHealthy ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
     final isShared = (report['feedDocId'] as String).isNotEmpty;
+    final imageUrl = report['imageUrl'] ?? '';
 
     return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => ReportDetailPage(report: report))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReportDetailPage(report: report))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: isHealthy ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
-              width: 1.5),
+          border: Border.all(color: isHealthy ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA), width: 1.5),
           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))],
         ),
         child: Row(children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(color: sb, shape: BoxShape.circle),
-            child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26))),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: imageUrl.isNotEmpty
+                ? Image.network(imageUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 52, height: 52, color: sb, child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))))
+                : Container(width: 52, height: 52, color: sb, child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(report['plantName'],
-                style: const TextStyle(color: Color(0xFF14532D),
-                    fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(report['plantName'], style: const TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 3),
-            Text(report['disease'], maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            Text(report['disease'], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
             const SizedBox(height: 4),
-            Row(children: [
-              Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-              if (isShared) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: const Color(0xFFF3F0FF),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: const Row(children: [
-                    Icon(Icons.share_rounded, color: Color(0xFF7C3AED), size: 10),
-                    SizedBox(width: 3),
-                    Text('مشارك', style: TextStyle(
-                        color: Color(0xFF7C3AED), fontSize: 10,
-                        fontWeight: FontWeight.bold)),
-                  ]),
-                ),
-              ],
-            ]),
+            Row(children: [Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)), if (isShared) ...[const SizedBox(width: 8), _SharedBadge()]]),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(20)),
-              child: Text(report['status'],
-                  style: TextStyle(color: sc, fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(20)), child: Text(report['status'], style: TextStyle(color: sc, fontSize: 11, fontWeight: FontWeight.bold))),
             const SizedBox(height: 8),
-            Icon(Icons.arrow_back_ios, size: 13, color: Colors.grey[400]),
+            Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey[400]),
           ]),
         ]),
       ),
@@ -288,9 +245,17 @@ class _ReportCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  REPORT DETAIL PAGE
-// ═══════════════════════════════════════════════
+class _SharedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: const Color(0xFFF3F0FF), borderRadius: BorderRadius.circular(10)),
+      child: const Row(children: [Icon(Icons.share_rounded, color: Color(0xFF7C3AED), size: 10), SizedBox(width: 3), Text('مشارك', style: TextStyle(color: Color(0xFF7C3AED), fontSize: 10, fontWeight: FontWeight.bold))]),
+    );
+  }
+}
+
 class ReportDetailPage extends StatefulWidget {
   final Map<String, dynamic> report;
   const ReportDetailPage({super.key, required this.report});
@@ -302,6 +267,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   static const _green600 = Color(0xFF16A34A);
   static const _green900 = Color(0xFF14532D);
   static const _green50  = Color(0xFFF0FDF4);
+  static const _darkBg   = Color(0xFF2D322C);
 
   String? _feedDocId;
   bool _isShared = false;
@@ -314,14 +280,10 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   @override
   void initState() {
     super.initState();
-    final existing = widget.report['feedDocId'] ?? '';
-    if (existing.isNotEmpty) {
-      _feedDocId = existing;
-      _isShared = true;
-    }
+    _feedDocId = widget.report['feedDocId']?.toString();
+    _isShared = _feedDocId != null && _feedDocId!.isNotEmpty;
   }
 
-  // ── UPDATED: uses top-level reports collection ──
   Future<void> _shareToggle() async {
     if (_sharingLoading) return;
     setState(() => _sharingLoading = true);
@@ -330,87 +292,49 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       if (user == null) return;
 
       if (_isShared && _feedDocId != null) {
-        // Cancel share
-        await FirebaseFirestore.instance
-            .collection('community_feed').doc(_feedDocId).delete();
-        await FirebaseFirestore.instance
-            .collection('reports').doc(widget.report['id'])
-            .update({
-          'feedDocId':           FieldValue.delete(),
+        await FirebaseFirestore.instance.collection('community_feed').doc(_feedDocId).delete();
+        await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
+          'feedDocId': FieldValue.delete(),
           'isSharedToCommunity': false,
         });
         setState(() { _isShared = false; _feedDocId = null; });
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ تم إلغاء المشاركة', textDirection: TextDirection.rtl),
-        ));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تم إلغاء المشاركة', textDirection: TextDirection.rtl)));
       } else {
-        // Check if already shared to prevent duplicates
-        final existingDoc = await FirebaseFirestore.instance
-            .collection('reports').doc(widget.report['id']).get();
-        final existingFeedId = existingDoc.data()?['feedDocId'] ?? '';
-        if (existingFeedId.isNotEmpty) {
-          setState(() { _isShared = true; _feedDocId = existingFeedId; });
-          if (mounted) setState(() => _sharingLoading = false);
-          return;
-        }
+        // --- THE FIX IS HERE ---
+        // Changed collection from 'accounts' to 'users' based on your screenshot
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
-        // Share
-        final doc = await FirebaseFirestore.instance
-            .collection('accounts').doc(user.uid).get();
-        final userName = doc.data()?['fullName'] ??
-            doc.data()?['username'] ?? 'مستخدم';
+        // Fetching the name from 'fullName' or 'username' as seen in your screenshot
+        final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
 
-        final ref = await FirebaseFirestore.instance
-            .collection('community_feed').add({
+        final ref = await FirebaseFirestore.instance.collection('community_feed').add({
           'plantName':  widget.report['plantName'],
+          'ImageUrl':   widget.report['imageUrl'],
           'diagnosis':  widget.report['disease'],
+          'details':    widget.report['details'],
           'treatment':  widget.report['treatment'],
           'isHealthy':  _isHealthy,
           'confidence': widget.report['confidence'],
           'status':     widget.report['status'],
-          'plantType':  widget.report['plantType'],
           'date':       widget.report['date'],
           'createdAt':  FieldValue.serverTimestamp(),
-          'sharedBy':   userName,
+          'sharedBy':   userName, // Now this will correctly say "بسمة" or the user's name
           'userId':     user.uid,
           'reportId':   widget.report['id'],
         });
 
-        await FirebaseFirestore.instance
-            .collection('reports').doc(widget.report['id'])
-            .update({
-          'feedDocId':           ref.id,
+        await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
+          'feedDocId': ref.id,
           'isSharedToCommunity': true,
         });
 
-        await Share.share(
-          '🌿 BioShield - تقرير تشخيص نبات\n'
-              '━━━━━━━━━━━━━━━━━━\n'
-              'النبات: ${widget.report['plantName']}\n'
-              'الحالة: ${widget.report['status']}\n'
-              'التشخيص: ${widget.report['disease']}\n'
-              'الدقة: ${widget.report['confidence']}%\n'
-              'العلاج: ${widget.report['treatment']}\n'
-              '━━━━━━━━━━━━━━━━━━\n'
-              'التاريخ: ${widget.report['date']}\n'
-              'تمت المشاركة عبر تطبيق BioShield 🌱',
-        );
-
         setState(() { _isShared = true; _feedDocId = ref.id; });
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ تمت المشاركة مع المجتمع!',
-              textDirection: TextDirection.rtl),
-          backgroundColor: Color(0xFF16A34A),
-        ));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تمت المشاركة مع المجتمع!', textDirection: TextDirection.rtl), backgroundColor: _green600));
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl),
-        backgroundColor: Colors.red,
-      ));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _sharingLoading = false);
     }
@@ -418,253 +342,186 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   Future<void> _exportPDF() async {
     try {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري حفظ التقرير...', textDirection: TextDirection.rtl), duration: Duration(seconds: 2)));
       final pdf = pw.Document();
+      final fontData = await rootBundle.load("assets/fonts/Amiri-Regular.ttf");
+      final arabicFont = pw.Font.ttf(fontData);
+
+      pw.MemoryImage? reportImage;
+      if (widget.report['imageUrl'].isNotEmpty) {
+        final resp = await http.get(Uri.parse(widget.report['imageUrl']));
+        if (resp.statusCode == 200) reportImage = pw.MemoryImage(resp.bodyBytes);
+      }
+
       pdf.addPage(pw.Page(
-        build: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text('BioShield - Plant Diagnosis Report',
-                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            pw.Divider(),
-            pw.SizedBox(height: 12),
-            pw.Text('Plant: ${widget.report['plantName']}'),
-            pw.SizedBox(height: 8),
-            pw.Text('Status: ${widget.report['status']}'),
-            pw.SizedBox(height: 8),
-            pw.Text('Confidence: ${widget.report['confidence']}%'),
-            pw.SizedBox(height: 8),
-            pw.Text('Diagnosis: ${widget.report['disease']}'),
-            pw.SizedBox(height: 8),
-            pw.Text('Treatment: ${widget.report['treatment']}'),
-            pw.SizedBox(height: 16),
-            pw.Divider(),
-            pw.Text('Date: ${widget.report['date']}'),
-            pw.Text('Generated by BioShield AI System'),
-          ],
-        ),
+        theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFont),
+        build: (ctx) => pw.Directionality(textDirection: pw.TextDirection.rtl, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Center(child: pw.Text('تقرير تشخيص BioShield', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
+          pw.Divider(),
+          if (reportImage != null) pw.Center(child: pw.Container(height: 200, width: 300, child: pw.Image(reportImage, fit: pw.BoxFit.cover))),
+          _pdfResultRow('اسم النبات:', widget.report['plantName']),
+          _pdfResultRow('الحالة الصحية:', widget.report['status']),
+          _pdfResultRow('تاريخ الفحص:', widget.report['date']),
+          _pdfResultRow('دقة التشخيص:', '${widget.report['confidence']}%'),
+          pw.SizedBox(height: 15),
+          pw.Text('التشخيص الملحوظ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(widget.report['disease'], style: const pw.TextStyle(fontSize: 12)),
+          pw.SizedBox(height: 10),
+          pw.Text('التفاصيل والمعلومات:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(widget.report['details'], style: const pw.TextStyle(fontSize: 12)),
+          pw.SizedBox(height: 10),
+          pw.Text('العلاج الموصى به:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(widget.report['treatment'], style: const pw.TextStyle(fontSize: 12)),
+          pw.Spacer(),
+          pw.Center(child: pw.Text('تم إنشاء هذا التقرير بواسطة تطبيق BioShield', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey))),
+        ])),
       ));
+
       final output = await getTemporaryDirectory();
-      final file = File('${output.path}/bioshield_report.pdf');
+      final file = File("${output.path}/bioshield_report.pdf");
       await file.writeAsBytes(await pdf.save());
-      await Share.shareXFiles([XFile(file.path)],
-          text: 'تقرير تشخيص النبات - BioShield');
+      await Share.shareXFiles([XFile(file.path)], text: 'تقرير BioShield');
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('❌ خطأ في تصدير PDF',
-              textDirection: TextDirection.rtl)));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ فشل تصدير الملف'), backgroundColor: Colors.red));
     }
   }
 
-  // ── UPDATED: deletes from top-level reports collection ──
+  pw.Widget _pdfResultRow(String label, String value) => pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4), child: pw.Row(children: [pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)), pw.SizedBox(width: 5), pw.Text(value, style: const pw.TextStyle(fontSize: 12))]));
+
   Future<void> _deleteReport() async {
+    if (_isShared) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن حذف التقرير المشارك', textDirection: TextDirection.rtl), backgroundColor: _darkBg));
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('حذف التقرير',
-              style: TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
-          content: const Text('هل أنت متأكد من حذف هذا التقرير؟',
-              style: TextStyle(color: Colors.grey)),
+          title: const Text('حذف التقرير'),
+          content: const Text('هل أنت متأكد من الحذف؟'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('حذف', style: TextStyle(color: Colors.white)),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('حذف', style: TextStyle(color: Colors.white))),
           ],
         ),
       ),
     );
-
     if (confirm == true) {
-      // If shared, remove from community feed too
-      if (_isShared && _feedDocId != null) {
-        await FirebaseFirestore.instance
-            .collection('community_feed').doc(_feedDocId).delete();
-      }
-      // Delete from top-level reports collection
-      await FirebaseFirestore.instance
-          .collection('reports').doc(widget.report['id']).delete();
-
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('🗑️ تم حذف التقرير', textDirection: TextDirection.rtl),
-      ));
+      try {
+        await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).delete();
+        if (mounted) { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ تم الحذف', textDirection: TextDirection.rtl), backgroundColor: _darkBg)); }
+      } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl))); }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = widget.report['imageUrl'] ?? '';
+    final double confidence = (widget.report['confidence'] as num).toDouble();
+
     return Scaffold(
       backgroundColor: _green50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: _green600),
-          onPressed: () => Navigator.pop(context),
+        automaticallyImplyLeading: false, // Disables the standard left button
+        title: const Text(
+          'تفاصيل التقرير',
+          style: TextStyle(
+            color: _green900,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
-        title: const Text('تفاصيل التقرير',
-            style: TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 18)),
+        actions: [
+          // 1. Wrapping the IconButton in a Transform.rotate widget
+          Transform.rotate(
+            // 2. Rotating by pi (180 degrees) so it points to the right
+            angle: 3.14159, // Standard 'pi' constant value
+            child: IconButton(
+              // 3. Using the standard ios back icon
+              icon: const Icon(Icons.arrow_back_ios_new),
+              // 4. Making the color black
+              color: Colors.black,
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ],
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const SizedBox(height: 8),
-
-            // ── Status card ──────────────────
+            if (imageUrl.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(imageUrl, height: 180, fit: BoxFit.cover)),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(18),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 3))],
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)]),
               child: Column(children: [
-                Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(color: _sb, shape: BoxShape.circle),
-                  child: Icon(_isHealthy ? Icons.check_circle_outline : Icons.error_outline,
-                      color: _sc, size: 46),
-                ),
+                Icon(_isHealthy ? Icons.check_circle : Icons.error, color: _sc, size: 60),
                 const SizedBox(height: 12),
-                Text(widget.report['plantName'],
-                    style: const TextStyle(color: _green900,
-                        fontWeight: FontWeight.bold, fontSize: 20)),
+                Text(widget.report['plantName'], style: const TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 20)),
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(color: _sb, borderRadius: BorderRadius.circular(20)),
-                  child: Text(widget.report['status'],
-                      style: TextStyle(color: _sc, fontWeight: FontWeight.bold, fontSize: 14)),
-                ),
-                const SizedBox(height: 8),
-                Text('📅 ${widget.report['date']}',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-              ]),
-            ),
-            const SizedBox(height: 12),
-
-            // ── Confidence ───────────────────
-            _InfoCard(
-              title: 'دقة التشخيص',
-              child: Row(children: [
-                Expanded(child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: (widget.report['confidence'] as int) / 100,
-                    backgroundColor: const Color(0xFFE5E7EB),
-                    color: _sc, minHeight: 10,
+                Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), decoration: BoxDecoration(color: _sb, borderRadius: BorderRadius.circular(20)), child: Text(widget.report['status'], style: TextStyle(color: _sc, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 12),
+                Column(children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('دقة التشخيص', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text('${confidence.toInt()}%', style: TextStyle(color: _sc, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ]),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(value: confidence / 100, backgroundColor: _sc.withOpacity(0.1), color: _sc, minHeight: 8),
                   ),
-                )),
-                const SizedBox(width: 12),
-                Text('${widget.report['confidence']}٪',
-                    style: TextStyle(color: _sc, fontWeight: FontWeight.bold, fontSize: 18)),
+                ]),
+                const SizedBox(height: 12),
+                Text('📅 ${widget.report['date']}', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
               ]),
             ),
             const SizedBox(height: 12),
-
-            // ── Diagnosis ────────────────────
+            // التشخيص بألوان متناسقة
             _InfoCard(
-              title: 'التشخيص',
-              icon: Icons.biotech_rounded,
-              child: Text(widget.report['disease'],
-                  style: const TextStyle(color: _green900, fontSize: 14, height: 1.6)),
+              title: _isHealthy ? 'الحالة الصحية' : 'التشخيص',
+              icon: _isHealthy ? Icons.check_circle_outline : Icons.biotech,
+              titleColor: _sc,
+              backgroundColor: _sb,
+              borderColor: _sc.withOpacity(0.3),
+              child: Text(widget.report['disease']),
             ),
             const SizedBox(height: 12),
-
-            // ── Treatment ────────────────────
+            // التفاصيل بألوان متناسقة (أزرق)
+            if (widget.report['details'].toString().isNotEmpty)
+              _InfoCard(
+                title: 'التفاصيل والمعلومات',
+                icon: Icons.info_outline,
+                titleColor: const Color(0xFF0284C7),
+                backgroundColor: const Color(0xFFEFF6FF),
+                borderColor: const Color(0xFF0284C7).withOpacity(0.3),
+                child: Text(widget.report['details']),
+              ),
+            const SizedBox(height: 12),
+            // العلاج بألوان متناسقة (برتقالي/أصفر)
             _InfoCard(
-              title: 'العلاج الموصى به',
-              icon: Icons.healing_rounded,
-              child: Text(widget.report['treatment'],
-                  style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.6)),
+              title: _isHealthy ? 'نصائح العناية' : 'العلاج الموصى به',
+              icon: _isHealthy ? Icons.eco_outlined : Icons.healing,
+              titleColor: const Color(0xFFD97706),
+              backgroundColor: const Color(0xFFFFFBEB),
+              borderColor: const Color(0xFFD97706).withOpacity(0.3),
+              child: Text(widget.report['treatment']),
             ),
             const SizedBox(height: 24),
-
-            // ── Row 1: PDF + Share toggle ────
             Row(children: [
-              Expanded(child: _ActionBtn(
-                icon: Icons.picture_as_pdf_rounded,
-                label: 'تصدير PDF',
-                color: const Color(0xFF0284C7),
-                onTap: _exportPDF,
-              )),
+              Expanded(child: _ActionBtn(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.blue, onTap: _exportPDF)),
               const SizedBox(width: 10),
-              Expanded(child: _sharingLoading
-                  ? Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: const Center(child: SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16A34A)),
-                )),
-              )
-                  : _ActionBtn(
-                icon: _isShared ? Icons.cancel_outlined : Icons.share_rounded,
-                label: _isShared ? 'إلغاء المشاركة' : 'مشاركة',
-                color: _isShared ? Colors.orange : _green600,
-                onTap: _shareToggle,
-              )),
+              Expanded(child: _sharingLoading ? const Center(child: CircularProgressIndicator()) : _ActionBtn(icon: _isShared ? Icons.cancel : Icons.share, label: _isShared ? 'إلغاء المشاركة' : 'مشاركة', color: _isShared ? Colors.orange : _green600, onTap: _shareToggle)),
             ]),
             const SizedBox(height: 10),
-
-            // ── Row 2: Delete + Close ────────
-            Row(children: [
-              Expanded(child: GestureDetector(
-                onTap: _deleteReport,
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.red.shade300, width: 1.5),
-                  ),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 20),
-                    const SizedBox(width: 6),
-                    Text('حذف', style: TextStyle(color: Colors.red.shade400,
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-                  ]),
-                ),
-              )),
-              const SizedBox(width: 10),
-              Expanded(child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                  ),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.close, color: Colors.grey.shade500, size: 20),
-                    const SizedBox(width: 6),
-                    Text('إغلاق', style: TextStyle(color: Colors.grey.shade500,
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-                  ]),
-                ),
-              )),
-            ]),
-            const SizedBox(height: 30),
+            _ActionBtn(icon: Icons.delete_forever, label: 'حذف التقرير', color: Colors.red, onTap: _deleteReport),
+            const SizedBox(height: 60),
           ]),
         ),
       ),
@@ -672,24 +529,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  WIDGETS
-// ═══════════════════════════════════════════════
 class _StatCard extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color color;
-  final Color bgColor;
-  const _StatCard({required this.value, required this.label,
-    required this.color, required this.bgColor});
+  final String value, label;
+  final Color color, bgColor;
+  const _StatCard({required this.value, required this.label, required this.color, required this.bgColor});
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: bgColor, borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.2))),
       child: Column(children: [
         Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
@@ -702,51 +550,54 @@ class _StatCard extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final String title;
   final Widget child;
-  final IconData? icon;
-  const _InfoCard({required this.title, required this.child, this.icon});
+  final IconData icon;
+  final Color titleColor;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  const _InfoCard({
+    required this.title,
+    required this.child,
+    required this.icon,
+    required this.titleColor,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
   @override
   Widget build(BuildContext context) => Container(
-    width: double.infinity, padding: const EdgeInsets.all(16),
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white, borderRadius: BorderRadius.circular(16),
-      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: borderColor),
     ),
+    margin: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        if (icon != null) ...[
-          Icon(icon, color: const Color(0xFF16A34A), size: 18),
-          const SizedBox(width: 6),
-        ],
-        Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
+        Icon(icon, color: titleColor, size: 18),
+        const SizedBox(width: 6),
+        Text(title, style: TextStyle(color: titleColor, fontSize: 13, fontWeight: FontWeight.bold))
       ]),
       const SizedBox(height: 10),
-      child,
+      DefaultTextStyle(
+        style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.6),
+        child: child,
+      ),
     ]),
   );
 }
 
 class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionBtn({required this.icon, required this.label,
-    required this.color, required this.onTap});
+  final IconData icon; final String label; final Color color; final VoidCallback onTap;
+  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 6),
-        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
-      ]),
+      height: 52, decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.4))),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: color, size: 20), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
     ),
   );
 }

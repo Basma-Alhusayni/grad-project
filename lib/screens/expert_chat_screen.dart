@@ -365,6 +365,10 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
 // ─── فقاعة الرسالة للخبير ─────────────────────────────────────
 class _ExpertMessageBubble extends StatelessWidget {
   final Map<String, dynamic> msg;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
   const _ExpertMessageBubble({required this.msg});
 
   @override
@@ -377,7 +381,14 @@ class _ExpertMessageBubble extends StatelessWidget {
         isExpert ? Alignment.centerLeft : Alignment.centerRight,
         child: Container(
           constraints: BoxConstraints(
+<<<<<<< HEAD
               maxWidth: MediaQuery.of(context).size.width * 0.72),
+=======
+              maxWidth: MediaQuery
+                  .of(context)
+                  .size
+                  .width * 0.72),
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
           padding: const EdgeInsets.symmetric(
               horizontal: 14, vertical: 8),
           decoration: BoxDecoration(

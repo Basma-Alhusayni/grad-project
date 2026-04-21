@@ -18,15 +18,14 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   int _currentIndex = 0;
   int _profileTabIndex = 0;
 
-  String _name = '';
-  String _specialty = '';
+  // ── الحقول الفعلية الموجودة في Firestore ──
+  String _fullName = '';
+  String _email = '';
+  String _experience = '';
+  String _certificates = '';
   double _rating = 0.0;
   int _reviewCount = 0;
-  int _responseTime = 15;
-  int _successRate = 96;
-  int _totalCases = 0;
-  String _education = '';
-  String _experience = '';
+  List<String> _certificateImages = [];
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true;
 
@@ -43,11 +42,43 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       return;
     }
     try {
+      // ── جلب بيانات specialists ──
       final doc = await FirebaseFirestore.instance
           .collection('specialists')
           .doc(uid)
           .get();
 
+      final d = doc.data() ?? {};
+
+      // ── جلب صور الشهادات من specialists أولاً ──
+      List<String> certImages = [];
+      if (d['certificateImages'] is List) {
+        certImages = (d['certificateImages'] as List)
+            .map((e) => e.toString())
+            .toList();
+      }
+
+      // ── إذا ما فيه صور في specialists نجيبها من specialist_requests ──
+      if (certImages.isEmpty) {
+        try {
+          final reqSnap = await FirebaseFirestore.instance
+              .collection('specialist_requests')
+              .where('specialistId', isEqualTo: uid)
+              .limit(1)
+              .get();
+
+          if (reqSnap.docs.isNotEmpty) {
+            final reqData = reqSnap.docs.first.data();
+            if (reqData['certificateImages'] is List) {
+              certImages = (reqData['certificateImages'] as List)
+                  .map((e) => e.toString())
+                  .toList();
+            }
+          }
+        } catch (_) {}
+      }
+
+      // ── جلب التقييمات ──
       List<Map<String, dynamic>> reviews = [];
       try {
         final reviewsSnap = await FirebaseFirestore.instance
@@ -59,9 +90,14 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         reviews = reviewsSnap.docs.map((e) => e.data()).toList();
       } catch (_) {}
 
+      // ── جلب الإيميل من Auth ──
+      await FirebaseAuth.instance.currentUser?.reload();
+      final authEmail =
+          FirebaseAuth.instance.currentUser?.email ?? '';
+
       if (!mounted) return;
-      final d = doc.data() ?? {};
       setState(() {
+<<<<<<< HEAD
         _name        = d['fullName'] ?? d['name'] ?? d['username'] ?? '';
         _specialty   = d['specialty'] ?? (d['specializations'] is List && (d['specializations'] as List).isNotEmpty ? (d['specializations'] as List)[0].toString() : '');
         _rating      = (d['rating'] is num) ? (d['rating'] as num).toDouble() : 0.0;
@@ -73,6 +109,17 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         _experience  = (d['experience'] != null) ? d['experience'].toString() : '';
         _reviews     = reviews;
         _loading     = false;
+=======
+        _fullName          = d['fullName'] ?? '';
+        _email             = authEmail.isNotEmpty ? authEmail : (d['email'] ?? '');
+        _experience        = d['experience'] ?? '';
+        _certificates      = d['certificates'] ?? '';
+        _rating            = (d['rating'] is num) ? (d['rating'] as num).toDouble() : 0.0;
+        _reviewCount       = (d['reviewCount'] is num) ? (d['reviewCount'] as num).toInt() : 0;
+        _certificateImages = certImages;
+        _reviews           = reviews;
+        _loading           = false;
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
       });
     } catch (e) {
       if (!mounted) return;
@@ -90,41 +137,148 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // ── عرض صورة الشهادة كاملة ──────────────────────────────────
+  void _showFullImage(String url) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'معاينة الشهادة',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF14532D),
+                          fontSize: 16),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight:
+                    MediaQuery.of(context).size.height * 0.65,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 10,
+                          offset: Offset(0, 4))
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: InteractiveViewer(
+                      maxScale: 5.0,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            height: 250,
+                            color: const Color(0xFFF3F4F6),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                  color: Color(0xFF16A34A)),
+                            ),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 200,
+                          width: double.infinity,
+                          color: const Color(0xFFFEF2F2),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.broken_image,
+                                  color: Colors.red, size: 48),
+                              SizedBox(height: 8),
+                              Text('تعذر تحميل الصورة',
+                                  style: TextStyle(
+                                      color: Colors.red, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: const Color(0xFFF0FDF4),
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
           centerTitle: true,
           title: const Text(
-            'خبير النباتات',
+            'BioShield',
             style: TextStyle(
-              color: Color(0xFF166534),
+              color: Color(0xFF16A34A),
               fontWeight: FontWeight.bold,
               fontSize: 20,
             ),
           ),
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.white,
-          elevation: 1,
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              'assets/images/logo_without_background.png',
+              errorBuilder: (_, __, ___) =>
+              const Icon(Icons.eco, color: Color(0xFF16A34A)),
+            ),
+          ),
           actions: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 36,
-                errorBuilder: (_, __, ___) =>
-                const Icon(Icons.eco, color: Color(0xFF16A34A)),
+            IconButton(
+              icon: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.rotationY(3.1416),
+                child: const Icon(Icons.logout, color: Color(0xFFCC0000)),
               ),
+              onPressed: _logout,
             ),
           ],
         ),
         body: _loading
             ? const Center(
+<<<<<<< HEAD
             child: CircularProgressIndicator(
                 color: Color(0xFF16A34A)))
+=======
+            child:
+            CircularProgressIndicator(color: Color(0xFF16A34A)))
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
             : _buildBody(),
         bottomNavigationBar: _buildBottomNav(),
       ),
@@ -133,6 +287,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   Widget _buildBody() {
     switch (_currentIndex) {
+<<<<<<< HEAD
       case 0:
         return _buildProfileTab();
       case 1:
@@ -143,35 +298,34 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         return const RequestsScreen();
       default:
         return const SizedBox();
+=======
+      case 0: return const RequestsScreen();
+      case 1: return const _ChatsPage();
+      case 2: return const ExpertScheduleScreen();
+      case 3: return _buildProfileTab();
+      default: return const SizedBox();
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
     }
   }
 
-  // ── Bottom Nav ────────────────────────────────────────────────
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(0, Icons.person_outline, 'الملف'),
-              _navItem(1, Icons.calendar_today_outlined, 'الجدول'),
-              _navItem(2, Icons.chat_bubble_outline, 'المحادثات'),
-              _navItem(3, Icons.assignment_outlined, 'الطلبات'),
-            ],
-          ),
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) => setState(() => _currentIndex = index),
+      selectedItemColor: const Color(0xFF16A34A),
+      unselectedItemColor: Colors.grey,
+      backgroundColor: Colors.white,
+      elevation: 8,
+      type: BottomNavigationBarType.fixed,
+      selectedFontSize: 12,
+      unselectedFontSize: 12,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.assignment_outlined),
+          activeIcon: Icon(Icons.assignment),
+          label: 'الطلبات',
         ),
+<<<<<<< HEAD
       ),
     );
   }
@@ -211,6 +365,24 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           ),
         ],
       ),
+=======
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat_bubble_outline),
+          activeIcon: Icon(Icons.chat_bubble),
+          label: 'المحادثات',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today_outlined),
+          activeIcon: Icon(Icons.calendar_today),
+          label: 'الجدول',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          activeIcon: Icon(Icons.person),
+          label: 'الملف الشخصي',
+        ),
+      ],
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
     );
   }
 
@@ -220,15 +392,12 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       child: Column(
         children: [
           _buildProfileHeader(),
-          _buildStatsRow(),
           _buildTabBar(),
           _profileTabIndex == 0
               ? _buildInfoContent()
               : _profileTabIndex == 1
               ? _buildReportsContent()
               : _buildReviewsContent(),
-          const SizedBox(height: 24),
-          _buildLogoutButton(),
           const SizedBox(height: 24),
         ],
       ),
@@ -258,7 +427,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             ),
             child: Center(
               child: Text(
-                _name.isNotEmpty ? _name[0].toUpperCase() : 'خ',
+                _fullName.isNotEmpty
+                    ? _fullName[0].toUpperCase()
+                    : 'خ',
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -272,17 +443,12 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _name.isNotEmpty ? 'د. $_name' : 'د. الخبير',
+                  _fullName.isNotEmpty ? 'د. $_fullName' : 'د. الخبير',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 2),
-                if (_specialty.isNotEmpty)
-                  Text(_specialty,
-                      style: const TextStyle(
-                          color: Color(0xFFBBF7D0), fontSize: 12)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -298,16 +464,14 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                           size: 13,
                         )),
                     const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '${_rating.toStringAsFixed(1)} ($_reviewCount تقييم)',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      '${_rating.toStringAsFixed(1)} ($_reviewCount تقييم)',
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 11),
                     ),
                   ],
                 ),
+<<<<<<< HEAD
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -317,6 +481,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                     _headerChip(Icons.location_on_outlined, 'موقع'),
                   ],
                 ),
+=======
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
               ],
             ),
           ),
@@ -325,6 +491,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+<<<<<<< HEAD
   Widget _headerChip(IconData icon, String label) {
     return Container(
       padding:
@@ -384,6 +551,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   Widget _vDivider() => Container(
       width: 1, height: 32, color: const Color(0xFFE5E7EB));
 
+=======
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
   Widget _buildTabBar() {
     const tabs = ['المعلومات', 'التقارير', 'التقييمات'];
     return Container(
@@ -426,43 +595,249 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+<<<<<<< HEAD
+=======
+  // ── تاب المعلومات ────────────────────────────────────────────
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
   Widget _buildInfoContent() {
     return Column(
       children: [
         const SizedBox(height: 12),
-        if (_specialty.isNotEmpty)
-          _sectionCard(
-            title: 'التخصصات',
-            child: Text(_specialty,
-                style: const TextStyle(
-                    fontSize: 13, color: Colors.black87)),
-          ),
+
+        // ── بطاقة المعلومات الشخصية
+        _sectionCard(
+          title: 'المعلومات الشخصية',
+          children: [
+            _buildInfoRow(
+              label: 'الاسم الكامل',
+              value: _fullName.isNotEmpty ? _fullName : '—',
+              icon: Icons.person_outline,
+            ),
+            _divider(),
+            _buildInfoRow(
+              label: 'البريد الإلكتروني',
+              value: _email.isNotEmpty ? _email : '—',
+              icon: Icons.email_outlined,
+            ),
+          ],
+        ),
+
         const SizedBox(height: 12),
-        if (_education.isNotEmpty || _experience.isNotEmpty)
-          _sectionCard(
-            title: 'المعلومات المهنية',
-            child: Column(
+
+        // ── بطاقة المعلومات المهنية
+        _sectionCard(
+          title: 'المعلومات المهنية',
+          children: [
+            _buildInfoRow(
+              label: 'سنوات الخبرة',
+              value: _experience.isNotEmpty ? _experience : '—',
+              icon: Icons.work_outline,
+            ),
+            _divider(),
+            _buildInfoRow(
+              label: 'الشهادات',
+              value: _certificates.isNotEmpty ? _certificates : '—',
+              icon: Icons.workspace_premium_outlined,
+            ),
+          ],
+        ),
+
+        // ── صور الشهادات
+        if (_certificateImages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildCertificateImages(),
+        ],
+
+        const SizedBox(height: 16),
+
+        // ── زر تسجيل الخروج
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _logout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFCC0000),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+              label: const Text(
+                'تسجيل الخروج',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  // ── بطاقة صور الشهادات ──────────────────────────────────────
+  Widget _buildCertificateImages() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
               children: [
-                if (_education.isNotEmpty) ...[
-                  _infoItem(Icons.school_outlined, _education),
-                  const SizedBox(height: 10),
-                ],
-                if (_experience.isNotEmpty)
-                  _infoItem(Icons.work_outline, _experience),
+                const Icon(Icons.photo_library_outlined,
+                    color: Color(0xFF16A34A), size: 18),
+                const SizedBox(width: 8),
+                const Text('صور الشهادات',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${_certificateImages.length} صورة',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF16A34A),
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
           ),
-        if (_education.isEmpty &&
-            _experience.isEmpty &&
-            _specialty.isEmpty)
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
           Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Text('لم يتم إضافة معلومات بعد',
-                  style: TextStyle(
-                      color: Colors.grey[500], fontSize: 14)),
+            padding: const EdgeInsets.all(12),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.1,
+              ),
+              itemCount: _certificateImages.length,
+              itemBuilder: (context, i) {
+                final imgUrl = _certificateImages[i];
+                return GestureDetector(
+                  onTap: () => _showFullImage(imgUrl),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                      Border.all(color: const Color(0xFFE8E8E8)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: Image.network(
+                            imgUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder:
+                                (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: const Color(0xFFF0FDF4),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                      color: Color(0xFF16A34A),
+                                      strokeWidth: 2),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFFF3F4F6),
+                              child: const Column(
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image,
+                                      color: Colors.grey, size: 32),
+                                  SizedBox(height: 4),
+                                  Text('تعذر التحميل',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // شريط سفلي مع رقم الشهادة وأيقونة تكبير
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 10),
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.vertical(
+                                  bottom: Radius.circular(9)),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.55),
+                                ],
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'شهادة ${i + 1}',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Icon(Icons.zoom_in,
+                                    color: Colors.white, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
+<<<<<<< HEAD
       ],
     );
   }
@@ -491,18 +866,103 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         child: Text('لا توجد تقارير حالياً',
             style:
             TextStyle(color: Colors.grey[500], fontSize: 14)),
+=======
+        ],
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
       ),
     );
   }
 
+<<<<<<< HEAD
+=======
+  Widget _sectionCard(
+      {required String title, required List<Widget> children}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(title,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87)),
+          ),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() => const Divider(
+      height: 1,
+      color: Color(0xFFEEEEEE),
+      indent: 16,
+      endIndent: 16);
+
+  Widget _buildInfoRow({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 3),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14, color: Colors.black87)),
+              ],
+            ),
+          ),
+          Icon(icon, color: const Color(0xFF16A34A), size: 22),
+        ],
+      ),
+    );
+  }
+
+  // ── تاب التقارير ─────────────────────────────────────────────
+  Widget _buildReportsContent() {
+    return const Padding(
+      padding: EdgeInsets.all(24),
+      child: Center(
+        child: Text('لا توجد تقارير حالياً',
+            style: TextStyle(color: Colors.grey, fontSize: 14)),
+      ),
+    );
+  }
+
+  // ── تاب التقييمات ────────────────────────────────────────────
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
   Widget _buildReviewsContent() {
     if (_reviews.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
+      return const Padding(
+        padding: EdgeInsets.all(24),
         child: Center(
           child: Text('لا توجد تقييمات بعد',
+<<<<<<< HEAD
               style: TextStyle(
                   color: Colors.grey[500], fontSize: 14)),
+=======
+              style: TextStyle(color: Colors.grey, fontSize: 14)),
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
         ),
       );
     }
@@ -551,15 +1011,14 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                             color: Colors.black87)),
                     Row(
                       children: List.generate(
-                        5,
-                            (i) => Icon(
-                          i < rating
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: const Color(0xFFFBBF24),
-                          size: 13,
-                        ),
-                      ),
+                          5,
+                              (i) => Icon(
+                            i < rating
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: const Color(0xFFFBBF24),
+                            size: 13,
+                          )),
                     ),
                   ],
                 ),
@@ -578,6 +1037,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 
   Widget _sectionCard(
       {required String title, required Widget child}) {
@@ -628,6 +1088,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       ),
     );
   }
+=======
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
 }
 
 // ─── صفحة المحادثات ───────────────────────────────────────────
@@ -683,8 +1145,13 @@ class _ChatsPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
+<<<<<<< HEAD
                     border: Border.all(
                         color: const Color(0xFFbbf7d0)),
+=======
+                    border:
+                    Border.all(color: const Color(0xFFbbf7d0)),
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),

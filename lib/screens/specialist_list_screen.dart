@@ -456,12 +456,16 @@ class _SpecialistListScreenState extends State<SpecialistListScreen> {
                     const EdgeInsets.fromLTRB(16, 16, 16, 12),
                     child: Column(
                       children: [
+<<<<<<< HEAD
                         const Text('الخبراء المتخصصون',
                             style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF166534))),
                         const SizedBox(height: 14),
+=======
+                        //خبراء متخصصون
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
                         Container(
                           decoration: BoxDecoration(
                             color: const Color(0xFFF0FDF4),
@@ -518,7 +522,11 @@ class _SpecialistListScreenState extends State<SpecialistListScreen> {
                                                   : const Color(
                                                   0xFF6475D8))),
                                       const SizedBox(height: 4),
+<<<<<<< HEAD
                                       Text('متاح الآن',
+=======
+                                      Text('خبير متاح',
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
                                           style: TextStyle(
                                               fontSize: 13,
                                               color: _showAvailableOnly
@@ -563,7 +571,11 @@ class _SpecialistListScreenState extends State<SpecialistListScreen> {
                                                   : const Color(
                                                   0xFF2E8B57))),
                                       const SizedBox(height: 4),
+<<<<<<< HEAD
                                       Text('خبير متاح',
+=======
+                                      Text('خبير غير متاح',
+>>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
                                           style: TextStyle(
                                               fontSize: 13,
                                               color: !_showAvailableOnly

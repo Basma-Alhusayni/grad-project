@@ -19,7 +19,7 @@ class AuthService {
     return doc.data()?['role'];
   }
 
-  // ── Register User ────────────────────────────────────────
+  // ── تسجيل مستخدم عادي ──────────────────────────────────────
   Future<String?> registerUser({
     required String email,
     required String password,
@@ -58,7 +58,7 @@ class AuthService {
     }
   }
 
-  // ── Register Admin ───────────────────────────────────────
+  // ── تسجيل مسؤول (كود داخلي) ───────────────────────────────
   Future<String?> registerAdmin({
     required String email,
     required String password,
@@ -93,7 +93,7 @@ class AuthService {
     }
   }
 
-  // ── Submit Specialist Request ────────────────────────────
+  // ── تقديم طلب انضمام خبير ──────────────────────────────────
   Future<String?> submitSpecialistRequest({
     required String email,
     required String fullName,
@@ -115,7 +115,6 @@ class AuthService {
         if (status == 'approved') {
           return 'تم قبول طلبك مسبقاً. يرجى تسجيل الدخول كخبير';
         }
-        // status == 'rejected' → allow resubmission
       }
 
       await _db.collection('specialist_requests').add({
@@ -133,12 +132,9 @@ class AuthService {
     }
   }
 
-  // ── Generate readable temp password ─────────────────────
+  // ── توليد كلمة مرور مؤقتة ──────────────────────────────────
   String _generateTempPassword() {
-    const words = [
-      'Plant', 'Green', 'Bloom', 'Leaf',
-      'Bio', 'Flora', 'Crop', 'Herb', 'Seed', 'Field'
-    ];
+    const words = ['Plant', 'Green', 'Bloom', 'Leaf', 'Bio', 'Flora', 'Crop', 'Herb', 'Seed', 'Field'];
     const symbols = ['!', '@', '#', r'$', '&'];
     final rand = Random.secure();
     final word = words[rand.nextInt(words.length)];
@@ -147,14 +143,7 @@ class AuthService {
     return '$word$digits$symbol';
   }
 
-  // ── Approve Specialist Request ───────────────────────────
-  // 1. Generate temp password
-  // 2. Try to create Firebase Auth account via REST API
-  //    - If EMAIL_EXISTS → account already exists, get UID from Firestore
-  //    - If new → write new accounts doc
-  // 3. Write/update specialists doc
-  // 4. Mark request approved
-  // 5. Send approval email with temp password via EmailJS
+  // ── اعتماد طلب الخبير من قبل الأدمن ────────────────────────
   Future<String?> approveSpecialistRequest({
     required Map<String, dynamic> requestData,
     required String requestDocId,
@@ -166,14 +155,12 @@ class AuthService {
       String uid;
       final tempPassword = _generateTempPassword();
 
-      // Try creating a new Firebase Auth account via REST API
       final createResult = await _createAuthAccountViaRestApi(
         email: email,
         password: tempPassword,
       );
 
       if (createResult['error'] == 'EMAIL_EXISTS') {
-        // Auth account already exists — get UID from Firestore accounts
         final existingAccount = await _db
             .collection('accounts')
             .where('email', isEqualTo: email)
@@ -181,16 +168,12 @@ class AuthService {
             .get();
 
         if (existingAccount.docs.isEmpty) {
-          // Auth exists but no Firestore doc — rare edge case
-          // Send password reset so expert can access their account
           await _auth.sendPasswordResetEmail(email: email);
-          return 'يوجد حساب بهذا البريد ولكن لا يوجد مستند Firestore. '
-              'تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني.';
+          return 'يوجد حساب بهذا البريد ولكن لا يوجد مستند Firestore. تم إرسال رابط إعادة التعيين.';
         }
 
         uid = existingAccount.docs.first.id;
 
-        // Update existing account to specialist role
         await _db.collection('accounts').doc(uid).update({
           'role': 'specialist',
           'status': 'active',
@@ -198,12 +181,9 @@ class AuthService {
           'isFirstLogin': true,
         });
 
-        // Send password reset email so expert can log in
-        // (we can't change their password without their current credentials)
         await _auth.sendPasswordResetEmail(email: email);
 
       } else if (createResult['uid'] != null) {
-        // New account created successfully
         uid = createResult['uid']!;
 
         await _db.collection('accounts').doc(uid).set({
@@ -217,11 +197,9 @@ class AuthService {
         });
 
       } else {
-        // Unexpected REST API error
         throw Exception(createResult['error'] ?? 'Unknown REST API error');
       }
 
-      // Save / update specialist profile
       await _db.collection('specialists').doc(uid).set({
         'specialistId': uid,
         'accountId': uid,
@@ -229,18 +207,17 @@ class AuthService {
         'fullName': fullName,
         'certificates': requestData['certificates'] ?? '',
         'experience': requestData['experience'] ?? '',
+        'certificateImages': requestData['certificateImages'] ?? [],
         'rating': 0.0,
         'reviewCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // Mark request approved
       await _db
           .collection('specialist_requests')
           .doc(requestDocId)
           .update({'status': 'approved', 'specialistId': uid});
 
-      // Send approval email with temp password via EmailJS
       final emailResult = await EmailService.sendApprovalEmail(
         toEmail: email,
         toName: fullName,
@@ -250,20 +227,16 @@ class AuthService {
       );
 
       if (!emailResult.success) {
-        // ignore: avoid_print
-        print('[AuthService] Approval email warning: ${emailResult.error}');
         return 'تم القبول ✓ لكن فشل إرسال البريد: ${emailResult.error}';
       }
 
       return null;
-    } on FirebaseAuthException catch (e) {
-      return _mapError(e.code);
     } catch (e) {
       return 'حدث خطأ: $e';
     }
   }
 
-  // ── Reject Specialist Request ────────────────────────────
+  // ── رفض طلب خبير ───────────────────────────────────────────
   Future<String?> rejectSpecialistRequest({
     required String requestDocId,
     required String expertEmail,
@@ -271,10 +244,7 @@ class AuthService {
     required String rejectionReason,
   }) async {
     try {
-      await _db
-          .collection('specialist_requests')
-          .doc(requestDocId)
-          .update({
+      await _db.collection('specialist_requests').doc(requestDocId).update({
         'status': 'rejected',
         'rejectionReason': rejectionReason,
         'rejectedAt': FieldValue.serverTimestamp(),
@@ -286,17 +256,14 @@ class AuthService {
         rejectionReason: rejectionReason,
       );
 
-      if (!emailResult.success) {
-        return 'تم الرفض ✓ لكن فشل إرسال البريد: ${emailResult.error}';
-      }
-
+      if (!emailResult.success) return 'تم الرفض ✓ لكن فشل إرسال البريد: ${emailResult.error}';
       return null;
     } catch (e) {
       return 'حدث خطأ: $e';
     }
   }
 
-  // ── Login (user / admin) ─────────────────────────────────
+  // ── تسجيل دخول (مستخدم / أدمن) مع التحقق من الدور ────────────
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -307,23 +274,24 @@ class AuthService {
           email: email, password: password);
       final uid = cred.user!.uid;
 
-      if (!cred.user!.emailVerified) {
-        await cred.user!.sendEmailVerification();
+      final doc = await _db.collection('accounts').doc(uid).get();
+      if (!doc.exists) {
         await _auth.signOut();
-        return {
-          'error': null,
-          'needsVerification': true,
-          'email': email,
-        };
+        return {'error': 'هذا الحساب غير مسجل في النظام'};
       }
 
-      final doc = await _db.collection('accounts').doc(uid).get();
-      if (!doc.exists) return {'error': 'الحساب غير موجود'};
-
       final role = doc.data()!['role'];
-      if (role != expectedRole && role != 'admin') {
+
+      // 🔥 الإصلاح: التحقق الصارم من الدور المخصص لكل شاشة
+      if (role != expectedRole) {
         await _auth.signOut();
-        return {'error': 'نوع الحساب غير صحيح'};
+        String roleLabel = expectedRole == 'admin' ? 'مدير' : 'مستخدم';
+        return {'error': 'عذراً، هذا الحساب ليس حساب $roleLabel'};
+      }
+
+      if (!cred.user!.emailVerified) {
+        await _auth.signOut();
+        return {'error': null, 'needsVerification': true, 'email': email};
       }
 
       return {'role': role, 'uid': uid};
@@ -332,7 +300,7 @@ class AuthService {
     }
   }
 
-  // ── Specialist Login ─────────────────────────────────────
+  // ── تسجيل دخول الخبير مع التحقق من الدور والدخول الأول ───────
   Future<Map<String, dynamic>> specialistLogin({
     required String email,
     required String password,
@@ -343,9 +311,14 @@ class AuthService {
       final uid = cred.user!.uid;
 
       final doc = await _db.collection('accounts').doc(uid).get();
-      if (!doc.exists) return {'error': 'الحساب غير موجود'};
+      if (!doc.exists) {
+        await _auth.signOut();
+        return {'error': 'الحساب غير موجود'};
+      }
 
       final role = doc.data()!['role'];
+
+      // 🔥 الإصلاح: منع الأدمن أو المستخدم من دخول واجهة الخبير
       if (role != 'specialist') {
         await _auth.signOut();
         return {'error': 'هذا الحساب ليس حساب خبير'};
@@ -358,13 +331,13 @@ class AuthService {
     }
   }
 
-  // ── Change password on first login ───────────────────────
+  // ── تغيير كلمة المرور عند الدخول الأول ─────────────────────
   Future<String?> changePasswordFirstTime({
     required String newPassword,
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return 'المستخدم غير مسجل الدخول';
+      if (user == null) return 'الجلسة منتهية، يرجى إعادة تسجيل الدخول';
 
       await user.updatePassword(newPassword);
       await _db
@@ -380,7 +353,7 @@ class AuthService {
     }
   }
 
-  // ── Reset Password ───────────────────────────────────────
+  // ── استعادة كلمة المرور ────────────────────────────────────
   Future<String?> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -390,21 +363,15 @@ class AuthService {
     }
   }
 
-  // ── Sign Out ─────────────────────────────────────────────
   Future<void> signOut() => _auth.signOut();
 
-  // ── REST API: Create Firebase Auth account ───────────────
-  // Returns {'uid': '...'} on success.
-  // Returns {'error': 'EMAIL_EXISTS'} if email already registered.
-  // Returns {'error': '...'} for other errors.
-  // Does NOT affect the admin's current session.
+  // ── استخدام REST API لإنشاء حساب بدون التأثير على جلسة الأدمن ──
   Future<Map<String, String>> _createAuthAccountViaRestApi({
     required String email,
     required String password,
   }) async {
     final url = Uri.parse(
-      'https://identitytoolkit.googleapis.com/v1/accounts:signUp'
-          '?key=$_firebaseWebApiKey',
+      'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$_firebaseWebApiKey',
     );
 
     final response = await http.post(
@@ -418,36 +385,22 @@ class AuthService {
     ).timeout(const Duration(seconds: 15));
 
     final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return {'uid': data['localId'] as String};
-    }
-
-    final errMsg = data['error']?['message'] ?? 'Unknown';
-    return {'error': errMsg};
+    if (response.statusCode == 200) return {'uid': data['localId'] as String};
+    return {'error': data['error']?['message'] ?? 'Unknown'};
   }
 
-  // ── Error mapper ─────────────────────────────────────────
+  // ── تحويل رموز الخطأ لرسائل عربية مفهومة ─────────────────────
   String _mapError(String code) {
     switch (code) {
-      case 'user-not-found':
-        return 'البريد الإلكتروني غير مسجل';
-      case 'wrong-password':
-        return 'كلمة المرور غير صحيحة';
-      case 'email-already-in-use':
-        return 'البريد الإلكتروني مستخدم بالفعل';
-      case 'weak-password':
-        return 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)';
-      case 'invalid-email':
-        return 'البريد الإلكتروني غير صحيح';
-      case 'too-many-requests':
-        return 'محاولات كثيرة. حاول لاحقاً';
-      case 'invalid-credential':
-        return 'هناك خطأ في البريد الإلكتروني أو كلمة المرور';
-      case 'requires-recent-login':
-        return 'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
-      default:
-        return 'هناك خطأ في البريد الإلكتروني أو في كلمة المرور';
+      case 'user-not-found': return 'البريد الإلكتروني غير مسجل';
+      case 'wrong-password': return 'كلمة المرور غير صحيحة';
+      case 'email-already-in-use': return 'البريد الإلكتروني مستخدم بالفعل';
+      case 'weak-password': return 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)';
+      case 'invalid-email': return 'البريد الإلكتروني غير صحيح';
+      case 'too-many-requests': return 'محاولات كثيرة. حاول لاحقاً';
+      case 'invalid-credential': return 'هناك خطأ في البريد الإلكتروني أو كلمة المرور';
+      case 'requires-recent-login': return 'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
+      default: return 'هناك خطأ في البريد الإلكتروني أو في كلمة المرور';
     }
   }
 }

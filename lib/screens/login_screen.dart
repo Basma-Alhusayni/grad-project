@@ -37,7 +37,7 @@ class LoginScreen extends StatelessWidget {
                     child: Image.asset(
                       'assets/images/logo.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
+                      errorBuilder: (_, _, _) => const Icon(
                           Icons.eco,
                           color: Color(0xFF16A34A),
                           size: 64),
@@ -51,9 +51,6 @@ class LoginScreen extends StatelessWidget {
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF14532D))),
-              const Text('حماية نباتاتك بالذكاء الاصطناعي',
-                  style: TextStyle(
-                      color: Color(0xFF16A34A), fontSize: 14)),
               const Spacer(),
               // Card
               Container(
@@ -152,7 +149,7 @@ class LoginScreen extends StatelessWidget {
                 ]),
               ),
               const Spacer(),
-              const Text('جميع الحقوق محفوظة © 2025 BioShield',
+              const Text('جميع الحقوق محفوظة © 2026 BioShield',
                   style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
             ]),
