@@ -271,7 +271,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                 ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.close, size: 16),
-                label: const Text('مغلق'),
+                label: const Text('غير متاح'),
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   _saveDay(false);
@@ -330,7 +330,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                     Colors.green),
                 const SizedBox(width: 10),
                 _statBox(
-                    '$closedDays', 'أيام مغلقة', Colors.blue),
+                    '$closedDays', 'أيام غير متاحة', Colors.blue),
               ],
             ),
             const SizedBox(height: 14),

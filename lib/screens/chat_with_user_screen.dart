@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ChatWithUserScreen extends StatefulWidget {
   final String chatId;
-  final String userName;
+  final String expertName;
+  final double expertRating;
   final bool isOnline;
 
   const ChatWithUserScreen({
     super.key,
     required this.chatId,
-    required this.userName,
-    required this.isOnline,
+    required this.expertName,
+    required this.expertRating,
+    this.isOnline = false,
   });
 
   @override
@@ -18,24 +23,38 @@ class ChatWithUserScreen extends StatefulWidget {
 }
 
 class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
-  final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _messageController =
+  TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final _db = FirebaseFirestore.instance;
+  final _picker = ImagePicker();
+  bool _isApproved = false;
 
-  final _plantNameController = TextEditingController();
-  final _diseaseController = TextEditingController();
-  final _diagnosisController = TextEditingController();
-  final _treatmentController = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+    _listenToApproval();
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _plantNameController.dispose();
-    _diseaseController.dispose();
-    _diagnosisController.dispose();
-    _treatmentController.dispose();
     super.dispose();
+  }
+
+  // ── مراقبة موافقة الخبير ───────────────────────────────────
+  void _listenToApproval() {
+    _db.collection('chats').doc(widget.chatId).snapshots().listen(
+          (snap) {
+        if (snap.exists && mounted) {
+          final approved = snap.data()?['expertApproved'] == true;
+          if (approved != _isApproved) {
+            setState(() => _isApproved = approved);
+          }
+        }
+      },
+    );
   }
 
   void _scrollToBottom() {
@@ -55,6 +74,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
+  // ── إرسال رسالة نصية ───────────────────────────────────────
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -63,7 +83,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
 
     final msg = {
       'id': 'msg-${DateTime.now().millisecondsSinceEpoch}',
-      'sender': 'expert',
+      'sender': 'user',
       'content': text,
       'time': _now(),
       'type': 'text',
@@ -73,113 +93,36 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
       'messages': FieldValue.arrayUnion([msg]),
       'lastMessage': text,
       'time': _now(),
+      'unread': FieldValue.increment(1),
     });
 
     _scrollToBottom();
   }
 
-  Future<void> _submitReport() async {
-    final plantName = _plantNameController.text.trim();
-    final disease = _diseaseController.text.trim();
-    final diagnosis = _diagnosisController.text.trim();
-    final treatment = _treatmentController.text.trim();
+  // ── إرسال صورة ─────────────────────────────────────────────
+  Future<void> _sendImage() async {
+    final picked =
+    await _picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
 
-    if (plantName.isEmpty || disease.isEmpty || diagnosis.isEmpty || treatment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('الرجاء ملء جميع الحقول', textDirection: TextDirection.rtl),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    // في التطبيق الحقيقي ارفع الصورة لـ Firebase Storage وخذ الرابط
+    // هنا نحفظ path مؤقت
+    final msg = {
+      'id': 'img-${DateTime.now().millisecondsSinceEpoch}',
+      'sender': 'user',
+      'content': picked.path,
+      'time': _now(),
+      'type': 'image',
+    };
 
-    await _db.collection('reports').add({
-      'id': 'report-${DateTime.now().millisecondsSinceEpoch}',
-      'chatId': widget.chatId,
-      'userName': widget.userName,
-      'plantName': plantName,
-      'disease': disease,
-      'diagnosis': diagnosis,
-      'treatment': treatment,
-      'date': DateTime.now().toIso8601String(),
-      'status': 'solved',
+    await _db.collection('chats').doc(widget.chatId).update({
+      'messages': FieldValue.arrayUnion([msg]),
+      'lastMessage': '📷 صورة',
+      'time': _now(),
+      'unread': FieldValue.increment(1),
     });
 
-    _plantNameController.clear();
-    _diseaseController.clear();
-    _diagnosisController.clear();
-    _treatmentController.clear();
-
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('تم إضافة التقرير إلى الحالات المعالجة',
-              textDirection: TextDirection.rtl),
-          backgroundColor: Colors.green[700],
-        ),
-      );
-    }
-  }
-
-  void _openReportDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إضافة تقرير العلاج'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _reportField('اسم النبتة', 'مثال: نبات الطماطم', _plantNameController),
-                const SizedBox(height: 12),
-                _reportField('المرض / الإصابة', 'مثال: تبقع الأوراق الفطري', _diseaseController),
-                const SizedBox(height: 12),
-                _reportField('التشخيص التفصيلي', 'اكتب التشخيص التفصيلي للحالة...', _diagnosisController, maxLines: 3),
-                const SizedBox(height: 12),
-                _reportField('العلاج المقترح', 'اكتب خطة العلاج والتوصيات...', _treatmentController, maxLines: 3),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16a34a)),
-              icon: const Icon(Icons.check_circle_outline, size: 18),
-              label: const Text('إضافة التقرير'),
-              onPressed: _submitReport,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _reportField(String label, String hint, TextEditingController ctrl, {int maxLines = 1}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        TextField(
-          controller: ctrl,
-          maxLines: maxLines,
-          textDirection: TextDirection.rtl,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(fontSize: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-        ),
-      ],
-    );
+    _scrollToBottom();
   }
 
   @override
@@ -191,6 +134,8 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
         body: Column(
           children: [
             _buildHeader(),
+            // بانر انتظار الموافقة
+            if (!_isApproved) _buildPendingBanner(),
             Expanded(child: _buildMessages()),
             _buildInputBar(),
           ],
@@ -199,56 +144,21 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  // ── بانر الانتظار ───────────────────────────────────────────
+  Widget _buildPendingBanner() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(8, 48, 8, 8),
-      child: Column(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      color: const Color(0xFFFFF7ED),
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_forward, color: Color(0xFF15803d)),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFFdcfce7),
-                child: Text(
-                  widget.userName.isNotEmpty ? widget.userName[0] : '?',
-                  style: const TextStyle(color: Color(0xFF15803d)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.userName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(
-                      widget.isOnline ? 'متصل الآن' : 'غير متصل',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: widget.isOnline ? Colors.green[600] : Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF16a34a),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              icon: const Icon(Icons.check_circle_outline, size: 18),
-              label: const Text('تم العلاج - إضافة إلى التقارير'),
-              onPressed: _openReportDialog,
+          const Icon(Icons.access_time,
+              color: Colors.orange, size: 16),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'رسائلك محفوظة — في انتظار موافقة الخبير لعرضها',
+              style: TextStyle(fontSize: 12, color: Colors.orange),
             ),
           ),
         ],
@@ -256,6 +166,73 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // ── هيدر ───────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(8, 48, 8, 10),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_forward,
+                color: Color(0xFF15803d)),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFdcfce7),
+            child: Text(
+              widget.expertName.isNotEmpty
+                  ? widget.expertName[0]
+                  : 'خ',
+              style: const TextStyle(color: Color(0xFF15803d)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.expertName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15)),
+                Row(
+                  children: [
+                    const Icon(Icons.star,
+                        size: 13, color: Colors.amber),
+                    const SizedBox(width: 3),
+                    Text('${widget.expertRating}',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _isApproved
+                            ? const Color(0xFF16a34a)
+                            : Colors.orange,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _isApproved ? 'مقبول' : 'قيد المراجعة',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.workspace_premium,
+              color: Color(0xFF16a34a), size: 22),
+        ],
+      ),
+    );
+  }
+
+  // ── الرسائل ─────────────────────────────────────────────────
   Widget _buildMessages() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.collection('chats').doc(widget.chatId).snapshots(),
@@ -264,24 +241,36 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final data = snapshot.data?.data() as Map<String, dynamic>?;
-        final rawMessages = data?['messages'] as List<dynamic>? ?? [];
+        final data =
+        snapshot.data?.data() as Map<String, dynamic>?;
+        final rawMessages =
+            data?['messages'] as List<dynamic>? ?? [];
 
         _scrollToBottom();
 
+        if (rawMessages.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.chat_bubble_outline,
+                    size: 60, color: Colors.grey[300]),
+                const SizedBox(height: 12),
+                const Text('ابدأ المحادثة مع الخبير',
+                    style:
+                    TextStyle(color: Colors.grey, fontSize: 14)),
+              ],
+            ),
+          );
+        }
+
         return ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           itemCount: rawMessages.length,
           itemBuilder: (context, index) {
-            final msg = Map<String, dynamic>.from(rawMessages[index]);
-
-            if (msg['type'] == 'plant-info' && msg['plantData'] != null) {
-              return _PlantInfoCard(
-                plantData: Map<String, dynamic>.from(msg['plantData']),
-              );
-            }
-
+            final msg =
+            Map<String, dynamic>.from(rawMessages[index]);
             return _MessageBubble(msg: msg);
           },
         );
@@ -289,108 +278,166 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // ── شريط الإدخال ────────────────────────────────────────────
   Widget _buildInputBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.attach_file, color: Color(0xFF16a34a)),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.image_outlined, color: Color(0xFF16a34a)),
-              onPressed: () {},
-            ),
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                textDirection: TextDirection.rtl,
-                onSubmitted: (_) => _sendMessage(),
-                decoration: InputDecoration(
-                  hintText: 'اكتب رسالتك...',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFbbf7d0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFbbf7d0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFF4ade80), width: 1.5),
+        child: Container(
+          padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            children: [
+              // زر الصورة
+              IconButton(
+                icon: const Icon(Icons.image_outlined,
+                    color: Color(0xFF16A34A)),
+                onPressed: _sendImage,
+              ),
+              // حقل النص
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  textDirection: TextDirection.rtl,
+                  onSubmitted: (_) => _sendMessage(),
+                  decoration: const InputDecoration(
+                    hintText: 'اكتب رسالتك...',
+                    border: InputBorder.none,
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _sendMessage,
-              child: const CircleAvatar(
-                radius: 22,
-                backgroundColor: Color(0xFF16a34a),
-                child: Icon(Icons.send, color: Colors.white, size: 20),
+              // زر الإرسال
+              GestureDetector(
+                onTap: _sendMessage,
+                child: Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF16A34A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.send,
+                      color: Colors.white, size: 20),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// ─── فقاعة الرسالة ───────────────────────────────────────────
 class _MessageBubble extends StatelessWidget {
   final Map<String, dynamic> msg;
   const _MessageBubble({required this.msg});
 
   @override
   Widget build(BuildContext context) {
-    final isExpert = msg['sender'] == 'expert';
+    final isUser = msg['sender'] == 'user';
+    final isImage = msg['type'] == 'image';
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Align(
-        alignment: isExpert ? Alignment.centerLeft : Alignment.centerRight,
+        alignment:
+        isUser ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.72),
+          padding: isImage
+              ? const EdgeInsets.all(4)
+              : const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: isExpert ? const Color(0xFF16a34a) : Colors.white,
+            color: isUser ? const Color(0xFF16a34a) : Colors.white,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),
-              bottomLeft: isExpert ? const Radius.circular(4) : const Radius.circular(16),
-              bottomRight: isExpert ? const Radius.circular(16) : const Radius.circular(4),
+              bottomLeft: isUser
+                  ? const Radius.circular(16)
+                  : const Radius.circular(4),
+              bottomRight: isUser
+                  ? const Radius.circular(4)
+                  : const Radius.circular(16),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2))
             ],
           ),
-          child: Column(
+          child: isImage
+              ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: File(msg['content'] ?? '').existsSync()
+                    ? Image.file(
+                  File(msg['content']),
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                )
+                    : (msg['content'] ?? '').startsWith('http')
+                    ? Image.network(
+                  msg['content'],
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                )
+                    : Container(
+                  width: 200,
+                  height: 200,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image,
+                      color: Colors.grey, size: 40),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(
+                    top: 4, right: 4, left: 4),
+                child: Text(
+                  msg['time'] ?? '',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: isUser
+                          ? Colors.green[100]
+                          : Colors.grey[400]),
+                ),
+              ),
+            ],
+          )
+              : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 msg['content'] ?? '',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: isExpert ? Colors.white : Colors.grey[800],
-                ),
+                    fontSize: 14,
+                    color: isUser
+                        ? Colors.white
+                        : Colors.grey[800]),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 msg['time'] ?? '',
                 style: TextStyle(
-                  fontSize: 10,
-                  color: isExpert ? Colors.green[100] : Colors.grey[400],
-                ),
+                    fontSize: 10,
+                    color: isUser
+                        ? Colors.green[100]
+                        : Colors.grey[400]),
               ),
             ],
           ),
@@ -398,87 +445,4 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PlantInfoCard extends StatelessWidget {
-  final Map<String, dynamic> plantData;
-  const _PlantInfoCard({required this.plantData});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFf0fdf4), Color(0xFFecfdf5)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: const Color(0xFF86efac), width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '📋 معلومات الحالة',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: Color(0xFF166534),
-              ),
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: (plantData['image'] ?? '').toString().isNotEmpty
-                  ? Image.network(
-                plantData['image'],
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _placeholder(),
-              )
-                  : _placeholder(),
-            ),
-            const SizedBox(height: 10),
-            Text('الوصف:', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-            const SizedBox(height: 4),
-            Text(plantData['description'] ?? '', style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('تشخيص AI:', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-                  const SizedBox(height: 4),
-                  Text(plantData['aiDiagnosis'] ?? '', style: const TextStyle(fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text(
-                    'دقة: ${plantData['aiConfidence'] ?? 0}%',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _placeholder() => Container(
-    height: 150,
-    width: double.infinity,
-    color: Colors.grey[200],
-    child: const Icon(Icons.image, size: 48, color: Colors.grey),
-  );
 }

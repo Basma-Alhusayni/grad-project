@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
 import 'requests_screen.dart';
-import 'chat_with_user_screen.dart';
+import 'expert_chat_screen.dart';
 import 'expert_schedule_screen.dart';
 
 class ExpertHomeScreen extends StatefulWidget {
@@ -62,17 +62,17 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       if (!mounted) return;
       final d = doc.data() ?? {};
       setState(() {
-        _name         = d['fullName'] ?? d['name'] ?? d['username'] ?? '';
-        _specialty    = d['specialty'] ?? (d['specializations'] is List && (d['specializations'] as List).isNotEmpty ? (d['specializations'] as List)[0].toString() : '');
-        _rating       = (d['rating'] is num) ? (d['rating'] as num).toDouble() : 0.0;
-        _reviewCount  = d['reviewCount'] ?? 0;
+        _name        = d['fullName'] ?? d['name'] ?? d['username'] ?? '';
+        _specialty   = d['specialty'] ?? (d['specializations'] is List && (d['specializations'] as List).isNotEmpty ? (d['specializations'] as List)[0].toString() : '');
+        _rating      = (d['rating'] is num) ? (d['rating'] as num).toDouble() : 0.0;
+        _reviewCount = d['reviewCount'] ?? 0;
         _responseTime = (d['responseTime'] is num) ? (d['responseTime'] as num).toInt() : 15;
-        _successRate  = (d['successRate'] is num) ? (d['successRate'] as num).toInt() : 96;
-        _totalCases   = (d['totalCases'] is num) ? (d['totalCases'] as num).toInt() : 0;
-        _education    = d['education'] ?? '';
-        _experience   = (d['experience'] != null) ? d['experience'].toString() : '';
-        _reviews      = reviews;
-        _loading      = false;
+        _successRate = (d['successRate'] is num) ? (d['successRate'] as num).toInt() : 96;
+        _totalCases  = (d['totalCases'] is num) ? (d['totalCases'] as num).toInt() : 0;
+        _education   = d['education'] ?? '';
+        _experience  = (d['experience'] != null) ? d['experience'].toString() : '';
+        _reviews     = reviews;
+        _loading     = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -123,7 +123,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         ),
         body: _loading
             ? const Center(
-            child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+            child: CircularProgressIndicator(
+                color: Color(0xFF16A34A)))
             : _buildBody(),
         bottomNavigationBar: _buildBottomNav(),
       ),
@@ -132,11 +133,16 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   Widget _buildBody() {
     switch (_currentIndex) {
-      case 0: return _buildProfileTab();
-      case 1: return const ExpertScheduleScreen();
-      case 2: return const _ChatsPage();
-      case 3: return const RequestsScreen();
-      default: return const SizedBox();
+      case 0:
+        return _buildProfileTab();
+      case 1:
+        return const ExpertScheduleScreen();
+      case 2:
+        return const _ChatsPage();
+      case 3:
+        return const RequestsScreen();
+      default:
+        return const SizedBox();
     }
   }
 
@@ -179,14 +185,19 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon,
-              color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
+              color: isSelected
+                  ? const Color(0xFF16A34A)
+                  : Colors.grey[400],
               size: 26),
           const SizedBox(height: 2),
           Text(label,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
+                fontWeight:
+                isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? const Color(0xFF16A34A)
+                    : Colors.grey[400],
               )),
           const SizedBox(height: 2),
           AnimatedContainer(
@@ -224,7 +235,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── Header أخضر ──────────────────────────────────────────────
   Widget _buildProfileHeader() {
     return Container(
       width: double.infinity,
@@ -276,15 +286,17 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    ...List.generate(5, (i) => Icon(
-                      i < _rating.floor()
-                          ? Icons.star
-                          : i < _rating
-                          ? Icons.star_half
-                          : Icons.star_border,
-                      color: const Color(0xFFFBBF24),
-                      size: 13,
-                    )),
+                    ...List.generate(
+                        5,
+                            (i) => Icon(
+                          i < _rating.floor()
+                              ? Icons.star
+                              : i < _rating
+                              ? Icons.star_half
+                              : Icons.star_border,
+                          color: const Color(0xFFFBBF24),
+                          size: 13,
+                        )),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
@@ -299,7 +311,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    _headerChip(Icons.chat_bubble_outline, 'غير متاح'),
+                    _headerChip(
+                        Icons.chat_bubble_outline, 'غير متاح'),
                     const SizedBox(width: 8),
                     _headerChip(Icons.location_on_outlined, 'موقع'),
                   ],
@@ -314,7 +327,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   Widget _headerChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF15803D),
         borderRadius: BorderRadius.circular(20),
@@ -325,16 +339,15 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           Icon(icon, color: Colors.white, size: 12),
           const SizedBox(width: 4),
           Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 11)),
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 11)),
         ],
       ),
     );
   }
 
-  // ── إحصائيات ─────────────────────────────────────────────────
   Widget _buildStatsRow() {
-    final hasStats = _totalCases > 0;
-    if (!hasStats) return const SizedBox.shrink();
+    if (_totalCases == 0) return const SizedBox.shrink();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -361,18 +374,18 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                   color: Color(0xFF14532D))),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              style:
+              const TextStyle(fontSize: 11, color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _vDivider() =>
-      Container(width: 1, height: 32, color: const Color(0xFFE5E7EB));
+  Widget _vDivider() => Container(
+      width: 1, height: 32, color: const Color(0xFFE5E7EB));
 
-  // ── Tab Bar ───────────────────────────────────────────────────
   Widget _buildTabBar() {
-    const tabs = ['المعلومات', 'التقارير (0)', 'التقييمات'];
+    const tabs = ['المعلومات', 'التقارير', 'التقييمات'];
     return Container(
       color: Colors.white,
       child: Row(
@@ -382,7 +395,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             child: GestureDetector(
               onTap: () => setState(() => _profileTabIndex = i),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding:
+                const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
@@ -412,7 +426,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── محتوى المعلومات ──────────────────────────────────────────
   Widget _buildInfoContent() {
     return Column(
       children: [
@@ -463,32 +476,33 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         Expanded(
           child: Text(text,
               style: const TextStyle(
-                  fontSize: 13, color: Colors.black87, height: 1.5)),
+                  fontSize: 13,
+                  color: Colors.black87,
+                  height: 1.5)),
         ),
       ],
     );
   }
 
-  // ── محتوى التقارير ───────────────────────────────────────────
   Widget _buildReportsContent() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Text('لا توجد تقارير حالياً',
-            style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+            style:
+            TextStyle(color: Colors.grey[500], fontSize: 14)),
       ),
     );
   }
 
-  // ── محتوى التقييمات ──────────────────────────────────────────
   Widget _buildReviewsContent() {
     if (_reviews.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
           child: Text('لا توجد تقييمات بعد',
-              style:
-              TextStyle(color: Colors.grey[500], fontSize: 14)),
+              style: TextStyle(
+                  color: Colors.grey[500], fontSize: 14)),
         ),
       );
     }
@@ -565,7 +579,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  Widget _sectionCard({required String title, required Widget child}) {
+  Widget _sectionCard(
+      {required String title, required Widget child}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -634,25 +649,28 @@ class _ChatsPage extends StatelessWidget {
           if (chats.isEmpty) {
             return const Center(
               child: Text('لا توجد محادثات',
-                  style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  style:
+                  TextStyle(color: Colors.grey, fontSize: 16)),
             );
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: chats.length,
             itemBuilder: (context, index) {
-              final data = chats[index].data() as Map<String, dynamic>;
+              final data =
+              chats[index].data() as Map<String, dynamic>;
               final chatId = chats[index].id;
               final userName = data['userName'] ?? '';
               final lastMessage = data['lastMessage'] ?? '';
               final time = data['time'] ?? '';
               final unread = data['unread'] ?? 0;
               final online = data['online'] ?? false;
+
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ChatWithUserScreen(
+                    builder: (_) => ExpertChatScreen(
                       chatId: chatId,
                       userName: userName,
                       isOnline: online,
@@ -665,7 +683,8 @@ class _ChatsPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFbbf7d0)),
+                    border: Border.all(
+                        color: const Color(0xFFbbf7d0)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
@@ -680,11 +699,15 @@ class _ChatsPage extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 24,
-                            backgroundColor: const Color(0xFFdcfce7),
+                            backgroundColor:
+                            const Color(0xFFdcfce7),
                             child: Text(
-                              userName.isNotEmpty ? userName[0] : '؟',
+                              userName.isNotEmpty
+                                  ? userName[0]
+                                  : '؟',
                               style: const TextStyle(
-                                  color: Color(0xFF15803d), fontSize: 18),
+                                  color: Color(0xFF15803d),
+                                  fontSize: 18),
                             ),
                           ),
                           if (online)
@@ -698,7 +721,8 @@ class _ChatsPage extends StatelessWidget {
                                   color: Colors.green,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                      color: Colors.white, width: 2),
+                                      color: Colors.white,
+                                      width: 2),
                                 ),
                               ),
                             ),
@@ -707,7 +731,8 @@ class _ChatsPage extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
                           children: [
                             Row(
                               mainAxisAlignment:
@@ -726,7 +751,8 @@ class _ChatsPage extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(lastMessage,
                                 style: TextStyle(
-                                    fontSize: 13, color: Colors.grey[600]),
+                                    fontSize: 13,
+                                    color: Colors.grey[600]),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis),
                           ],
@@ -736,10 +762,12 @@ class _ChatsPage extends StatelessWidget {
                         const SizedBox(width: 8),
                         CircleAvatar(
                           radius: 11,
-                          backgroundColor: const Color(0xFF16A34A),
+                          backgroundColor:
+                          const Color(0xFF16A34A),
                           child: Text('$unread',
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 11)),
+                                  color: Colors.white,
+                                  fontSize: 11)),
                         ),
                       ],
                     ],
