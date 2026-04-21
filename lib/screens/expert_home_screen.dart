@@ -483,6 +483,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // backgroundColor: Colors.white, // Optional: ensures background is solid
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -494,166 +495,181 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               16,
               20,
               16,
-              MediaQuery.of(ctx).viewInsets.bottom + 20,
+              // This handles the keyboard popping up
+              MediaQuery.of(ctx).viewInsets.bottom + 16,
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Center(
-                    child: Text(
-                      'طلب تعديل المعلومات',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- Header ---
+                const Center(
+                  child: Text(
+                    'طلب تعديل المعلومات',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Center(
-                    child: Text(
-                      'سيتم مراجعة التعديلات من قِبل الإدارة قبل تطبيقها',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
+                ),
+                const SizedBox(height: 6),
+                const Center(
+                  child: Text(
+                    'سيتم مراجعة التعديلات من قِبل الإدارة قبل تطبيقها',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  const SizedBox(height: 20),
-                  _editField('الاسم الكامل', nameController),
-                  _editField('الخبرة', experienceController, maxLines: 3),
-                  _editField('الشهادات', certificatesController, maxLines: 3),
-                  _editField('البريد الإلكتروني', emailController),
-                  const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 20),
 
-                  const Text(
-                    'صور الشهادات',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () async {
-                      final picked = await ImagePicker().pickMultiImage();
-                      if (picked.isNotEmpty) {
-                        setSheet(
-                          () => newImages = picked
-                              .map((e) => File(e.path))
-                              .toList(),
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.upload_file, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Text(
-                            newImages.isNotEmpty
-                                ? 'تم اختيار ${newImages.length} صورة ✓'
-                                : 'اضغط لاختيار صور الشهادات',
-                            style: TextStyle(
-                              color: newImages.isNotEmpty
-                                  ? const Color(0xFF16A34A)
-                                  : Colors.grey,
+                // --- Scrollable Fields ---
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _editField('الاسم الكامل', nameController),
+                        _editField('الخبرة', experienceController, maxLines: 3),
+                        _editField('الشهادات', certificatesController, maxLines: 3),
+                        _editField('البريد الإلكتروني', emailController),
+                        const SizedBox(height: 12),
+
+                        const Text(
+                          'صور الشهادات',
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () async {
+                            final picked = await ImagePicker().pickMultiImage();
+                            if (picked.isNotEmpty) {
+                              setSheet(
+                                    () => newImages = picked
+                                    .map((e) => File(e.path))
+                                    .toList(),
+                              );
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(10),
+                              color: Colors.grey.shade50,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.upload_file, color: Colors.grey),
+                                const SizedBox(width: 8),
+                                Text(
+                                  newImages.isNotEmpty
+                                      ? 'تم اختيار ${newImages.length} صورة ✓'
+                                      : 'اضغط لاختيار صور الشهادات',
+                                  style: TextStyle(
+                                    color: newImages.isNotEmpty
+                                        ? const Color(0xFF16A34A)
+                                        : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (newImages.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 80,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: newImages.length,
+                              itemBuilder: (_, i) => Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    newImages[i],
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
-                      ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
+                ),
 
-                  if (newImages.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: newImages.length,
-                        itemBuilder: (_, i) => Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              newImages[i],
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                            ),
+                // --- Action Button with SafeArea ---
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                          setSheet(() => isLoading = true);
+                          try {
+                            await _submitEditRequest(
+                              newFullName: nameController.text.trim(),
+                              newExperience: experienceController.text.trim(),
+                              newCertificates: certificatesController.text.trim(),
+                              newEmail: emailController.text.trim(),
+                              newImages: newImages,
+                            );
+                            if (mounted) Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('✅ تم إرسال طلب التعديل للمراجعة'),
+                                backgroundColor: Color(0xFF16A34A),
+                              ),
+                            );
+                          } catch (e) {
+                            setSheet(() => isLoading = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('حدث خطأ: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        child: isLoading
+                            ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                            : const Text(
+                          'إرسال طلب التعديل',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                  ],
-
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: isLoading
-                          ? null
-                          : () async {
-                              setSheet(() => isLoading = true);
-                              try {
-                                await _submitEditRequest(
-                                  newFullName: nameController.text.trim(),
-                                  newExperience: experienceController.text
-                                      .trim(),
-                                  newCertificates: certificatesController.text
-                                      .trim(),
-                                  newEmail: emailController.text.trim(),
-                                  newImages: newImages,
-                                );
-                                if (mounted) Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      '✅ تم إرسال طلب التعديل للمراجعة',
-                                    ),
-                                    backgroundColor: Color(0xFF16A34A),
-                                  ),
-                                );
-                              } catch (e) {
-                                setSheet(() => isLoading = false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('حدث خطأ: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            },
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'إرسال طلب التعديل',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                              ),
-                            ),
-                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -825,7 +841,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                   style: TextStyle(fontSize: 14),
                 ),
                 trailing: const Icon(
-                  Icons.arrow_back_ios,
+                  Icons.arrow_forward_ios,
                   size: 14,
                   color: Colors.grey,
                 ),

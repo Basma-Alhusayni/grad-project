@@ -36,17 +36,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         .doc(user.uid)
         .get();
 
-    String name =
-        userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? '';
+    String name = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? '';
 
     if (name.isEmpty) {
       final accountDoc = await FirebaseFirestore.instance
           .collection('accounts')
           .doc(user.uid)
           .get();
-      name = accountDoc.data()?['fullName'] ??
-          accountDoc.data()?['username'] ??
-          '';
+      name = accountDoc.data()?['fullName'] ?? accountDoc.data()?['username'] ?? '';
     }
 
     if (name.isEmpty) {
@@ -61,7 +58,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     });
   }
 
-  // ── تعديل الاسم (نفس ستايل الأدمن) ──────────────────────────
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
     bool saving = false;
@@ -72,106 +68,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text(
               'تعديل المعلومات الشخصية',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _green900),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _green900),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  textAlign: TextAlign.right,
-                  textDirection: TextDirection.rtl,
-                  keyboardType: TextInputType.name,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: 'الاسم',
-                    labelStyle: const TextStyle(color: _green600),
-                    prefixIcon:
-                    const Icon(Icons.person_outline, color: _green600),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                      const BorderSide(color: _green600, width: 2),
-                    ),
-                  ),
-                ),
-              ],
+            content: TextField(
+              controller: nameController,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'الاسم',
+                prefixIcon: const Icon(Icons.person_outline, color: _green600),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child:
-                const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
               ElevatedButton(
-                onPressed: saving
-                    ? null
-                    : () async {
+                onPressed: saving ? null : () async {
                   final newName = nameController.text.trim();
                   if (newName.isEmpty) return;
                   setDialogState(() => saving = true);
                   try {
-                    final uid =
-                        FirebaseAuth.instance.currentUser?.uid;
+                    final uid = FirebaseAuth.instance.currentUser?.uid;
                     if (uid != null) {
-                      // حفظ في مجموعة users (كلا الحقلين)
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(uid)
-                          .update({
-                        'username': newName,
-                        'fullName': newName,
-                      });
-                      // حفظ في مجموعة accounts
-                      await FirebaseFirestore.instance
-                          .collection('accounts')
-                          .doc(uid)
-                          .update({
-                        'username': newName,
-                        'fullName': newName,
-                      });
+                      await FirebaseFirestore.instance.collection('users').doc(uid).update({'username': newName, 'fullName': newName});
+                      await FirebaseFirestore.instance.collection('accounts').doc(uid).update({'username': newName, 'fullName': newName});
                     }
                     if (!mounted) return;
                     setState(() => _name = newName);
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('تم حفظ التعديلات بنجاح ✓'),
-                        backgroundColor: _green600,
-                      ),
-                    );
                   } catch (e) {
                     setDialogState(() => saving = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('حدث خطأ: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _green600,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: saving
-                    ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                    : const Text('حفظ',
-                    style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: _green600),
+                child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -180,110 +112,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  // ── تغيير كلمة المرور ──────────────────────────────────────
   Future<void> _showChangePasswordDialog() async {
     bool sending = false;
-
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text(
-              'تغيير كلمة المرور',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _green900),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
-                  textAlign: TextAlign.right,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                    Border.all(color: const Color(0xFF86EFAC)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.email_outlined,
-                          color: _green600, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _email,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF166534),
-                              fontWeight: FontWeight.w500),
-                          textDirection: TextDirection.ltr,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _green900)),
+            content: Text('سيتم إرسال رابط إعادة تعيين كلمة المرور إلى: \n$_email'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء',
-                    style: TextStyle(color: Colors.grey)),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
               ElevatedButton(
-                onPressed: sending
-                    ? null
-                    : () async {
+                onPressed: sending ? null : () async {
                   setDialogState(() => sending = true);
-                  try {
-                    await FirebaseAuth.instance
-                        .sendPasswordResetEmail(email: _email);
-                    if (!mounted) return;
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            '✅ تم إرسال رابط إعادة التعيين إلى بريدك'),
-                        backgroundColor: _green600,
-                      ),
-                    );
-                  } catch (e) {
-                    setDialogState(() => sending = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('حدث خطأ: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
+                  await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _green600,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: sending
-                    ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                    : const Text('إرسال',
-                    style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: _green600),
+                child: const Text('إرسال', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -305,206 +155,151 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _green50,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
-        ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ── Header ──
-              Container(
-                width: double.infinity,
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: _green100,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _green600, width: 2),
-                      ),
-                      child: const Icon(Icons.person,
-                          color: _green600, size: 38),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _name,
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _green900),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('مستخدم',
-                        style: TextStyle(color: Colors.grey)),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── المعلومات الشخصية ──
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      child: Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+        // هذه الخاصية تضمن أن الشاشة لا تضغط العناصر بشكل سيء عند ظهور الكيبورد
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: LayoutBuilder( // يستخدم لضمان توزيع العناصر بشكل صحيح في المساحات المختلفة
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                // نعيد السكرول ولكن نجعله يعمل فقط إذا ضاقت الشاشة (مثل عند ظهور الكيبورد)
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
                         children: [
-                          const Text('المعلومات الشخصية',
+                          // ── Custom Header ──
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              'الملف الشخصي',
                               style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87)),
-                          // ── زر التعديل (نفس الأدمن) ──
-                          GestureDetector(
-                            onTap: _showEditDialog,
-                            child: const Row(
-                              children: [
-                                Icon(Icons.edit_outlined,
-                                    color: _green600, size: 17),
-                                SizedBox(width: 4),
-                                Text('تعديل',
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: _green600)),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _green900,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── بطاقة معلومات المستخدم ──
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
                               ],
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: _green100,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: _green600, width: 2),
+                                  ),
+                                  child: const Icon(Icons.person, color: _green600, size: 45),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _name,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _green900),
+                                ),
+                                const Text('مستخدم BioShield', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── قسم المعلومات التفصيلية ──
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  title: const Text('المعلومات الشخصية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  trailing: TextButton.icon(
+                                    onPressed: _showEditDialog,
+                                    icon: const Icon(Icons.edit_outlined, size: 16, color: _green600),
+                                    label: const Text('تعديل', style: TextStyle(color: _green600, fontSize: 12)),
+                                  ),
+                                ),
+                                _buildInfoRow('الاسم', _name, Icons.person_outline),
+                                const Divider(indent: 16, endIndent: 16),
+                                _buildInfoRow('البريد الإلكتروني', _email, Icons.email_outlined),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── قسم الأمان ──
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(Icons.lock_outline, color: _green600),
+                              title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 14)),
+                              trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                              onTap: _showChangePasswordDialog,
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          // ── زر تسجيل الخروج ──
+                          Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  await AuthService().signOut();
+                                  if (!context.mounted) return;
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const SplashScreen()),
+                                        (_) => false,
+                                  );
+                                },
+                                icon: const Icon(Icons.logout),
+                                label: const Text('تسجيل الخروج', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFCC0000),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  elevation: 0,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                    _buildInfoRow(
-                        'الاسم', _name, Icons.person_outline),
-                    const Divider(
-                        height: 1,
-                        color: Color(0xFFEEEEEE),
-                        indent: 16,
-                        endIndent: 16),
-                    _buildInfoRow('البريد الإلكتروني', _email,
-                        Icons.email_outlined),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── قسم الأمان ──
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                ),
-                child: Column(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'الأمان',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87),
-                        ),
-                      ),
-                    ),
-                    const Divider(
-                        height: 1, color: Color(0xFFEEEEEE)),
-                    ListTile(
-                      leading: const Icon(Icons.lock_outline,
-                          color: _green600),
-                      title: const Text('تغيير كلمة المرور',
-                          style: TextStyle(fontSize: 14)),
-                      trailing: const Icon(
-                        Icons.arrow_forward_ios,
-                        size: 14,
-                        color: Colors.grey,
-                        textDirection: TextDirection.ltr,
-                      ),
-                      onTap: _showChangePasswordDialog,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── الخبراء ──
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.people_alt_rounded,
-                      color: _green900),
-                  title: const Text('الخبراء'),
-                  trailing: const Icon(
-                    Icons.arrow_forward_ios,
-                    size: 14,
-                    textDirection: TextDirection.ltr,
-                  ),
-                  onTap: () => ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                      const SnackBar(content: Text('قريباً 🌿'))),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ── زر تسجيل الخروج ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await AuthService().signOut();
-                      if (!context.mounted) return;
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SplashScreen()),
-                            (_) => false,
-                      );
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('تسجيل الخروج',
-                        style: TextStyle(fontSize: 16)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCC0000),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 30),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -513,24 +308,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildInfoRow(String label, String value, IconData icon) {
     return Padding(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 3),
-                Text(value,
-                    style: const TextStyle(fontSize: 14)),
-              ],
-            ),
+          Icon(icon, color: _green600, size: 20),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            ],
           ),
-          Icon(icon, color: _green600),
         ],
       ),
     );

@@ -195,13 +195,6 @@ class _ReportsDashboard extends StatefulWidget {
 class _ReportsDashboardState extends State<_ReportsDashboard> {
   final TextEditingController _searchController = TextEditingController();
   final ValueNotifier<String> _notifier = ValueNotifier<String>('');
-  String _username = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUsername();
-  }
 
   @override
   void dispose() {
@@ -210,40 +203,52 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
     super.dispose();
   }
 
-  Future<void> _fetchUsername() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    final doc =
-    await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    if (mounted) setState(() => _username = doc.data()?['username'] ?? 'مستخدم');
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Get current user UID to listen to the specific document
+    final String? uid = FirebaseAuth.instance.currentUser?.uid;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF14532D), Color(0xFF16A34A)]),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(children: [
-            Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('مرحباً، $_username 👋',
+        // Real-time Greeting Header
+        StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+          builder: (context, snapshot) {
+            String displayName = '...'; // Temporary loading state
+
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final data = snapshot.data!.data() as Map<String, dynamic>;
+              // Matches 'fullName' from your Firestore screenshot
+              displayName = data['fullName'] ?? 'مستخدم';
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF14532D), Color(0xFF16A34A)]),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'مرحباً، $displayName 👋',
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                )),
-            const Icon(Icons.eco_rounded, color: Colors.white, size: 36),
-          ]),
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.eco_rounded, color: Colors.white, size: 36),
+              ]),
+            );
+          },
         ),
         const SizedBox(height: 16),
         TextField(

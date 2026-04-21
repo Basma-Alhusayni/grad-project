@@ -111,8 +111,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
         final filtered = allReports.where((r) {
           final matchFilter = _filter == 'الكل' || r['status'] == _filter;
           final matchSearch = _search.isEmpty ||
-              (r['plantName'] as String).toLowerCase().contains(_search.toLowerCase()) ||
-              (r['disease'] as String).toLowerCase().contains(_search.toLowerCase());
+              (r['plantName'] as String).toLowerCase().contains(_search.toLowerCase());
           return matchFilter && matchSearch;
         }).toList();
 

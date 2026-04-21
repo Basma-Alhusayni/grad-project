@@ -607,10 +607,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _showUserDetails(Map<String, dynamic> data,
+  void _showUserDetails(
+      Map<String, dynamic> data,
       String status,
       String createdAt,
-      String userId,) async {
+      String userId,
+      ) async {
     final reportsSnapshot = await FirebaseFirestore.instance
         .collection('reports')
         .where('userId', isEqualTo: userId)
@@ -627,7 +629,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       isScrollControlled: true,
       builder: (_) {
         return Padding(
-          padding: const EdgeInsets.all(20),
+          // إضافة مسافة سفلية لتجنب شريط الجهاز
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -635,13 +638,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const Center(
                 child: Text(
                   'معلومات المستخدم',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
-
               const SizedBox(height: 20),
 
               _detailRow('الاسم', data['username'] ?? ''),
@@ -649,37 +648,44 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _detailRow('تاريخ الانضمام', createdAt),
               _detailRow('عدد التقارير', reportsCount.toString()),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text('حالة الحساب'),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: status == 'active' ? Colors.green : Colors.grey,
-                      borderRadius: BorderRadius.circular(12),
+              // صف حالة الحساب المحدث
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // الحالة على اليسار
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: status == 'active' ? Colors.green : Colors.grey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status == 'active' ? 'نشط' : 'معطل',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
                     ),
-                    child: Text(
-                      status == 'active' ? 'نشط' : 'معطل',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
+                    // العنوان على اليمين
+                    const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 20),
 
+              // زر الإغلاق باللون الأخضر
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: const Color(0xFFFFFFFF),
+                    foregroundColor: Colors.grey,
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('إغلاق'),
+                  child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -1041,22 +1047,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _showSpecialistDetails(Map<String, dynamic> data,
+  void _showSpecialistDetails(
+      Map<String, dynamic> data,
       String status,
-      String createdAt,) {
+      String createdAt,
+      ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      isScrollControlled: true, // لضمان ظهور المحتوى بشكل كامل
       builder: (_) {
         return Padding(
-          padding: const EdgeInsets.all(20),
+          // رفع المحتوى عن شريط النظام السفلي (Gesture Bar)
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-
               const Center(
                 child: Text(
                   'تفاصيل الخبير',
@@ -1066,46 +1075,63 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
               const SizedBox(height: 20),
 
-              _detailRow('الاسم', data['fullName']),
-              _detailRow('البريد', data['email']),
+              _detailRow('الاسم', data['fullName'] ?? ''),
+              _detailRow('البريد', data['email'] ?? ''),
               _detailRow('تاريخ الانضمام', createdAt),
-              _detailRow('عدد الحالات', data['reviewCount'].toString()),
-              _detailRow('التقييم', data['rating'].toString()),
-              _detailRow('الخبرة', data['experience']),
-              _detailRow('الشهادات', data['certificates']),
+              _detailRow('عدد الحالات', data['reviewCount']?.toString() ?? '0'),
+              _detailRow('التقييم', data['rating']?.toString() ?? '0.0'),
+              _detailRow('الخبرة', data['experience'] ?? ''),
+              _detailRow('الشهادات', data['certificates'] ?? ''),
 
               const SizedBox(height: 10),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text('حالة الحساب'),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: status == 'active' ? Colors.green : Colors.grey,
-                      borderRadius: BorderRadius.circular(12),
+              // صف حالة الحساب المحدث: العنوان يمين والبطاقة يسار
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // البطاقة (تظهر في اليسار)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: status == 'active' ? Colors.green : Colors.grey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status == 'active' ? 'نشط' : 'معطل',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
                     ),
-                    child: Text(
-                      status == 'active' ? 'نشط' : 'معطل',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
+                    // العنوان (يظهر في اليمين)
+                    const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 20),
 
+              // زر الإغلاق باللون الأخضر المتناسق مع BioShield
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: const Color(0xFFFFFFFF),
+                    foregroundColor: Colors.grey,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('إغلاق'),
+                  child: const Text(
+                    'إغلاق',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
               ),
             ],
