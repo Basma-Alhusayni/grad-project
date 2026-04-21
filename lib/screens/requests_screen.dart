@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'expert_chat_screen.dart';
 
 class RequestsScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class _RequestsScreenState extends State<RequestsScreen>
     with SingleTickerProviderStateMixin {
   final _db = FirebaseFirestore.instance;
   late TabController _tabController;
+  final _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   bool _isAvailable = true;
   Map<String, dynamic>? _selectedRequest;
@@ -34,78 +36,108 @@ class _RequestsScreenState extends State<RequestsScreen>
 
   // ── قبول الطلب ─────────────────────────────────────────────
   Future<void> _acceptRequest(Map<String, dynamic> request) async {
-    await _db.collection('requests').doc(request['id']).update({
-      'status': 'accepted',
-    });
-
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    final chatRef = await _db.collection('chats').add({
-      'userId': request['userId'] ?? '',
-      'userName': request['userName'] ?? '',
-      'lastMessage': 'تم قبول طلبك',
-      'time': timeStr,
-      'online': false,
-      'unread': 1,
-      'requestId': request['id'],
-      'createdAt': now.toIso8601String(),
-      'messages': [
-        {
-          'id': 'msg-${now.millisecondsSinceEpoch}',
-          'sender': 'expert',
-          'content': 'مرحباً، تم قبول طلبك. كيف يمكنني مساعدتك؟',
-          'time': timeStr,
-          'type': 'text',
-        },
-        {
-          'id': 'plant-${now.millisecondsSinceEpoch}',
-          'sender': 'user',
-          'content': '',
-          'time': timeStr,
-          'type': 'plant-info',
-          'plantData': {
-            'image': request['plantImage'] ?? '',
-            'description': request['description'] ?? '',
-            'aiDiagnosis': request['aiDiagnosis'] ?? '',
-            'aiConfidence': request['aiConfidence'] ?? 0,
-          },
-        },
-      ],
-    });
+    // إذا عنده chatId من قبل (اليوزر فتح شات مسبقاً) — وافق عليه
+    final existingChatId = request['chatId'] ?? '';
 
-    // حفظ chatId في الطلب
-    await _db.collection('requests').doc(request['id']).update({
-      'chatId': chatRef.id,
-    });
+    if (existingChatId.isNotEmpty) {
+      // وافق على الشات الموجود
+      await _db.collection('chats').doc(existingChatId).update({
+        'expertApproved': true,
+        'lastMessage': 'تم قبول طلبك',
+        'time': timeStr,
+      });
+      await _db.collection('requests').doc(request['id']).update({
+        'status': 'accepted',
+      });
 
-    if (mounted) {
-      setState(() => _selectedRequest = null);
-      _showSnack('تم قبول الطلب وإنشاء محادثة مع المستخدم');
-      await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ExpertChatScreen(
-              chatId: chatRef.id,
-              userName: request['userName'] ?? '',
-              isOnline: false,
+        setState(() => _selectedRequest = null);
+        _showSnack('تم قبول الطلب');
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ExpertChatScreen(
+                chatId: existingChatId,
+                userName: request['userName'] ?? '',
+                isOnline: false,
+              ),
             ),
-          ),
-        );
+          );
+        }
+      }
+    } else {
+      // إنشاء شات جديد
+      final chatRef = await _db.collection('chats').add({
+        'specialistId': _uid,
+        'specialistName': request['specialistName'] ?? '',
+        'userId': request['userId'] ?? '',
+        'userName': request['userName'] ?? '',
+        'lastMessage': 'تم قبول طلبك',
+        'time': timeStr,
+        'online': false,
+        'unread': 1,
+        'expertApproved': true,
+        'requestId': request['id'],
+        'createdAt': now.toIso8601String(),
+        'messages': [
+          {
+            'id': 'msg-${now.millisecondsSinceEpoch}',
+            'sender': 'expert',
+            'content': 'مرحباً، تم قبول طلبك. كيف يمكنني مساعدتك؟',
+            'time': timeStr,
+            'type': 'text',
+          },
+        ],
+      });
+
+      await _db.collection('requests').doc(request['id']).update({
+        'status': 'accepted',
+        'chatId': chatRef.id,
+      });
+
+      if (mounted) {
+        setState(() => _selectedRequest = null);
+        _showSnack('تم قبول الطلب وإنشاء محادثة');
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ExpertChatScreen(
+                chatId: chatRef.id,
+                userName: request['userName'] ?? '',
+                isOnline: false,
+              ),
+            ),
+          );
+        }
       }
     }
   }
 
   // ── رفض الطلب ──────────────────────────────────────────────
-  Future<void> _rejectRequest(String requestId) async {
+  Future<void> _rejectRequest(String requestId,
+      {String? chatId}) async {
     final reason = _rejectReasonController.text.trim();
+
     await _db.collection('requests').doc(requestId).update({
       'status': 'rejected',
       'rejectionReason': reason,
     });
+
+    // إذا عنده شات — ضع rejected = true
+    if (chatId != null && chatId.isNotEmpty) {
+      await _db.collection('chats').doc(chatId).update({
+        'rejected': true,
+        'expertApproved': false,
+      });
+    }
 
     _rejectReasonController.clear();
     if (mounted) {
@@ -147,7 +179,8 @@ class _RequestsScreenState extends State<RequestsScreen>
                       radius: 22,
                       backgroundColor: const Color(0xFFdcfce7),
                       child: Text(
-                        (request['userName'] as String? ?? '').isNotEmpty
+                        (request['userName'] as String? ?? '')
+                            .isNotEmpty
                             ? request['userName'][0]
                             : '؟',
                         style: const TextStyle(
@@ -155,74 +188,78 @@ class _RequestsScreenState extends State<RequestsScreen>
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(request['userName'] ?? '',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15)),
-                        Text(request['date'] ?? '',
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500])),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(request['userName'] ?? '',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15)),
+                          Text(request['date'] ?? '',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500])),
+                        ],
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: (request['plantImage'] ?? '').isNotEmpty
-                      ? Image.network(request['plantImage'],
+                if ((request['plantImage'] ?? '').isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      request['plantImage'],
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          _imgPlaceholder(180))
-                      : _imgPlaceholder(180),
-                ),
+                          _imgPlaceholder(180),
+                    ),
+                  )
+                else
+                  _imgPlaceholder(180),
                 const SizedBox(height: 12),
                 const Text('الوصف:',
-                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    style:
+                    TextStyle(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 4),
                 Text(request['description'] ?? '',
                     style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                    borderRadius: BorderRadius.circular(10),
+                if ((request['aiDiagnosis'] ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      border: Border.all(
+                          color: const Color(0xFFFDE68A)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('تحليل الذكاء الاصطناعي:',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        Text(
+                            'التشخيص: ${request['aiDiagnosis']}',
+                            style:
+                            const TextStyle(fontSize: 13)),
+                        Text(
+                            'مستوى الثقة: ${request['aiConfidence'] ?? 0}%',
+                            style:
+                            const TextStyle(fontSize: 13)),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('تحليل الذكاء الاصطناعي:',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Text(
-                          'التشخيص: ${request['aiDiagnosis'] ?? ''}',
-                          style: const TextStyle(fontSize: 13)),
-                      Text(
-                          'مستوى الثقة: ${request['aiConfidence'] ?? 0}%',
-                          style: const TextStyle(fontSize: 13)),
-                      if ((request['aiConfidence'] ?? 0) < 60)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 4),
-                          child: Text(
-                              '⚠️ دقة منخفضة - يحتاج مراجعة خبير',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.orange)),
-                        ),
-                    ],
-                  ),
-                ),
+                ],
                 if (request['status'] == 'rejected' &&
-                    (request['rejectionReason'] ?? '').isNotEmpty) ...[
+                    (request['rejectionReason'] ?? '')
+                        .isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -305,7 +342,8 @@ class _RequestsScreenState extends State<RequestsScreen>
                       radius: 22,
                       backgroundColor: const Color(0xFFdcfce7),
                       child: Text(
-                        (request['userName'] as String? ?? '').isNotEmpty
+                        (request['userName'] as String? ?? '')
+                            .isNotEmpty
                             ? request['userName'][0]
                             : '؟',
                         style: const TextStyle(
@@ -328,53 +366,28 @@ class _RequestsScreenState extends State<RequestsScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: (request['plantImage'] ?? '').isNotEmpty
-                      ? Image.network(request['plantImage'],
+                if ((request['plantImage'] ?? '').isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      request['plantImage'],
                       height: 150,
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          _imgPlaceholder(150))
-                      : _imgPlaceholder(150),
-                ),
+                          _imgPlaceholder(150),
+                    ),
+                  )
+                else
+                  _imgPlaceholder(80),
                 const SizedBox(height: 10),
                 Text(request['description'] ?? '',
                     style: const TextStyle(fontSize: 13)),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('تحليل الذكاء الاصطناعي:',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12)),
-                      Text(
-                          'التشخيص: ${request['aiDiagnosis'] ?? ''}',
-                          style: const TextStyle(fontSize: 12)),
-                      Text(
-                          'مستوى الثقة: ${request['aiConfidence'] ?? 0}%',
-                          style: const TextStyle(fontSize: 12)),
-                      if ((request['aiConfidence'] ?? 0) < 60)
-                        const Text(
-                            '⚠️ دقة منخفضة - يحتاج مراجعة خبير',
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.orange)),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 12),
                 const Text('سبب الرفض:',
                     style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _rejectReasonController,
@@ -393,7 +406,8 @@ class _RequestsScreenState extends State<RequestsScreen>
           ),
           actions: [
             TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(
+                  foregroundColor: Colors.red),
               icon: const Icon(Icons.close, size: 16),
               label: const Text('إلغاء'),
               onPressed: () => Navigator.of(context).pop(),
@@ -403,13 +417,23 @@ class _RequestsScreenState extends State<RequestsScreen>
                   backgroundColor: const Color(0xFF16a34a)),
               icon: const Icon(Icons.check, size: 16),
               label: const Text('رفض الطلب'),
-              onPressed: () => _rejectRequest(request['id']),
+              onPressed: () => _rejectRequest(
+                request['id'],
+                chatId: request['chatId'],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _imgPlaceholder(double h) => Container(
+    height: h,
+    width: double.infinity,
+    color: Colors.grey[200],
+    child: const Icon(Icons.image, size: 40, color: Colors.grey),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -418,7 +442,11 @@ class _RequestsScreenState extends State<RequestsScreen>
       child: Scaffold(
         backgroundColor: const Color(0xFFF0FDF4),
         body: StreamBuilder<QuerySnapshot>(
-          stream: _db.collection('requests').snapshots(),
+          // ✅ فلتر على specialistId عشان يجيب طلبات هذا الخبير فقط
+          stream: _db
+              .collection('requests')
+              .where('specialistId', isEqualTo: _uid)
+              .snapshots(),
           builder: (context, snapshot) {
             final allRequests = snapshot.data?.docs
                 .map((d) => {
@@ -442,14 +470,17 @@ class _RequestsScreenState extends State<RequestsScreen>
               children: [
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding:
+                  const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Column(
                     children: [
+                      // سويتش التوفر
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[200]!),
+                          border: Border.all(
+                              color: Colors.grey[200]!),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -484,21 +515,25 @@ class _RequestsScreenState extends State<RequestsScreen>
                         ),
                       ),
                       const SizedBox(height: 10),
+
+                      // إحصائيات
                       Row(
                         children: [
                           _StatCard('${pending.length}',
                               'قيد المراجعة', Colors.orange),
                           const SizedBox(width: 8),
-                          _StatCard(
-                              '${accepted.length}', 'مقبولة', Colors.green),
+                          _StatCard('${accepted.length}',
+                              'مقبولة', Colors.green),
                           const SizedBox(width: 8),
-                          _StatCard(
-                              '${rejected.length}', 'مرفوضة', Colors.grey),
+                          _StatCard('${rejected.length}',
+                              'مرفوضة', Colors.grey),
                         ],
                       ),
                       const SizedBox(height: 10),
+
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('طلبات الاستشارة',
                               style: TextStyle(
@@ -511,17 +546,20 @@ class _RequestsScreenState extends State<RequestsScreen>
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.orange,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius:
+                                BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${pending.length} جديد',
                                 style: const TextStyle(
-                                    color: Colors.white, fontSize: 11),
+                                    color: Colors.white,
+                                    fontSize: 11),
                               ),
                             ),
                         ],
                       ),
                       const SizedBox(height: 8),
+
                       TabBar(
                         controller: _tabController,
                         labelColor: const Color(0xFF16a34a),
@@ -565,13 +603,6 @@ class _RequestsScreenState extends State<RequestsScreen>
       ),
     );
   }
-
-  Widget _imgPlaceholder(double h) => Container(
-    height: h,
-    width: double.infinity,
-    color: Colors.grey[200],
-    child: const Icon(Icons.image, size: 40, color: Colors.grey),
-  );
 }
 
 // ─── إحصائية ─────────────────────────────────────────────────
@@ -600,8 +631,8 @@ class _StatCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: color.shade700)),
             Text(label,
-                style:
-                TextStyle(fontSize: 11, color: color.shade600)),
+                style: TextStyle(
+                    fontSize: 11, color: color.shade600)),
           ],
         ),
       ),
@@ -645,7 +676,8 @@ class _RequestList extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFbbf7d0)),
+              border:
+              Border.all(color: const Color(0xFFbbf7d0)),
               boxShadow: [
                 BoxShadow(
                     color: Colors.black.withOpacity(0.04),
@@ -662,17 +694,20 @@ class _RequestList extends StatelessWidget {
                     radius: 22,
                     backgroundColor: const Color(0xFFdcfce7),
                     child: Text(
-                      (req['userName'] as String? ?? '').isNotEmpty
+                      (req['userName'] as String? ?? '')
+                          .isNotEmpty
                           ? req['userName'][0]
                           : '؟',
                       style: const TextStyle(
-                          color: Color(0xFF15803d), fontSize: 17),
+                          color: Color(0xFF15803d),
+                          fontSize: 17),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
                       children: [
                         Row(
                           mainAxisAlignment:
@@ -682,57 +717,38 @@ class _RequestList extends StatelessWidget {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14)),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: confidence < 50
-                                    ? const Color(0xFFFEE2E2)
-                                    : const Color(0xFFFEF9C3),
-                                borderRadius: BorderRadius.circular(20),
+                            if (confidence > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: confidence < 50
+                                      ? const Color(0xFFFEE2E2)
+                                      : const Color(0xFFFEF9C3),
+                                  borderRadius:
+                                  BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '$confidence% دقة AI',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: confidence < 50
+                                          ? Colors.red[700]
+                                          : Colors.yellow[800]),
+                                ),
                               ),
-                              child: Text(
-                                '$confidence% دقة AI',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: confidence < 50
-                                        ? Colors.red[700]
-                                        : Colors.yellow[800]),
-                              ),
-                            ),
                           ],
                         ),
                         Text(req['date'] ?? '',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey[500])),
-                        const SizedBox(height: 6),
-                        if ((req['plantImage'] ?? '').isNotEmpty)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              req['plantImage'],
-                              height: 120,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                height: 120,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.image,
-                                    color: Colors.grey),
-                              ),
-                            ),
-                          ),
+                                fontSize: 11,
+                                color: Colors.grey[500])),
                         const SizedBox(height: 6),
                         Text(req['description'] ?? '',
-                            style: const TextStyle(fontSize: 13),
+                            style:
+                            const TextStyle(fontSize: 13),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Text(
-                          'تشخيص AI: ${req['aiDiagnosis'] ?? ''}',
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.amber),
-                        ),
                         if (req['status'] == 'pending' &&
                             onAccept != null &&
                             onReject != null) ...[
@@ -745,13 +761,15 @@ class _RequestList extends StatelessWidget {
                                     foregroundColor: Colors.red,
                                     side: const BorderSide(
                                         color: Colors.red),
-                                    padding: const EdgeInsets.symmetric(
+                                    padding:
+                                    const EdgeInsets.symmetric(
                                         vertical: 6),
                                   ),
                                   icon: const Icon(Icons.close,
                                       size: 14),
                                   label: const Text('رفض',
-                                      style: TextStyle(fontSize: 13)),
+                                      style: TextStyle(
+                                          fontSize: 13)),
                                   onPressed: () => onReject!(req),
                                 ),
                               ),
@@ -761,14 +779,16 @@ class _RequestList extends StatelessWidget {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
                                     const Color(0xFF16a34a),
-                                    padding: const EdgeInsets.symmetric(
+                                    padding:
+                                    const EdgeInsets.symmetric(
                                         vertical: 6),
                                     elevation: 0,
                                   ),
                                   icon: const Icon(Icons.check,
                                       size: 14),
                                   label: const Text('قبول',
-                                      style: TextStyle(fontSize: 13)),
+                                      style: TextStyle(
+                                          fontSize: 13)),
                                   onPressed: () => onAccept!(req),
                                 ),
                               ),

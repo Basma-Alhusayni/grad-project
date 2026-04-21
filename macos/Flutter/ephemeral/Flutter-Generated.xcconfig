@@ -1,10 +1,6 @@
 // This is a generated file; do not edit or check into version control.
 FLUTTER_ROOT=C:\develop\flutter
-<<<<<<< HEAD
 FLUTTER_APPLICATION_PATH=C:\Users\Lena\AndroidStudioProjects\grad-project2
-=======
-FLUTTER_APPLICATION_PATH=D:\Users\grad-project
->>>>>>> 4a3691ecb9c23c0dc6ec33b2b4bd34f1e4151d5f
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=1.0.0
