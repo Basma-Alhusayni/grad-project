@@ -289,6 +289,12 @@ class AuthService {
         return {'error': 'عذراً، هذا الحساب ليس حساب $roleLabel'};
       }
 
+      final status = doc.data()!['status'];
+      if (status == 'suspended') {
+        await _auth.signOut();
+        return {'error': 'حسابك موقوف حالياً، لا يمكنك تسجيل الدخول'};
+      }
+
       if (!cred.user!.emailVerified) {
         await _auth.signOut();
         return {'error': null, 'needsVerification': true, 'email': email};
@@ -322,6 +328,12 @@ class AuthService {
       if (role != 'specialist') {
         await _auth.signOut();
         return {'error': 'هذا الحساب ليس حساب خبير'};
+      }
+
+      final status = doc.data()!['status'];
+      if (status == 'suspended') {
+        await _auth.signOut();
+        return {'error': 'حسابك موقوف حالياً، لا يمكنك تسجيل الدخول'};
       }
 
       final isFirstLogin = doc.data()!['isFirstLogin'] == true;

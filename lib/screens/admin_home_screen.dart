@@ -11,12 +11,14 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
   String _name = '';
   String _email = '';
   bool _loading = true;
   String _searchQuery = '';
-  String _filterStatus = 'all';
+  String _filterStatus = 'active';
+  String selectedStatus = 'pending';
+  String _selectedEditStatus = 'pending';
 
   @override
   void initState() {
@@ -187,13 +189,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ? const Center(
             child: CircularProgressIndicator(color: Color(0xFF16A34A)))
             : _currentIndex == 0
-            ? _buildHomeTab()
-            : _currentIndex == 1
             ? _buildUsersTab()
-            : _currentIndex == 2
+            : _currentIndex == 1
             ? _buildSpecialistsTab()
-            : _currentIndex == 3
+            : _currentIndex == 2
             ? _buildRequestsTab()
+            : _currentIndex == 3
+            ? _buildEditRequestsTab()
             : _buildProfileTab(),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -207,11 +209,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           unselectedFontSize: 12,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'الرئيسية',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
               label: 'المستخدمين',
             ),
@@ -222,7 +219,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.person_add_outlined),
               activeIcon: Icon(Icons.person_add),
-              label: 'الطلبات',
+              label: 'طلبات الانضمام',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.edit_note_outlined),
+              activeIcon: Icon(Icons.edit_note),
+              label: 'طلبات التعديل',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
@@ -234,109 +236,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
-
-  // ── Home Tab ────────────────────────────────────────────────
-  Widget _buildHomeTab() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: RichText(
-              textAlign: TextAlign.right,
-              text: TextSpan(
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF14532D),
-                ),
-                children: [
-                  const TextSpan(text: 'مرحباً '),
-                  TextSpan(
-                    text: _name,
-                    style: const TextStyle(color: Color(0xFF16A34A)),
-                  ),
-                  const TextSpan(text: ' !'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'لوحة تحكم الإدارة',
-              textAlign: TextAlign.right,
-              style: TextStyle(color: Colors.grey, fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 24),
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('specialist_requests')
-                .snapshots(),
-            builder: (context, snapshot) {
-              final docs = snapshot.data?.docs ?? [];
-              final pending = docs
-                  .where((d) => (d.data() as Map)['status'] == 'pending')
-                  .length;
-              final approved = docs
-                  .where((d) => (d.data() as Map)['status'] == 'approved')
-                  .length;
-              final rejected = docs
-                  .where((d) => (d.data() as Map)['status'] == 'rejected')
-                  .length;
-              return Row(
-                children: [
-                  _statCard('$pending', 'طلبات معلقة', Colors.orange,
-                      Icons.pending_actions),
-                  const SizedBox(width: 12),
-                  _statCard('$approved', 'تمت الموافقة', Colors.green,
-                      Icons.check_circle_outline),
-                  const SizedBox(width: 12),
-                  _statCard(
-                      '$rejected', 'مرفوضة', Colors.red, Icons.cancel_outlined),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statCard(
-      String value, String label, MaterialColor color, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.shade50,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.shade200),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color.shade600, size: 28),
-            const SizedBox(height: 6),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: color.shade700)),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: color.shade600)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Users Tab ────────────────────────────────────────────────
+// ── Users management Tab ────────────────────────────────────────────
   Widget _buildUsersTab() {
     return Column(
       children: [
@@ -359,95 +259,182 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             },
           ),
         ),
+
         StreamBuilder<QuerySnapshot>(
-          stream:
-          FirebaseFirestore.instance.collection('accounts').snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox();
-            final accounts = snapshot.data!.docs;
-            int active =
-                accounts.where((a) => a['status'] == 'active').length;
-            int disabled =
-                accounts.where((a) => a['status'] != 'active').length;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _filterStatus = 'active'),
-                      child: _statBox("$active", "مستخدم نشط"),
-                    ),
+          stream: FirebaseFirestore.instance.collection('users').snapshots(),
+          builder: (context, usersSnap) {
+            if (!usersSnap.hasData) return const SizedBox();
+
+            final users = usersSnap.data!.docs;
+
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('accounts')
+                  .snapshots(),
+              builder: (context, accSnap) {
+                if (!accSnap.hasData) return const SizedBox();
+
+                final accounts = accSnap.data!.docs;
+
+                int active = 0;
+                int disabled = 0;
+
+                for (var user in users) {
+                  final userId = user.id;
+
+                  final acc = accounts.where((a) => a['accountId'] == userId);
+
+                  if (acc.isNotEmpty) {
+                    final status = acc.first['status'];
+
+                    if (status == 'active') {
+                      active++;
+                    } else {
+                      disabled++;
+                    }
+                  }
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _filterStatus = 'active';
+                            });
+                          },
+                          child: _statBox(
+                            "$active",
+                            "مستخدم نشط",
+                            Colors.green,
+                            _filterStatus == 'active',
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _filterStatus = 'disabled';
+                            });
+                          },
+                          child: _statBox(
+                            "$disabled",
+                            "مستخدم معطل",
+                            Colors.red,
+                            _filterStatus == 'disabled',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _filterStatus = 'disabled'),
-                      child: _statBox("$disabled", "مستخدم معطل"),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         ),
+
         const SizedBox(height: 10),
+
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream:
-            FirebaseFirestore.instance.collection('users').snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (context, usersSnap) {
+              if (!usersSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final docs = snapshot.data!.docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final name =
-                (data['username'] ?? '').toString().toLowerCase();
-                if (!name.contains(_searchQuery)) return false;
-                if (_filterStatus == 'all') return true;
-                return true;
-              }).toList();
 
-              if (docs.isEmpty) {
-                return const Center(child: Text('لا يوجد مستخدمين'));
-              }
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('accounts')
+                    .snapshots(),
+                builder: (context, accSnap) {
+                  if (!accSnap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final data =
-                  docs[index].data() as Map<String, dynamic>;
-                  final uid = docs[index].id;
+                  final users = usersSnap.data!.docs;
+                  final accounts = accSnap.data!.docs;
 
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('accounts')
-                        .doc(uid)
-                        .get(),
-                    builder: (context, accSnap) {
-                      if (!accSnap.hasData) {
-                        return const Center(
-                            child: CircularProgressIndicator());
-                      }
-                      final accData = accSnap.data!.data()
-                      as Map<String, dynamic>? ??
-                          {};
-                      final status = accData['status'] ?? 'active';
-                      if (_filterStatus == 'active' &&
-                          status != 'active') {
-                        return const SizedBox();
-                      }
-                      if (_filterStatus == 'disabled' &&
-                          status == 'active') {
-                        return const SizedBox();
-                      }
+                  final combined = users.map((user) {
+                    final data = user.data() as Map<String, dynamic>;
+                    final uid = user.id;
+
+                    final accList = accounts.where((a) => a.id == uid).toList();
+
+                    final accData = accList.isNotEmpty
+                        ? accList.first.data() as Map<String, dynamic>
+                        : {};
+
+                    return {
+                      ...data,
+                      'uid': uid,
+                      'status': accData['status'] ?? 'active',
+                      'createdAt': accData['createdAt'],
+                    };
+                  }).toList();
+
+                  final filtered = combined.where((user) {
+                    final name =
+                    (user['username'] ?? '').toString().toLowerCase();
+
+                    if (!name.contains(_searchQuery)) return false;
+
+                    if (_filterStatus == 'active') {
+                      return user['status'] == 'active';
+                    }
+
+                    if (_filterStatus == 'disabled') {
+                      return user['status'] != 'active';
+                    }
+
+                    return true;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox_outlined,
+                              size: 64, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          Text(
+                            _filterStatus == 'active'
+                                ? 'لا يوجد مستخدمين نشطين'
+                                : _filterStatus == 'disabled'
+                                ? 'لا يوجد مستخدمين معطلين'
+                                : 'لا يوجد مستخدمين',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // display the list
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final user = filtered[index];
+
+                      final status = user['status'];
+                      final uid = user['uid'];
+
                       DateTime? createdAt =
-                      (accData['createdAt'] as Timestamp?)?.toDate();
+                      (user['createdAt'] as Timestamp?)?.toDate();
+
                       String formattedDate = createdAt != null
-                          ? "${createdAt.day}-${createdAt.month}-${createdAt.year}"
+                          ? "${createdAt.day}-${createdAt.month}-${createdAt
+                          .year}"
                           : "";
 
                       return Container(
@@ -464,89 +451,87 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ],
                         ),
                         child: Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+
                                         Container(
-                                          padding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: status == 'active'
                                                 ? Colors.green
                                                 : Colors.grey,
-                                            borderRadius:
-                                            BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                                12),
                                           ),
                                           child: Text(
-                                            status == 'active'
-                                                ? 'نشط'
-                                                : 'معطل',
+                                            status == 'active' ? 'نشط' : 'معطل',
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 11),
                                           ),
                                         ),
+
                                         const SizedBox(width: 8),
+
                                         Text(
-                                          data['username'] ?? '',
+                                          user['username'] ?? '',
                                           style: const TextStyle(
-                                              fontWeight:
-                                              FontWeight.bold),
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ],
                                     ),
                                   ),
+
                                   const SizedBox(height: 6),
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      data['email'] ?? '',
+                                      user['email'] ?? '',
                                       style: const TextStyle(
                                           color: Colors.grey),
                                     ),
                                   ),
+
                                   const SizedBox(height: 4),
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       "تاريخ الانضمام • $formattedDate",
                                       style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey),
+                                          fontSize: 11, color: Colors.grey),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+
                             PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert,
-                                  color: Colors.grey),
+                              icon: const Icon(
+                                  Icons.more_vert, color: Colors.grey),
                               onSelected: (value) {
                                 if (value == 'view') {
                                   _showUserDetails(
-                                      data, status, formattedDate);
-                                } else if (value == 'edit') {
-                                  _editUser(uid, data);
-                                } else if (value == 'delete') {
-                                  _deleteUser(uid);
+                                      user, status, formattedDate, uid);
                                 } else if (value == 'toggle') {
                                   _toggleStatus(uid, status);
                                 }
                               },
-                              itemBuilder: (context) => [
+                              itemBuilder: (context) =>
+                              [
                                 const PopupMenuItem(
                                   value: 'view',
                                   child: Row(
@@ -557,43 +542,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                     ],
                                   ),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit, size: 18),
-                                      SizedBox(width: 8),
-                                      Text('تعديل'),
-                                    ],
-                                  ),
-                                ),
+
                                 PopupMenuItem(
                                   value: 'toggle',
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.block, size: 18),
-                                      const SizedBox(width: 8),
+                                      Icon(Icons.block, size: 18),
+                                      SizedBox(width: 8),
                                       Text(status == 'active'
                                           ? 'تعطيل الحساب'
                                           : 'تفعيل الحساب'),
                                     ],
                                   ),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete,
-                                          size: 18, color: Colors.red),
-                                      SizedBox(width: 8),
-                                      Text('حذف المستخدم',
-                                          style: TextStyle(
-                                              color: Colors.red)),
-                                    ],
-                                  ),
-                                ),
                               ],
-                            ),
+                            )
                           ],
                         ),
                       );
@@ -603,35 +566,59 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               );
             },
           ),
-        ),
+        )
       ],
     );
   }
 
-  Widget _statBox(String number, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+  Widget _statBox(String count, String label, MaterialColor color,
+      bool isSelected) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: isSelected ? color.shade100 : color.shade50,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? color.shade600 : color.shade200,
+          width: isSelected ? 2 : 1,
+        ),
       ),
       child: Column(
         children: [
-          Text(number,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? color.shade800 : color.shade700,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? color.shade700 : color.shade600,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  void _showUserDetails(
-      Map<String, dynamic> data,
+  void _showUserDetails(Map<String, dynamic> data,
       String status,
       String createdAt,
-      ) {
+      String userId,) async {
+    final reportsSnapshot = await FirebaseFirestore.instance
+        .collection('reports')
+        .where('userId', isEqualTo: userId)
+        .count()
+        .get();
+
+    final reportsCount = reportsSnapshot.count;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -647,16 +634,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             children: [
               const Center(
                 child: Text(
-                  'تفاصيل المستخدم',
+                  'معلومات المستخدم',
                   style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
+
               const SizedBox(height: 20),
-              _detailRow('الاسم', data['username']),
-              _detailRow('البريد الإلكتروني', data['email']),
+
+              _detailRow('الاسم', data['username'] ?? ''),
+              _detailRow('البريد الإلكتروني', data['email'] ?? ''),
               _detailRow('تاريخ الانضمام', createdAt),
-              _detailRow('عدد التقارير', '12'),
+              _detailRow('عدد التقارير', reportsCount.toString()),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -666,9 +658,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: status == 'active'
-                          ? Colors.green
-                          : Colors.grey,
+                      color: status == 'active' ? Colors.green : Colors.grey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -678,7 +668,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -710,42 +702,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _editUser(String uid, Map<String, dynamic> data) {
-    TextEditingController name =
-    TextEditingController(text: data['username']);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('تعديل المستخدم'),
-        content: TextField(controller: name),
-        actions: [
-          TextButton(
-            child: const Text('حفظ'),
-            onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(uid)
-                  .update({'username': name.text});
-              Navigator.pop(context);
-            },
-          )
-        ],
-      ),
-    );
-  }
-
   void _toggleStatus(String uid, String status) async {
+    final newStatus = status == 'active' ? 'suspended' : 'active';
+
     await FirebaseFirestore.instance
         .collection('accounts')
         .doc(uid)
-        .update({'status': status == 'active' ? 'suspended' : 'active'});
-  }
+        .update({
+      'status': newStatus,
+    });
 
-  void _deleteUser(String uid) async {
-    await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+    setState(() {});
   }
-
-  // ── Specialists Tab ────────────────────────────────────────────
+  // ── Specialists management Tab ────────────────────────────────────────────
   Widget _buildSpecialistsTab() {
     return Column(
       children: [
@@ -767,84 +736,177 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             },
           ),
         ),
+
         StreamBuilder<QuerySnapshot>(
-          stream:
-          FirebaseFirestore.instance.collection('accounts').snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox();
-            final accounts = snapshot.data!.docs;
-            int active =
-                accounts.where((a) => a['status'] == 'active').length;
-            int disabled =
-                accounts.where((a) => a['status'] != 'active').length;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _filterStatus = 'active'),
-                      child: _statBox("$active", "خبير نشط"),
-                    ),
+          stream: FirebaseFirestore.instance
+              .collection('specialists')
+              .snapshots(),
+          builder: (context, specSnap) {
+            if (!specSnap.hasData) return const SizedBox();
+
+            final specialists = specSnap.data!.docs;
+
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('accounts')
+                  .snapshots(),
+              builder: (context, accSnap) {
+                if (!accSnap.hasData) return const SizedBox();
+
+                final accounts = accSnap.data!.docs;
+
+                int active = 0;
+                int disabled = 0;
+
+                for (var spec in specialists) {
+                  final accountId = spec['accountId'];
+
+                  final accList =
+                  accounts.where((a) => a['accountId'] == accountId);
+
+                  if (accList.isNotEmpty) {
+                    final status = accList.first['status'];
+
+                    if (status == 'active') {
+                      active++;
+                    } else {
+                      disabled++;
+                    }
+                  }
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _filterStatus = 'active'),
+                          child: _statBox(
+                            "$active",
+                            "خبير نشط",
+                            Colors.green,
+                            _filterStatus == 'active',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _filterStatus = 'disabled'),
+                          child: _statBox(
+                            "$disabled",
+                            "خبير معطل",
+                            Colors.red,
+                            _filterStatus == 'disabled',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _filterStatus = 'disabled'),
-                      child: _statBox("$disabled", "خبير معطل"),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         ),
+
         const SizedBox(height: 10),
+
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('specialists')
                 .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+            builder: (context, specSnap) {
+              if (!specSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final docs = snapshot.data!.docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final name =
-                (data['fullName'] ?? '').toString().toLowerCase();
-                return name.contains(_searchQuery);
-              }).toList();
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final data =
-                  docs[index].data() as Map<String, dynamic>;
-                  final uid = data['accountId'];
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('accounts')
+                    .snapshots(),
+                builder: (context, accSnap) {
+                  if (!accSnap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('accounts')
-                        .doc(uid)
-                        .get(),
-                    builder: (context, accSnap) {
-                      if (!accSnap.hasData) return const SizedBox();
-                      final accData = accSnap.data!.data()
-                      as Map<String, dynamic>? ??
-                          {};
-                      final status = accData['status'] ?? 'active';
-                      if (_filterStatus == 'active' &&
-                          status != 'active') return const SizedBox();
-                      if (_filterStatus == 'disabled' &&
-                          status == 'active') return const SizedBox();
+                  final specialists = specSnap.data!.docs;
+                  final accounts = accSnap.data!.docs;
+
+                  final combined = specialists.map((spec) {
+                    final data = spec.data() as Map<String, dynamic>;
+                    final accountId = data['accountId'];
+
+                    final accList = accounts
+                        .where((a) => a['accountId'] == accountId)
+                        .toList();
+
+                    final accData = accList.isNotEmpty
+                        ? accList.first.data() as Map<String, dynamic>
+                        : {};
+
+                    return {
+                      ...data,
+                      'status': accData['status'] ?? 'active',
+                    };
+                  }).toList();
+
+                  final filtered = combined.where((spec) {
+                    final name =
+                    (spec['fullName'] ?? '').toString().toLowerCase();
+
+                    if (!name.contains(_searchQuery)) return false;
+
+                    if (_filterStatus == 'active') {
+                      return spec['status'] == 'active';
+                    }
+
+                    if (_filterStatus == 'disabled') {
+                      return spec['status'] != 'active';
+                    }
+
+                    return true;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox_outlined,
+                              size: 64, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          Text(
+                            _filterStatus == 'active'
+                                ? 'لا يوجد خبراء نشطين'
+                                : _filterStatus == 'disabled'
+                                ? 'لا يوجد خبراء معطلين'
+                                : 'لا يوجد خبراء',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final spec = filtered[index];
+
+                      final status = spec['status'];
+                      final accountId = spec['accountId'];
+
                       DateTime? createdAt =
-                      (data['createdAt'] as Timestamp?)?.toDate();
+                      (spec['createdAt'] as Timestamp?)?.toDate();
+
                       String formattedDate = createdAt != null
-                          ? "${createdAt.year}-${createdAt.month}-${createdAt.day}"
+                          ? "${createdAt.year}-${createdAt.month}-${createdAt
+                          .day}"
                           : "";
 
                       return Container(
@@ -853,96 +915,94 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                            )
+                          ],
                         ),
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+
                                         Container(
-                                          padding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: status == 'active'
                                                 ? Colors.green
                                                 : Colors.grey,
-                                            borderRadius:
-                                            BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                                12),
                                           ),
                                           child: Text(
-                                            status == 'active'
-                                                ? 'نشط'
-                                                : 'معطل',
+                                            status == 'active' ? 'نشط' : 'معطل',
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 11),
                                           ),
                                         ),
+
                                         const SizedBox(width: 8),
+
                                         Text(
-                                          data['fullName'] ?? '',
+                                          spec['fullName'] ?? '',
                                           style: const TextStyle(
-                                              fontWeight:
-                                              FontWeight.bold),
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ],
                                     ),
                                   ),
+
                                   const SizedBox(height: 6),
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      data['email'] ?? '',
+                                      spec['email'] ?? '',
                                       style: const TextStyle(
                                           color: Colors.grey),
                                     ),
                                   ),
+
                                   const SizedBox(height: 4),
+
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       "تاريخ الانضمام • $formattedDate",
                                       style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      "⭐ ${data['rating']}   •   ${data['reviewCount']} مراجعة",
-                                      style:
-                                      const TextStyle(fontSize: 11),
+                                          fontSize: 11, color: Colors.grey),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert),
                               onSelected: (value) {
                                 if (value == 'view') {
                                   _showSpecialistDetails(
-                                      data, status, formattedDate);
-                                } else if (value == 'delete') {
-                                  _deleteUser(uid);
+                                      spec, status, formattedDate);
                                 } else if (value == 'toggle') {
-                                  _toggleStatus(uid, status);
+                                  _toggleStatus(accountId, status);
                                 }
                               },
-                              itemBuilder: (context) => [
+                              itemBuilder: (context) =>
+                              [
                                 const PopupMenuItem(
                                   value: 'view',
                                   child: Row(
@@ -957,24 +1017,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   value: 'toggle',
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.block),
-                                      const SizedBox(width: 8),
+                                      Icon(Icons.block, size: 18),
+                                      SizedBox(width: 8),
                                       Text(status == 'active'
                                           ? 'تعطيل الحساب'
                                           : 'تفعيل الحساب'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete,
-                                          color: Colors.red),
-                                      SizedBox(width: 8),
-                                      Text('حذف',
-                                          style: TextStyle(
-                                              color: Colors.red)),
                                     ],
                                   ),
                                 ),
@@ -994,11 +1041,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _showSpecialistDetails(
-      Map<String, dynamic> data,
+  void _showSpecialistDetails(Map<String, dynamic> data,
       String status,
-      String createdAt,
-      ) {
+      String createdAt,) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1011,14 +1056,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+
               const Center(
                 child: Text(
                   'تفاصيل الخبير',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
+
               const SizedBox(height: 20),
+
               _detailRow('الاسم', data['fullName']),
               _detailRow('البريد', data['email']),
               _detailRow('تاريخ الانضمام', createdAt),
@@ -1026,7 +1073,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _detailRow('التقييم', data['rating'].toString()),
               _detailRow('الخبرة', data['experience']),
               _detailRow('الشهادات', data['certificates']),
+
               const SizedBox(height: 10),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -1036,9 +1085,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: status == 'active'
-                          ? Colors.green
-                          : Colors.grey,
+                      color: status == 'active' ? Colors.green : Colors.grey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -1048,12 +1095,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black),
+                    backgroundColor: Colors.black,
+                  ),
                   onPressed: () => Navigator.pop(context),
                   child: const Text('إغلاق'),
                 ),
@@ -1064,36 +1114,110 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       },
     );
   }
-
   // ── Requests Tab ────────────────────────────────────────────
   Widget _buildRequestsTab() {
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: const TabBar(
-              labelColor: Color(0xFF16A34A),
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Color(0xFF16A34A),
-              tabs: [
-                Tab(text: 'معلقة'),
-                Tab(text: 'موافق عليها'),
-                Tab(text: 'مرفوضة'),
-              ],
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('specialist_requests')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+
+        final pending = docs
+            .where((d) => (d.data() as Map)['status'] == 'pending')
+            .length;
+        final approved = docs
+            .where((d) => (d.data() as Map)['status'] == 'approved')
+            .length;
+        final rejected = docs
+            .where((d) => (d.data() as Map)['status'] == 'rejected')
+            .length;
+
+        return Column(
+          children: [
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  _filterCard('pending', 'معلقة', Colors.orange,
+                      Icons.pending_actions, pending),
+                  const SizedBox(width: 10),
+                  _filterCard('approved', 'موافق عليها', Colors.green,
+                      Icons.check_circle_outline, approved),
+                  const SizedBox(width: 10),
+                  _filterCard('rejected', 'مرفوضة', Colors.red,
+                      Icons.cancel_outlined, rejected),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _requestsList(selectedStatus),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _filterCard(
+      String status,
+      String label,
+      MaterialColor color,
+      IconData icon,
+      int count,
+      ) {
+    final isSelected = selectedStatus == status;
+
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          setState(() {
+            selectedStatus = status;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? color.shade100 : color.shade50,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? color.shade600 : color.shade200,
+              width: isSelected ? 2 : 1,
             ),
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _requestsList('pending'),
-                _requestsList('approved'),
-                _requestsList('rejected'),
-              ],
-            ),
+          child: Column(
+            children: [
+              Icon(icon,
+                  color: isSelected ? color.shade800 : color.shade600,
+                  size: 26),
+
+              const SizedBox(height: 6),
+
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? color.shade800 : color.shade700,
+                ),
+              ),
+
+              const SizedBox(height: 2),
+
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? color.shade700 : color.shade600,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1692,6 +1816,594 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  // ── Edit requests Tab ────────────────────────────────────────────
+  Widget _buildEditRequestsTab() {
+    return Column(
+      children: [
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('Specialist_edit_request')
+              .snapshots(),
+          builder: (context, snap) {
+            final docs = snap.data?.docs ?? [];
+            final pending = docs.where((d) =>
+            (d.data() as Map)['status'] == 'pending').length;
+            final approved = docs.where((d) =>
+            (d.data() as Map)['status'] == 'approved').length;
+            final rejected = docs.where((d) =>
+            (d.data() as Map)['status'] == 'rejected').length;
+
+            return Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(12),
+              child: Row(children: [
+                _editFilterCard('pending', 'معلقة', Colors.orange,
+                    Icons.pending_actions, pending),
+                const SizedBox(width: 10),
+                _editFilterCard('approved', 'موافق عليها', Colors.green,
+                    Icons.check_circle_outline, approved),
+                const SizedBox(width: 10),
+                _editFilterCard('rejected', 'مرفوضة', Colors.red,
+                    Icons.cancel_outlined, rejected),
+              ]),
+            );
+          },
+        ),
+        Expanded(child: _editRequestsList()),
+      ],
+    );
+  }
+
+  Widget _editFilterCard(String status, String label, MaterialColor color,
+      IconData icon, int count) {
+    final isSelected = _selectedEditStatus == status;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _selectedEditStatus = status),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? color.shade100 : color.shade50,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? color.shade600 : color.shade200,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(children: [
+            Icon(icon,
+                color: isSelected ? color.shade800 : color.shade600,
+                size: 26),
+            const SizedBox(height: 6),
+            Text('$count',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? color.shade800 : color.shade700)),
+            const SizedBox(height: 2),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected ? color.shade700 : color.shade600)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _editRequestsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('Specialist_edit_request')
+          .where('status', isEqualTo: _selectedEditStatus)
+          .orderBy('submittedAt', descending: true)
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)));
+        }
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
+                const SizedBox(height: 12),
+                Text(
+                  _selectedEditStatus == 'pending'
+                      ? 'لا توجد طلبات معلقة'
+                      : _selectedEditStatus == 'approved'
+                      ? 'لا توجد طلبات موافق عليها'
+                      : 'لا توجد طلبات مرفوضة',
+                  style: const TextStyle(color: Colors.grey, fontSize: 15),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (ctx, i) {
+            final data = docs[i].data() as Map<String, dynamic>;
+            return _editRequestCard(data, docs[i].id);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _editRequestCard(Map<String, dynamic> data, String docId) {
+    final status = data['status'] as String;
+    final statusColor = status == 'pending'
+        ? Colors.orange
+        : status == 'approved'
+        ? Colors.green
+        : Colors.red;
+
+    final oldImages = List<String>.from(data['oldCertificateImages'] ?? []);
+    final newImages = List<String>.from(data['newCertificateImages'] ?? []);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: const Color(0xFFDCFCE7),
+                child: Text(
+                  (data['specialistName'] ?? 'خ')[0],
+                  style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(data['specialistName'] ?? '',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF14532D))),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                ),
+                child: Text(
+                  status == 'pending'
+                      ? 'معلق'
+                      : status == 'approved'
+                      ? 'موافق عليه'
+                      : 'مرفوض',
+                  style: TextStyle(fontSize: 11, color: statusColor),
+                ),
+              ),
+            ]),
+          ),
+
+          // Comparison content
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _editComparisonRow('الاسم الكامل',
+                    data['oldFullName'], data['newFullName']),
+                _editComparisonRow('الخبرة',
+                    data['oldExperience'], data['newExperience']),
+                _editComparisonRow('الشهادات',
+                    data['oldCertificates'], data['newCertificates']),
+                _editComparisonRow('البريد الإلكتروني',
+                    data['oldEmail'], data['newEmail']),
+
+                // Certificate images comparison
+                if (oldImages.isNotEmpty || newImages.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text('صور الشهادات',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('قبل',
+                                style: TextStyle(fontSize: 11, color: Colors.red)),
+                            const SizedBox(height: 4),
+                            oldImages.isEmpty
+                                ? const Text('—',
+                                style: TextStyle(color: Colors.grey))
+                                : Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: oldImages
+                                  .map((url) => ClipRRect(
+                                borderRadius:
+                                BorderRadius.circular(6),
+                                child: Image.network(url,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover),
+                              ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(Icons.arrow_forward,
+                            size: 14, color: Colors.grey),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('بعد',
+                                style: TextStyle(
+                                    fontSize: 11, color: Color(0xFF16A34A))),
+                            const SizedBox(height: 4),
+                            newImages.isEmpty
+                                ? const Text('لم يتم تغييرها',
+                                style: TextStyle(color: Colors.grey))
+                                : Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: newImages
+                                  .map((url) => ClipRRect(
+                                borderRadius:
+                                BorderRadius.circular(6),
+                                child: Image.network(url,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover),
+                              ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Rejection reason
+                if (status == 'rejected' &&
+                    (data['rejectionReason'] ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('سبب الرفض:',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(data['rejectionReason'],
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          if (status == 'pending')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Row(children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approveEditRequest(data, docId),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.check, color: Colors.white, size: 16),
+                    label: const Text('قبول',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showEditRejectDialog(data, docId),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFCC0000),
+                      side: const BorderSide(color: Color(0xFFCC0000)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.close,
+                        color: Color(0xFFCC0000), size: 16),
+                    label: const Text('رفض',
+                        style: TextStyle(color: Color(0xFFCC0000), fontSize: 13)),
+                  ),
+                ),
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _editComparisonRow(String label, String? oldVal, String? newVal) {
+    final changed =
+        (oldVal ?? '') != (newVal ?? '') && (newVal ?? '').isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Row(children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(oldVal ?? '—',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                        decoration: TextDecoration.lineThrough)),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: changed ? const Color(0xFFF0FDF4) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(newVal ?? '—',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: changed ? const Color(0xFF16A34A) : Colors.grey,
+                        fontWeight:
+                        changed ? FontWeight.bold : FontWeight.normal)),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+// ── Approve edit request ──────────────────────────────────────────────
+  Future<void> _approveEditRequest(
+      Map<String, dynamic> data, String docId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('تأكيد القبول',
+              style: TextStyle(
+                  color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
+          content: Text(
+              'هل تريد قبول تعديلات ${data['specialistName'] ?? ''}؟ سيتم تحديث بياناته تلقائياً.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A)),
+              child:
+              const Text('قبول', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final specialistId = data['specialistId'] as String;
+    final batch = FirebaseFirestore.instance.batch();
+
+    batch.update(
+      FirebaseFirestore.instance
+          .collection('Specialist_edit_request')
+          .doc(docId),
+      {'status': 'approved'},
+    );
+
+    final updates = <String, dynamic>{};
+    if ((data['newFullName'] ?? '').isNotEmpty)
+      updates['fullName'] = data['newFullName'];
+    if ((data['newExperience'] ?? '').isNotEmpty)
+      updates['experience'] = data['newExperience'];
+    if ((data['newCertificates'] ?? '').isNotEmpty)
+      updates['certificates'] = data['newCertificates'];
+    if ((data['newEmail'] ?? '').isNotEmpty)
+      updates['email'] = data['newEmail'];
+    final newImages = List<String>.from(data['newCertificateImages'] ?? []);
+    if (newImages.isNotEmpty) updates['certificateImages'] = newImages;
+
+    batch.update(
+      FirebaseFirestore.instance.collection('specialists').doc(specialistId),
+      updates,
+    );
+
+    final accountUpdates = <String, dynamic>{};
+    if ((data['newEmail'] ?? '').isNotEmpty &&
+        data['newEmail'] != data['oldEmail']) {
+      accountUpdates['email'] = data['newEmail'];
+    }
+    if ((data['newFullName'] ?? '').isNotEmpty &&
+        data['newFullName'] != data['oldFullName']) {
+      accountUpdates['username'] = data['newFullName'];
+    }
+    if (accountUpdates.isNotEmpty) {
+      batch.update(
+        FirebaseFirestore.instance
+            .collection('accounts')
+            .doc(specialistId),
+        accountUpdates,
+      );
+    }
+
+    await batch.commit();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            '✅ تم قبول تعديلات ${data['specialistName'] ?? ''} وتحديث بياناته'),
+        backgroundColor: const Color(0xFF16A34A),
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+// ── Reject edit request ──────────────────────────────────────────────
+  void _showEditRejectDialog(Map<String, dynamic> data, String docId) {
+    final reasonController = TextEditingController();
+    String? reasonError;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Row(children: [
+              const Icon(Icons.cancel_outlined,
+                  color: Color(0xFFCC0000), size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'رفض تعديل ${data['specialistName'] ?? ''}',
+                  style: const TextStyle(
+                      color: Color(0xFF14532D),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
+                ),
+              ),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('سبب الرفض *',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151))),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 4,
+                  textDirection: TextDirection.rtl,
+                  onChanged: (v) => setDialog(() {
+                    reasonError = v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
+                  }),
+                  decoration: InputDecoration(
+                    hintText: 'أدخل سبب الرفض...',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    errorText: reasonError,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child:
+                const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    setDialog(() => reasonError = 'سبب الرفض مطلوب');
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  await FirebaseFirestore.instance
+                      .collection('Specialist_edit_request')
+                      .doc(docId)
+                      .update({
+                    'status': 'rejected',
+                    'rejectionReason': reason,
+                    'rejectedAt': FieldValue.serverTimestamp(),
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          '❌ تم رفض تعديلات ${data['specialistName'] ?? ''}'),
+                      backgroundColor: Colors.orange,
+                    ));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFCC0000)),
+                icon: const Icon(Icons.close, color: Colors.white, size: 16),
+                label: const Text('رفض',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
