@@ -38,48 +38,49 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        backgroundColor: const Color(0xFFF0FDF4),appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        centerTitle: true,
-        title: const Text(
-          'BioShield',
-          style: TextStyle(
-            color: Color(0xFF16A34A),
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/logo_without_background.png',
-            errorBuilder: (_, __, ___) =>
-            const Icon(Icons.eco, color: Color(0xFF16A34A)),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.rotationY(3.1416), // horizontal rotate
-              child: const Icon(
-                Icons.logout,
-                color: Color(0xFF16A34A),
-              ),
+        backgroundColor: const Color(0xFFF0FDF4),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          centerTitle: true,
+          title: const Text(
+            'BioShield',
+            style: TextStyle(
+              color: Color(0xFF16A34A),
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
             ),
-            onPressed: () async {
-              await AuthService().signOut();
-              if (!mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const SplashScreen()),
-                    (_) => false,
-              );
-            },
           ),
-        ],
-      ),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              'assets/images/logo_without_background.png',
+              errorBuilder: (_, __, ___) =>
+              const Icon(Icons.eco, color: Color(0xFF16A34A)),
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.rotationY(3.1416),
+                child: const Icon(
+                  Icons.logout,
+                  color: Color(0xFFCC0000),
+                ),
+              ),
+              onPressed: () async {
+                await AuthService().signOut();
+                if (!mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SplashScreen()),
+                      (_) => false,
+                );
+              },
+            ),
+          ],
+        ),
         body: IndexedStack(index: _currentIndex, children: _pages),
         bottomNavigationBar: _buildBottomNav(),
       ),
@@ -87,26 +88,26 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 
   Widget _buildBottomNav() {
-    // We wrap the entire custom bar in a SafeArea
     return SafeArea(
-      bottom: true, // Only add padding at the bottom
+      bottom: true,
       child: Container(
-        height: 90, // Adjusted height
+        height: 90,
         color: Colors.transparent,
         child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            // White background box
             Container(
               height: 75,
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, -4))
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 15,
+                      offset: const Offset(0, -4))
                 ],
               ),
             ),
-            // Navigation Items
             Padding(
               padding: const EdgeInsets.only(bottom: 5),
               child: Row(
@@ -127,7 +128,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     );
   }
 
-  Widget _navItem(int index, IconData icon, IconData activeIcon, String label, {bool isCircle = false}) {
+  Widget _navItem(int index, IconData icon, IconData activeIcon, String label,
+      {bool isCircle = false}) {
     final isSelected = _currentIndex == index;
     final Color activeColor = const Color(0xFF16A34A);
     final Color inactiveColor = Colors.grey[400]!;
@@ -149,7 +151,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 3))
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3))
                   ],
                 ),
                 child: const Icon(Icons.camera_alt, color: Colors.white, size: 24),
@@ -167,7 +172,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               label,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight:
+                isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected ? activeColor : inactiveColor,
               ),
             ),
@@ -179,7 +185,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 }
 
-// ─── COMMUNITY FEED DASHBOARD (Logic Unchanged) ───────────────
+// ─── COMMUNITY FEED DASHBOARD ───────────────────────────────
 class _ReportsDashboard extends StatefulWidget {
   const _ReportsDashboard();
   @override
@@ -207,7 +213,8 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
   Future<void> _fetchUsername() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc =
+    await FirebaseFirestore.instance.collection('users').doc(uid).get();
     if (mounted) setState(() => _username = doc.data()?['username'] ?? 'مستخدم');
   }
 
@@ -219,16 +226,22 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF14532D), Color(0xFF16A34A)]),
+            gradient: const LinearGradient(
+                colors: [Color(0xFF14532D), Color(0xFF16A34A)]),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(children: [
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('مرحباً، $_username 👋', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
-            )),
+            Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('مرحباً، $_username 👋',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                )),
             const Icon(Icons.eco_rounded, color: Colors.white, size: 36),
           ]),
         ),
@@ -243,48 +256,72 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
               valueListenable: _notifier,
               builder: (context, query, _) {
                 return query.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () {
-                  _searchController.clear();
-                  _notifier.value = '';
-                })
+                    ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: () {
+                      _searchController.clear();
+                      _notifier.value = '';
+                    })
                     : const SizedBox.shrink();
               },
             ),
             filled: true,
             fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
           ),
         ),
         const SizedBox(height: 20),
-        const Text('التقارير المشاركة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+        const Text('التقارير المشاركة',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF166534))),
         const SizedBox(height: 12),
         ValueListenableBuilder<String>(
           valueListenable: _notifier,
           builder: (context, query, child) {
             return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('community_feed').orderBy('createdAt', descending: true).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('community_feed')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: Color(0xFF16A34A))));
+                  return const Center(
+                      child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF16A34A))));
                 }
                 final allDocs = snapshot.data?.docs ?? [];
                 final filtered = allDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final plantName = (data['plantName'] ?? '').toString().toLowerCase();
+                  final plantName =
+                  (data['plantName'] ?? '').toString().toLowerCase();
                   return plantName.contains(query.toLowerCase().trim());
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('لا توجد نتائج مطابقة')));
+                  return const Center(
+                      child: Padding(
+                          padding: EdgeInsets.all(40),
+                          child: Text('لا توجد نتائج مطابقة')));
                 }
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.8,
+                  gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.8,
                   ),
                   itemCount: filtered.length,
-                  itemBuilder: (context, i) => _ReportCard(report: filtered[i].data() as Map<String, dynamic>),
+                  itemBuilder: (context, i) => _ReportCard(
+                      report: filtered[i].data() as Map<String, dynamic>),
                 );
               },
             );
@@ -301,50 +338,92 @@ class _ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
+    final isHealthy =
+        report['status'] == 'سليم' || report['isHealthy'] == true;
     final imageUrl = report['ImageUrl'] ?? report['imageUrl'] ?? '';
 
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => SharedReportDetailPage(report: report))),
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (c) => SharedReportDetailPage(report: report))),
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.04), blurRadius: 6)
+            ]),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Stack(children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                  borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(15)),
                   child: imageUrl.isNotEmpty
-                      ? Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _imgPlaceholder())
+                      ? Image.network(imageUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _imgPlaceholder())
                       : _imgPlaceholder(),
                 ),
-                Positioned(top: 6, right: 6,
-                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: isHealthy ? Colors.green : Colors.red, borderRadius: BorderRadius.circular(10)),
-                      child: Text(isHealthy ? 'سليم' : 'مريض', style: const TextStyle(color: Colors.white, fontSize: 10))),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: isHealthy ? Colors.green : Colors.red,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(isHealthy ? 'سليم' : 'مريض',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 10))),
                 ),
               ]),
             ),
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(report['plantName'] ?? 'نبات', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text('بواسطة: ${report['sharedBy'] ?? 'مستخدم'}', style: const TextStyle(fontSize: 10, color: Colors.grey), maxLines: 1),
-                const SizedBox(height: 4),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('دقة التشخيص ${report['confidence'] ?? 0}%', style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
-                  const Icon(Icons.arrow_circle_left_outlined, size: 14, color: Colors.grey),
-                ]),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(report['plantName'] ?? 'نبات',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    Text('بواسطة: ${report['sharedBy'] ?? 'مستخدم'}',
+                        style:
+                        const TextStyle(fontSize: 10, color: Colors.grey),
+                        maxLines: 1),
+                    const SizedBox(height: 4),
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('دقة التشخيص ${report['confidence'] ?? 0}%',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF16A34A),
+                                  fontWeight: FontWeight.bold)),
+                          const Icon(Icons.arrow_circle_left_outlined,
+                              size: 14, color: Colors.grey),
+                        ]),
+                  ]),
             ),
           ],
         ),
       ),
     );
   }
-  Widget _imgPlaceholder() => Container(color: Colors.grey[100], child: const Center(child: Icon(Icons.eco_outlined, color: Colors.grey)));
+
+  Widget _imgPlaceholder() => Container(
+      color: Colors.grey[100],
+      child: const Center(
+          child: Icon(Icons.eco_outlined, color: Colors.grey)));
 }
 
 class SharedReportDetailPage extends StatelessWidget {
@@ -353,9 +432,11 @@ class SharedReportDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
+    final isHealthy =
+        report['status'] == 'سليم' || report['isHealthy'] == true;
     final imageUrl = report['ImageUrl'] ?? report['imageUrl'] ?? '';
-    final Color primaryColor = isHealthy ? const Color(0xFF16A34A) : Colors.red;
+    final Color primaryColor =
+    isHealthy ? const Color(0xFF16A34A) : Colors.red;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -366,7 +447,10 @@ class SharedReportDetailPage extends StatelessWidget {
           elevation: 1,
           centerTitle: true,
           title: const Text('تفاصيل التقرير المشترك',
-              style: TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold, fontSize: 18)),
+              style: TextStyle(
+                  color: Color(0xFF14532D),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF16A34A)),
             onPressed: () => Navigator.pop(context),
@@ -380,40 +464,64 @@ class SharedReportDetailPage extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, height: 280, width: double.infinity, fit: BoxFit.cover,
+                    ? Image.network(imageUrl,
+                    height: 280,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _placeholder())
                     : _placeholder(),
               ),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10)
+                    ]),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(report['plantName'] ?? 'نبات',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+                            style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF14532D))),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                          child: Text(isHealthy ? 'سليم' : 'مريض', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20)),
+                          child: Text(isHealthy ? 'سليم' : 'مريض',
+                              style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                     const Divider(height: 30),
-                    _detailRow(Icons.person_pin_rounded, 'تم النشر بواسطة', report['sharedBy'] ?? 'مستخدم'),
-                    _detailRow(Icons.calendar_month_rounded, 'تاريخ التقرير', report['date'] ?? '—'),
-                    _detailRow(Icons.bolt_rounded, 'دقة التشخيص ', '${report['confidence'] ?? 0}%'),
+                    _detailRow(Icons.person_pin_rounded, 'تم النشر بواسطة',
+                        report['sharedBy'] ?? 'مستخدم'),
+                    _detailRow(Icons.calendar_month_rounded, 'تاريخ التقرير',
+                        report['date'] ?? '—'),
+                    _detailRow(Icons.bolt_rounded, 'دقة التشخيص ',
+                        '${report['confidence'] ?? 0}%'),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              _infoSection('التشخيص', report['diagnosis'] ?? 'لا يوجد بيانات', Icons.biotech_rounded),
+              _infoSection('التشخيص', report['diagnosis'] ?? 'لا يوجد بيانات',
+                  Icons.biotech_rounded),
               const SizedBox(height: 12),
-              _infoSection('العلاج الموصى به', report['treatment'] ?? 'لا يوجد علاج متاح حالياً', Icons.healing_rounded),
+              _infoSection('العلاج الموصى به',
+                  report['treatment'] ?? 'لا يوجد علاج متاح حالياً',
+                  Icons.healing_rounded),
               const SizedBox(height: 40),
             ],
           ),
@@ -429,8 +537,14 @@ class SharedReportDetailPage extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: const Color(0xFF16A34A)),
           const SizedBox(width: 10),
-          Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2F3A33)))),
+          Text('$label: ',
+              style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF2F3A33)))),
         ],
       ),
     );
@@ -439,18 +553,29 @@ class SharedReportDetailPage extends StatelessWidget {
   Widget _infoSection(String title, String content, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE8F5E9))),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: const Color(0xFFE8F5E9))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(icon, color: const Color(0xFF16A34A), size: 18),
           const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
         ]),
         const SizedBox(height: 10),
-        Text(content, style: const TextStyle(color: Colors.black87, height: 1.6, fontSize: 14)),
+        Text(content,
+            style: const TextStyle(
+                color: Colors.black87, height: 1.6, fontSize: 14)),
       ]),
     );
   }
 
-  Widget _placeholder() => Container(height: 200, color: Colors.grey[200], child: const Icon(Icons.image_not_supported_outlined, size: 50, color: Colors.grey));
+  Widget _placeholder() => Container(
+      height: 200,
+      color: Colors.grey[200],
+      child: const Icon(Icons.image_not_supported_outlined,
+          size: 50, color: Colors.grey));
 }

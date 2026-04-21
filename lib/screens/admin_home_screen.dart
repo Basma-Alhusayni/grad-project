@@ -62,20 +62,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-
   void _showFullImage(String url) {
     showDialog(
       context: context,
-      barrierDismissible: true, // يغلق عند الضغط خارج الصورة
+      barrierDismissible: true,
       builder: (_) => Directionality(
         textDirection: TextDirection.rtl,
         child: Dialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // رأس النافذة المنبثقة
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 16, 8),
                 child: Row(
@@ -96,14 +95,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ],
                 ),
               ),
-              // جسم الصورة
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))
+                      BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 10,
+                          offset: Offset(0, 4))
                     ],
                   ),
                   child: ClipRRect(
@@ -119,7 +120,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             height: 200,
                             color: const Color(0xFFF3F4F6),
                             child: const Center(
-                              child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                              child: CircularProgressIndicator(
+                                  color: Color(0xFF16A34A)),
                             ),
                           );
                         },
@@ -127,29 +129,28 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           height: 200,
                           width: double.infinity,
                           color: const Color(0xFFFEF2F2),
-                          child: const Icon(Icons.broken_image, color: Colors.red, size: 48),
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.red, size: 48),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-              // زر الإغلاق السفلي
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-              ),
+              const Padding(padding: EdgeInsets.only(bottom: 16)),
             ],
           ),
         ),
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        resizeToAvoidBottomInset: false, // تمت إضافة هذه الخاصية بناءً على طلبك
+        resizeToAvoidBottomInset: false,
         backgroundColor: const Color(0xFFF0FDF4),
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -175,13 +176,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             IconButton(
               icon: Transform(
                 alignment: Alignment.center,
-                transform: Matrix4.rotationY(3.1416), // دوران أفقي للأيقونة
-                child: const Icon(
-                  Icons.logout,
-                  color: Color(0xFF16A34A),
-                ),
+                transform: Matrix4.rotationY(3.1416),
+                child: const Icon(Icons.logout, color: Color(0xFFCC0000)),
               ),
-              onPressed: _logout, // استدعاء الدالة المعرفة مسبقاً في الكلاس
+              onPressed: _logout,
             ),
           ],
         ),
@@ -276,19 +274,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          // Quick stats
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('specialist_requests')
                 .snapshots(),
             builder: (context, snapshot) {
               final docs = snapshot.data?.docs ?? [];
-              final pending =
-                  docs.where((d) => (d.data() as Map)['status'] == 'pending').length;
-              final approved =
-                  docs.where((d) => (d.data() as Map)['status'] == 'approved').length;
-              final rejected =
-                  docs.where((d) => (d.data() as Map)['status'] == 'rejected').length;
+              final pending = docs
+                  .where((d) => (d.data() as Map)['status'] == 'pending')
+                  .length;
+              final approved = docs
+                  .where((d) => (d.data() as Map)['status'] == 'approved')
+                  .length;
+              final rejected = docs
+                  .where((d) => (d.data() as Map)['status'] == 'rejected')
+                  .length;
               return Row(
                 children: [
                   _statCard('$pending', 'طلبات معلقة', Colors.orange,
@@ -297,8 +297,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   _statCard('$approved', 'تمت الموافقة', Colors.green,
                       Icons.check_circle_outline),
                   const SizedBox(width: 12),
-                  _statCard('$rejected', 'مرفوضة', Colors.red,
-                      Icons.cancel_outlined),
+                  _statCard(
+                      '$rejected', 'مرفوضة', Colors.red, Icons.cancel_outlined),
                 ],
               );
             },
@@ -329,20 +329,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     color: color.shade700)),
             Text(label,
                 textAlign: TextAlign.center,
-                style:
-                TextStyle(fontSize: 11, color: color.shade600)),
+                style: TextStyle(fontSize: 11, color: color.shade600)),
           ],
         ),
       ),
     );
   }
 
-  // ── Users management Tab ────────────────────────────────────────────
+  // ── Users Tab ────────────────────────────────────────────────
   Widget _buildUsersTab() {
     return Column(
       children: [
-
-        /// 🔍 Search
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
@@ -362,43 +359,31 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             },
           ),
         ),
-
-        /// 🔢 الإحصائيات (نشط / معطل)
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('accounts').snapshots(),
+          stream:
+          FirebaseFirestore.instance.collection('accounts').snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const SizedBox();
-
             final accounts = snapshot.data!.docs;
-
             int active =
                 accounts.where((a) => a['status'] == 'active').length;
-
             int disabled =
                 accounts.where((a) => a['status'] != 'active').length;
-
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _filterStatus = 'active';
-                        });
-                      },
+                      onTap: () =>
+                          setState(() => _filterStatus = 'active'),
                       child: _statBox("$active", "مستخدم نشط"),
                     ),
                   ),
-
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _filterStatus = 'disabled';
-                        });
-                      },
+                      onTap: () =>
+                          setState(() => _filterStatus = 'disabled'),
                       child: _statBox("$disabled", "مستخدم معطل"),
                     ),
                   ),
@@ -407,29 +392,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             );
           },
         ),
-
         const SizedBox(height: 10),
-
-        /// 👥 List
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            stream:
+            FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               final docs = snapshot.data!.docs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
-                final name = (data['username'] ?? '').toString().toLowerCase();
-
+                final name =
+                (data['username'] ?? '').toString().toLowerCase();
                 if (!name.contains(_searchQuery)) return false;
-
-                // 🔥 فلترة بالحالة
                 if (_filterStatus == 'all') return true;
-
-                // بنجيب status من accounts
-                return true; // الفلترة الفعلية تصير تحت داخل FutureBuilder
+                return true;
               }).toList();
 
               if (docs.isEmpty) {
@@ -450,26 +428,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         .doc(uid)
                         .get(),
                     builder: (context, accSnap) {
-
                       if (!accSnap.hasData) {
                         return const Center(
                             child: CircularProgressIndicator());
                       }
-
-                      final accData =
-                          accSnap.data!.data() as Map<String, dynamic>? ?? {};
-
+                      final accData = accSnap.data!.data()
+                      as Map<String, dynamic>? ??
+                          {};
                       final status = accData['status'] ?? 'active';
-                      if (_filterStatus == 'active' && status != 'active') {
+                      if (_filterStatus == 'active' &&
+                          status != 'active') {
                         return const SizedBox();
                       }
-                      if (_filterStatus == 'disabled' && status == 'active') {
+                      if (_filterStatus == 'disabled' &&
+                          status == 'active') {
                         return const SizedBox();
                       }
-                      /// 🔥 معالجة التاريخ
                       DateTime? createdAt =
                       (accData['createdAt'] as Timestamp?)?.toDate();
-
                       String formattedDate = createdAt != null
                           ? "${createdAt.day}-${createdAt.month}-${createdAt.year}"
                           : "";
@@ -488,77 +464,80 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ],
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                           children: [
-
-                            /// 📄 Info (خليه أول شي)
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                crossAxisAlignment:
+                                CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-
-                                Align(
-                                alignment: Alignment.centerRight,
-                                child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: status == 'active'
-                                              ? Colors.green
-                                              : Colors.grey,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          status == 'active' ? 'نشط' : 'معطل',
-                                          style: const TextStyle(
-                                              color: Colors.white, fontSize: 11),
-                                        ),
-                                      ),
-
-                                      const SizedBox(width: 8),
-
-                                      Text(
-                                        data['username'] ?? '',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                  const SizedBox(height: 6),
-
                                   Align(
-                                    alignment: Alignment.centerRight, // 👈 مهم
-                                    child: Text(
-                                      data['email'] ?? '',
-                                      style: const TextStyle(color: Colors.grey),
+                                    alignment: Alignment.centerRight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: status == 'active'
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            borderRadius:
+                                            BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            status == 'active'
+                                                ? 'نشط'
+                                                : 'معطل',
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          data['username'] ?? '',
+                                          style: const TextStyle(
+                                              fontWeight:
+                                              FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ),
-
-                                  const SizedBox(height: 4),
-
+                                  const SizedBox(height: 6),
                                   Align(
-                                    alignment: Alignment.centerRight, // 👈 مهم
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      data['email'] ?? '',
+                                      style: const TextStyle(
+                                          color: Colors.grey),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Align(
+                                    alignment: Alignment.centerRight,
                                     child: Text(
                                       "تاريخ الانضمام • $formattedDate",
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-
-                            /// 🔘 الثلاث نقاط (آخر شي)
                             PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, color: Colors.grey),
+                              icon: const Icon(Icons.more_vert,
+                                  color: Colors.grey),
                               onSelected: (value) {
                                 if (value == 'view') {
-                                  _showUserDetails(data, status, formattedDate);
+                                  _showUserDetails(
+                                      data, status, formattedDate);
                                 } else if (value == 'edit') {
                                   _editUser(uid, data);
                                 } else if (value == 'delete') {
@@ -592,9 +571,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   value: 'toggle',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.block, size: 18),
-                                      SizedBox(width: 8),
-                                      Text(status == 'active' ? 'تعطيل الحساب' : 'تفعيل الحساب'),
+                                      const Icon(Icons.block, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(status == 'active'
+                                          ? 'تعطيل الحساب'
+                                          : 'تفعيل الحساب'),
                                     ],
                                   ),
                                 ),
@@ -602,17 +583,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   value: 'delete',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.delete, size: 18, color: Colors.red),
+                                      Icon(Icons.delete,
+                                          size: 18, color: Colors.red),
                                       SizedBox(width: 8),
-                                      Text('حذف المستخدم', style: TextStyle(color: Colors.red)),
+                                      Text('حذف المستخدم',
+                                          style: TextStyle(
+                                              color: Colors.red)),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                        )
-                        );
+                        ),
+                      );
                     },
                   );
                 },
@@ -623,6 +607,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ],
     );
   }
+
   Widget _statBox(String number, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -641,6 +626,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
   void _showUserDetails(
       Map<String, dynamic> data,
       String status,
@@ -659,25 +645,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-
-              /// عنوان
               const Center(
                 child: Text(
                   'تفاصيل المستخدم',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               _detailRow('الاسم', data['username']),
               _detailRow('البريد الإلكتروني', data['email']),
               _detailRow('تاريخ الانضمام', createdAt),
-              _detailRow('عدد التقارير', '12'), // تقدري تربطينه لاحقاً
-
+              _detailRow('عدد التقارير', '12'),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -699,10 +678,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
-
-              /// زر إغلاق
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -720,6 +696,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       },
     );
   }
+
   Widget _detailRow(String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -732,10 +709,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
   void _editUser(String uid, Map<String, dynamic> data) {
     TextEditingController name =
     TextEditingController(text: data['username']);
-
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -756,26 +733,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
   void _toggleStatus(String uid, String status) async {
     await FirebaseFirestore.instance
         .collection('accounts')
         .doc(uid)
-        .update({
-      'status': status == 'active' ? 'suspended' : 'active'
-    });
+        .update({'status': status == 'active' ? 'suspended' : 'active'});
   }
+
   void _deleteUser(String uid) async {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .delete();
+    await FirebaseFirestore.instance.collection('users').doc(uid).delete();
   }
-  // ── Specialists management Tab ────────────────────────────────────────────
+
+  // ── Specialists Tab ────────────────────────────────────────────
   Widget _buildSpecialistsTab() {
     return Column(
       children: [
-
-        /// 🔍 Search
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
@@ -794,32 +767,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             },
           ),
         ),
-
-        /// 🔢 الإحصائيات
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('accounts').snapshots(),
+          stream:
+          FirebaseFirestore.instance.collection('accounts').snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const SizedBox();
-
             final accounts = snapshot.data!.docs;
-
-            int active = accounts.where((a) => a['status'] == 'active').length;
-            int disabled = accounts.where((a) => a['status'] != 'active').length;
-
+            int active =
+                accounts.where((a) => a['status'] == 'active').length;
+            int disabled =
+                accounts.where((a) => a['status'] != 'active').length;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _filterStatus = 'active'),
+                      onTap: () =>
+                          setState(() => _filterStatus = 'active'),
                       child: _statBox("$active", "خبير نشط"),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _filterStatus = 'disabled'),
+                      onTap: () =>
+                          setState(() => _filterStatus = 'disabled'),
                       child: _statBox("$disabled", "خبير معطل"),
                     ),
                   ),
@@ -828,21 +801,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             );
           },
         ),
-
         const SizedBox(height: 10),
-
-        /// 👥 List
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('specialists').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('specialists')
+                .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               final docs = snapshot.data!.docs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
-                final name = (data['fullName'] ?? '').toString().toLowerCase();
+                final name =
+                (data['fullName'] ?? '').toString().toLowerCase();
                 return name.contains(_searchQuery);
               }).toList();
 
@@ -850,7 +822,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 padding: const EdgeInsets.all(16),
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
-                  final data = docs[index].data() as Map<String, dynamic>;
+                  final data =
+                  docs[index].data() as Map<String, dynamic>;
                   final uid = data['accountId'];
 
                   return FutureBuilder<DocumentSnapshot>(
@@ -859,22 +832,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         .doc(uid)
                         .get(),
                     builder: (context, accSnap) {
-
                       if (!accSnap.hasData) return const SizedBox();
-
-                      final accData =
-                          accSnap.data!.data() as Map<String, dynamic>? ?? {};
-
+                      final accData = accSnap.data!.data()
+                      as Map<String, dynamic>? ??
+                          {};
                       final status = accData['status'] ?? 'active';
-
-                      /// فلترة
-                      if (_filterStatus == 'active' && status != 'active') return const SizedBox();
-                      if (_filterStatus == 'disabled' && status == 'active') return const SizedBox();
-
-                      /// التاريخ
+                      if (_filterStatus == 'active' &&
+                          status != 'active') return const SizedBox();
+                      if (_filterStatus == 'disabled' &&
+                          status == 'active') return const SizedBox();
                       DateTime? createdAt =
                       (data['createdAt'] as Timestamp?)?.toDate();
-
                       String formattedDate = createdAt != null
                           ? "${createdAt.year}-${createdAt.month}-${createdAt.day}"
                           : "";
@@ -888,88 +856,86 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                         child: Row(
                           children: [
-
                             const SizedBox(width: 10),
-
-                            /// 📄 Info
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                crossAxisAlignment:
+                                CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-
-                                  /// الاسم + الحالة (يمين مضبوط)
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          padding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4),
                                           decoration: BoxDecoration(
                                             color: status == 'active'
                                                 ? Colors.green
                                                 : Colors.grey,
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                            BorderRadius.circular(12),
                                           ),
                                           child: Text(
-                                            status == 'active' ? 'نشط' : 'معطل',
-                                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                                            status == 'active'
+                                                ? 'نشط'
+                                                : 'معطل',
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11),
                                           ),
                                         ),
-
                                         const SizedBox(width: 8),
-
                                         Text(
                                           data['fullName'] ?? '',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                              fontWeight:
+                                              FontWeight.bold),
                                         ),
                                       ],
                                     ),
                                   ),
-
                                   const SizedBox(height: 6),
-
-                                  /// الايميل
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       data['email'] ?? '',
-                                      style: const TextStyle(color: Colors.grey),
+                                      style: const TextStyle(
+                                          color: Colors.grey),
                                     ),
                                   ),
-
                                   const SizedBox(height: 4),
-
-                                  /// التاريخ
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       "تاريخ الانضمام • $formattedDate",
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey),
                                     ),
                                   ),
-
                                   const SizedBox(height: 6),
-
-                                  /// التقييم
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       "⭐ ${data['rating']}   •   ${data['reviewCount']} مراجعة",
-                                      style: const TextStyle(fontSize: 11),
+                                      style:
+                                      const TextStyle(fontSize: 11),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            /// 🔘 الثلاث نقاط
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert),
                               onSelected: (value) {
                                 if (value == 'view') {
-                                  _showSpecialistDetails(data, status, formattedDate);
+                                  _showSpecialistDetails(
+                                      data, status, formattedDate);
                                 } else if (value == 'delete') {
                                   _deleteUser(uid);
                                 } else if (value == 'toggle') {
@@ -1003,9 +969,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   value: 'delete',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.delete, color: Colors.red),
+                                      Icon(Icons.delete,
+                                          color: Colors.red),
                                       SizedBox(width: 8),
-                                      Text('حذف', style: TextStyle(color: Colors.red)),
+                                      Text('حذف',
+                                          style: TextStyle(
+                                              color: Colors.red)),
                                     ],
                                   ),
                                 ),
@@ -1024,6 +993,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ],
     );
   }
+
   void _showSpecialistDetails(
       Map<String, dynamic> data,
       String status,
@@ -1041,16 +1011,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-
               const Center(
                 child: Text(
                   'تفاصيل الخبير',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               _detailRow('الاسم', data['fullName']),
               _detailRow('البريد', data['email']),
               _detailRow('تاريخ الانضمام', createdAt),
@@ -1058,18 +1026,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _detailRow('التقييم', data['rating'].toString()),
               _detailRow('الخبرة', data['experience']),
               _detailRow('الشهادات', data['certificates']),
-
               const SizedBox(height: 10),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   const Text('حالة الحساب'),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: status == 'active' ? Colors.green : Colors.grey,
+                      color: status == 'active'
+                          ? Colors.green
+                          : Colors.grey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -1079,15 +1048,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                  ),
+                      backgroundColor: Colors.black),
                   onPressed: () => Navigator.pop(context),
                   child: const Text('إغلاق'),
                 ),
@@ -1098,6 +1064,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       },
     );
   }
+
   // ── Requests Tab ────────────────────────────────────────────
   Widget _buildRequestsTab() {
     return DefaultTabController(
@@ -1106,11 +1073,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         children: [
           Container(
             color: Colors.white,
-            child: TabBar(
-              labelColor: const Color(0xFF16A34A),
+            child: const TabBar(
+              labelColor: Color(0xFF16A34A),
               unselectedLabelColor: Colors.grey,
-              indicatorColor: const Color(0xFF16A34A),
-              tabs: const [
+              indicatorColor: Color(0xFF16A34A),
+              tabs: [
                 Tab(text: 'معلقة'),
                 Tab(text: 'موافق عليها'),
                 Tab(text: 'مرفوضة'),
@@ -1178,7 +1145,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> data, String docId, String status) {
+  Widget _buildRequestCard(
+      Map<String, dynamic> data, String docId, String status) {
     final statusColor = status == 'pending'
         ? Colors.orange
         : status == 'approved'
@@ -1194,7 +1162,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
       child: Column(
         children: [
-          // Card header
           Container(
             padding: const EdgeInsets.all(14),
             decoration: const BoxDecoration(
@@ -1251,14 +1218,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         : status == 'approved'
                         ? 'موافق عليه'
                         : 'مرفوض',
-                    style:
-                    TextStyle(fontSize: 11, color: statusColor),
+                    style: TextStyle(fontSize: 11, color: statusColor),
                   ),
                 ),
               ],
             ),
           ),
-          // Details
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -1268,15 +1233,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 const SizedBox(height: 8),
                 _requestRow(Icons.history_edu_outlined, 'الخبرة',
                     data['experience'] ?? '—'),
-                // ─── عرض صور الشهادات (محاذاة لليمين) ───
-                if (data['certificateImages'] != null && (data['certificateImages'] as List).isNotEmpty) ...[
+                if (data['certificateImages'] != null &&
+                    (data['certificateImages'] as List).isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  // محاذاة العنوان لليمين
                   const Align(
                     alignment: Alignment.centerRight,
                     child: Text(
                       'الصور المرفقة:',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1284,19 +1251,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     height: 90,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      // عكس اتجاه القائمة لتبدأ من اليمين لليسار
-                      itemCount: (data['certificateImages'] as List).length,
+                      itemCount:
+                      (data['certificateImages'] as List).length,
                       itemBuilder: (context, i) {
-                        final imgUrl = data['certificateImages'][i].toString();
+                        final imgUrl =
+                        data['certificateImages'][i].toString();
                         return GestureDetector(
                           onTap: () => _showFullImage(imgUrl),
                           child: Container(
-                            margin: const EdgeInsets.only(right: 8), // تغيير الهامش ليكون جهة اليمين
+                            margin: const EdgeInsets.only(right: 8),
                             width: 90,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade200),
-                              image: DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover),
+                              border: Border.all(
+                                  color: Colors.grey.shade200),
+                              image: DecorationImage(
+                                  image: NetworkImage(imgUrl),
+                                  fit: BoxFit.cover),
                             ),
                           ),
                         );
@@ -1304,7 +1275,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                   ),
                 ],
-                // Show rejection reason if rejected
                 if (status == 'rejected' &&
                     (data['rejectionReason'] ?? '').isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -1314,8 +1284,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: const Color(0xFFFCA5A5)),
+                      border:
+                      Border.all(color: const Color(0xFFFCA5A5)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1336,7 +1306,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
-          // Action buttons (only for pending)
           if (status == 'pending')
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -1410,10 +1379,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Approve Request ──────────────────────────────────────────
   Future<void> _approveRequest(
       Map<String, dynamic> data, String docId) async {
-    // Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -1428,15 +1395,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                  'هل تريد قبول طلب ${data['fullName'] ?? ''}؟'),
+              Text('هل تريد قبول طلب ${data['fullName'] ?? ''}؟'),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF86EFAC)),
+                  border:
+                  Border.all(color: const Color(0xFF86EFAC)),
                 ),
                 child: const Row(children: [
                   Icon(Icons.email_outlined,
@@ -1446,8 +1413,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     child: Text(
                       'سيتم إرسال رابط تعيين كلمة المرور إلى بريده الإلكتروني تلقائياً',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF166534)),
+                          fontSize: 12, color: Color(0xFF166534)),
                     ),
                   ),
                 ]),
@@ -1477,14 +1443,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     if (confirm != true) return;
 
-    // Show loading
     if (mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(
-          child: CircularProgressIndicator(
-              color: Color(0xFF16A34A)),
+          child:
+          CircularProgressIndicator(color: Color(0xFF16A34A)),
         ),
       );
     }
@@ -1495,13 +1460,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
 
     if (!mounted) return;
-    Navigator.pop(context); // Close loading dialog
+    Navigator.pop(context);
 
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('حدث خطأ: $err'),
-        backgroundColor: Colors.red,
-      ));
+          content: Text('حدث خطأ: $err'),
+          backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1514,7 +1478,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
-  // ── Reject Dialog ────────────────────────────────────────────
   void _showRejectDialog(Map<String, dynamic> data, String docId) {
     final reasonController = TextEditingController();
     String? reasonError;
@@ -1525,8 +1488,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            backgroundColor: Colors.white, // خلفية بيضاء بالكامل
-            surfaceTintColor: Colors.white, // لضمان عدم تغير اللون في Material 3
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16)),
             title: Row(children: [
@@ -1545,24 +1508,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ]),
             content: SizedBox(
               width: double.maxFinite,
-              child: SingleChildScrollView( // حل مشكلة التداخل مع لوحة المفاتيح
+              child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // معلومات المتقدم
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB)),
                       ),
                       child: Row(
                         children: [
                           CircleAvatar(
                             radius: 18,
-                            backgroundColor: const Color(0xFFDCFCE7),
+                            backgroundColor:
+                            const Color(0xFFDCFCE7),
                             child: Text(
                               (data['fullName'] ?? 'خ')[0],
                               style: const TextStyle(
@@ -1573,7 +1537,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
                               children: [
                                 Text(data['fullName'] ?? '',
                                     style: const TextStyle(
@@ -1581,7 +1546,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                         fontSize: 14)),
                                 Text(data['email'] ?? '',
                                     style: const TextStyle(
-                                        fontSize: 12, color: Colors.grey)),
+                                        fontSize: 12,
+                                        color: Colors.grey)),
                               ],
                             ),
                           ),
@@ -1589,22 +1555,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'سبب الرفض *',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF374151)),
-                    ),
+                    const Text('سبب الرفض *',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151))),
                     const SizedBox(height: 6),
                     TextField(
                       controller: reasonController,
-                      maxLines: 3, // قللت عدد الأسطر قليلاً لتوفير مساحة
+                      maxLines: 3,
                       textDirection: TextDirection.rtl,
                       onChanged: (v) {
                         setDialogState(() {
-                          reasonError =
-                          v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
+                          reasonError = v.trim().isEmpty
+                              ? 'سبب الرفض مطلوب'
+                              : null;
                         });
                       },
                       decoration: InputDecoration(
@@ -1612,8 +1577,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         hintStyle: TextStyle(
                             fontSize: 12, color: Colors.grey[400]),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                            borderRadius: BorderRadius.circular(10)),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: const BorderSide(
@@ -1629,7 +1593,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF7ED),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
+                        border: Border.all(
+                            color: const Color(0xFFFDE68A)),
                       ),
                       child: const Row(children: [
                         Icon(Icons.email_outlined,
@@ -1639,7 +1604,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           child: Text(
                             'سيتم إرسال سبب الرفض إلى بريد المتقدم تلقائياً',
                             style: TextStyle(
-                                fontSize: 11, color: Color(0xFF9A3412)),
+                                fontSize: 11,
+                                color: Color(0xFF9A3412)),
                           ),
                         ),
                       ]),
@@ -1648,36 +1614,39 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            actionsPadding:
+            const EdgeInsets.fromLTRB(16, 0, 16, 16),
             actions: [
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton( // زر الإلغاء مع إطار
+                    child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300), // الإطار
+                        side: BorderSide(
+                            color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12),
                       ),
                       child: const Text('إلغاء',
-                          style: TextStyle(color: Colors.black38)),
+                          style:
+                          TextStyle(color: Colors.black38)),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        final reason = reasonController.text.trim();
+                        final reason =
+                        reasonController.text.trim();
                         if (reason.isEmpty) {
-                          setDialogState(() => reasonError = 'سبب الرفض مطلوب');
+                          setDialogState(() =>
+                          reasonError = 'سبب الرفض مطلوب');
                           return;
                         }
-
                         Navigator.pop(ctx);
-
-                        // إظهار مؤشر التحميل
                         showDialog(
                           context: context,
                           barrierDismissible: false,
@@ -1686,36 +1655,36 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 color: Color(0xFF16A34A)),
                           ),
                         );
-
-                        final err = await AuthService().rejectSpecialistRequest(
+                        final err = await AuthService()
+                            .rejectSpecialistRequest(
                           requestDocId: docId,
                           expertEmail: data['email'] ?? '',
                           expertName: data['fullName'] ?? '',
                           rejectionReason: reason,
                         );
-
                         if (!mounted) return;
-                        Navigator.pop(context); // إغلاق مؤشر التحميل
-
+                        Navigator.pop(context);
                         if (err != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text('حدث خطأ: $err'),
-                            backgroundColor: Colors.red,
-                          ));
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(
+                              content: Text('حدث خطأ: $err'),
+                              backgroundColor: Colors.red));
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('❌ تم رفض طلب ${data['fullName']}'),
-                              backgroundColor: Color(0xFF2D322C),
-                            ),
-                          );
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(
+                            content: Text(
+                                '❌ تم رفض طلب ${data['fullName']}'),
+                            backgroundColor:
+                            const Color(0xFF2D322C),
+                          ));
                         }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFCC0000),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12),
                         elevation: 0,
                       ),
                       child: const Text('رفض الطلب',
@@ -1736,6 +1705,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     return SingleChildScrollView(
       child: Column(
         children: [
+          // ── Header ──
           Container(
             width: double.infinity,
             color: Colors.white,
@@ -1768,7 +1738,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
+
           const SizedBox(height: 12),
+
+          // ── المعلومات الشخصية ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -1837,7 +1810,50 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          // ── قسم الأمان ──
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8E8E8)),
+            ),
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'الأمان',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                ListTile(
+                  leading: const Icon(Icons.lock_outline,
+                      color: Color(0xFF16A34A)),
+                  title: const Text('تغيير كلمة المرور',
+                      style: TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_back_ios,
+                      size: 14, color: Colors.grey),
+                  onTap: _showChangePasswordDialog,
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 24),
+
+          // ── زر تسجيل الخروج ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
@@ -1867,6 +1883,118 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // ── تغيير كلمة المرور (أدمن) ──────────────────────────────
+  void _showChangePasswordDialog() {
+    bool sending = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'تغيير كلمة المرور',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF14532D)),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.email_outlined,
+                          color: Color(0xFF16A34A), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _email,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF166534),
+                              fontWeight: FontWeight.w500),
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: sending
+                    ? null
+                    : () async {
+                  setDialogState(() => sending = true);
+                  try {
+                    await FirebaseAuth.instance
+                        .sendPasswordResetEmail(email: _email);
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            '✅ تم إرسال رابط إعادة التعيين إلى بريدك'),
+                        backgroundColor: Color(0xFF16A34A),
+                      ),
+                    );
+                  } catch (e) {
+                    setDialogState(() => sending = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('حدث خطأ: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: sending
+                    ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                    : const Text('إرسال',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── تعديل المعلومات الشخصية (أدمن) ──────────────────────────
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
@@ -1890,7 +2018,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               children: [
                 TextField(
                   controller: nameController,
+                  textAlign: TextAlign.right,
                   textDirection: TextDirection.rtl,
+                  keyboardType: TextInputType.name,
+                  textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: 'الاسم',
                     labelStyle:
@@ -1942,7 +2073,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   try {
                     final uid =
                         FirebaseAuth.instance.currentUser?.uid;
-                    final newName = nameController.text.trim();
+                    final newName =
+                    nameController.text.trim();
                     final newEmail =
                     emailController.text.trim();
                     if (uid != null) {
@@ -1951,18 +2083,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           .doc(uid)
                           .update({
                         'username': newName,
-                        'email': newEmail,
+                        'email': newEmail
                       });
                       await FirebaseFirestore.instance
                           .collection('accounts')
                           .doc(uid)
                           .update({
                         'username': newName,
-                        'email': newEmail,
+                        'email': newEmail
                       });
                       if (newEmail != _email) {
-                        await FirebaseAuth.instance.currentUser
-                            ?.verifyBeforeUpdateEmail(newEmail);
+                        await FirebaseAuth
+                            .instance.currentUser
+                            ?.verifyBeforeUpdateEmail(
+                            newEmail);
                       }
                     }
                     if (!mounted) return;
@@ -1973,8 +2107,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context)
                         .showSnackBar(const SnackBar(
-                      content:
-                      Text('تم حفظ التعديلات بنجاح ✓'),
+                      content: Text('تم حفظ التعديلات بنجاح ✓'),
                       backgroundColor: Color(0xFF16A34A),
                     ));
                   } catch (e) {
