@@ -790,6 +790,52 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         const SizedBox(height: 16),
 
+        // ── قسم الأمان ──
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE8E8E8)),
+          ),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'الأمان',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              ListTile(
+                leading: const Icon(
+                  Icons.lock_outline,
+                  color: Color(0xFF16A34A),
+                ),
+                title: const Text(
+                  'تغيير كلمة المرور',
+                  style: TextStyle(fontSize: 14),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_back_ios,
+                  size: 14,
+                  color: Colors.grey,
+                ),
+                onTap: _showChangePasswordDialog,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
         // ── زر تسجيل الخروج
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -820,6 +866,133 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         const SizedBox(height: 8),
       ],
+    );
+  }
+
+  // ── تغيير كلمة المرور (خبير) ──────────────────────────────
+  void _showChangePasswordDialog() {
+    bool sending = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'تغيير كلمة المرور',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF14532D),
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.email_outlined,
+                        color: Color(0xFF16A34A),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _email,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: sending
+                    ? null
+                    : () async {
+                        setDialogState(() => sending = true);
+                        try {
+                          await FirebaseAuth.instance.sendPasswordResetEmail(
+                            email: _email,
+                          );
+                          if (!mounted) return;
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '✅ تم إرسال رابط إعادة التعيين إلى بريدك',
+                              ),
+                              backgroundColor: Color(0xFF16A34A),
+                            ),
+                          );
+                        } catch (e) {
+                          setDialogState(() => sending = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('حدث خطأ: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'إرسال',
+                        style: TextStyle(color: Colors.white),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
