@@ -2223,10 +2223,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(oldVal ?? '—',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.red,
-                        decoration: TextDecoration.lineThrough)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: changed ? Colors.red : Colors.grey,
+                    )),
               ),
             ),
             const Padding(
@@ -2293,20 +2293,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       FirebaseFirestore.instance
           .collection('Specialist_edit_request')
           .doc(docId),
-      {'status': 'approved'},
+      {'status': 'approved' },
     );
 
     final updates = <String, dynamic>{};
-    if ((data['newFullName'] ?? '').isNotEmpty)
+
+    if ((data['newFullName'] ?? '').isNotEmpty &&
+        data['newFullName'] != data['oldFullName'])
       updates['fullName'] = data['newFullName'];
-    if ((data['newExperience'] ?? '').isNotEmpty)
+
+    if ((data['newExperience'] ?? '').isNotEmpty &&
+        data['newExperience'] != data['oldExperience'])
       updates['experience'] = data['newExperience'];
-    if ((data['newCertificates'] ?? '').isNotEmpty)
+
+    if ((data['newCertificates'] ?? '').isNotEmpty &&
+        data['newCertificates'] != data['oldCertificates'])
       updates['certificates'] = data['newCertificates'];
-    if ((data['newEmail'] ?? '').isNotEmpty)
+
+    if ((data['newEmail'] ?? '').isNotEmpty &&
+        data['newEmail'] != data['oldEmail'])
       updates['email'] = data['newEmail'];
+
     final newImages = List<String>.from(data['newCertificateImages'] ?? []);
-    if (newImages.isNotEmpty) updates['certificateImages'] = newImages;
+    if (newImages.isNotEmpty)
+      updates['certificateImages'] = newImages;
+
+    if (updates.isEmpty) {
+      await FirebaseFirestore.instance
+          .collection('Specialist_edit_request')
+          .doc(docId)
+          .update({'status': 'approved'});
+      return;
+    }
 
     batch.update(
       FirebaseFirestore.instance.collection('specialists').doc(specialistId),

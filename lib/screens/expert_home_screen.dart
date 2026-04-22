@@ -7,7 +7,7 @@ import 'expert_chat_screen.dart';
 import 'expert_schedule_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:bioshield/services/image_upload_service.dart';
 
 class ExpertHomeScreen extends StatefulWidget {
   const ExpertHomeScreen({super.key});
@@ -796,12 +796,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     // تحميل صور الشهادات الجديدة
     List<String> newImageUrls = [];
     for (int i = 0; i < newImages.length; i++) {
-      final ref = FirebaseStorage.instance.ref().child(
-        'certificate_edit_requests/$uid/${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
-      );
-      await ref.putFile(newImages[i]);
-      final url = await ref.getDownloadURL();
-      newImageUrls.add(url);
+      String? url = await ImageUploadService.uploadImage(newImages[i]);
+      if (url != null) {
+        newImageUrls.add(url);
+      }
     }
 
     await FirebaseFirestore.instance.collection('Specialist_edit_request').add({
@@ -1329,8 +1327,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تاب التقارير ─────────────────────────────────────────────
-  // ── تاب التقارير ─────────────────────────────────────────────
   // ── تاب التقارير ─────────────────────────────────────────────
   Widget _buildReportsContent() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
