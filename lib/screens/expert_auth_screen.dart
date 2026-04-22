@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -118,6 +120,18 @@ class _ExpertAuthScreenState extends State<ExpertAuthScreen>
       // حفظ حالة تذكرني
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('remember_me', _rememberMe);
+
+      // 🔥 ADD THIS ENTIRE BLOCK HERE: Set expert to online before navigating
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        try {
+          await FirebaseFirestore.instance.collection('specialists').doc(uid).update({
+            'isOnline': true,
+          });
+        } catch (e) {
+          debugPrint('Error updating online status: $e');
+        }
+      }
 
       // --- منطق التوجيه الذكي ---
       if (res['isFirstLogin'] == true) {

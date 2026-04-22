@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'expert_chat_screen.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
@@ -25,99 +26,86 @@ class _RequestsScreenState extends State<RequestsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _fetchAvailability();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _rejectReasonController.dispose();
-    super.dispose();
+// 2. Add this method to fetch the initial status
+  Future<void> _fetchAvailability() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final now = DateTime.now();
+    final todayKey = DateFormat('yyyy-MM-dd').format(now);
+
+    bool autoAvailable = false;
+
+    // 1. Check the Schedule Time
+    final schedDoc = await _db.collection('expertSchedules').doc(uid).get();
+    if (schedDoc.exists) {
+      final todayData = schedDoc.data()?[todayKey];
+      if (todayData != null && todayData['isAvailable'] == true) {
+        try {
+          final startParts = (todayData['startTime'] ?? '00:00').split(':');
+          final endParts = (todayData['endTime'] ?? '23:59').split(':');
+
+          final startTime = DateTime(now.year, now.month, now.day, int.parse(startParts[0]), int.parse(startParts[1]));
+          final endTime = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+
+          // True if current time is inside the hours!
+          if (now.isAfter(startTime) && now.isBefore(endTime)) {
+            autoAvailable = true;
+          }
+        } catch (e) {
+          debugPrint('Error parsing time: $e');
+        }
+      }
+    }
+
+    // 2. Check manual toggle from Profile
+    final specDoc = await _db.collection('specialists').doc(uid).get();
+    bool manualSwitch = specDoc.data()?['isAvailable'] ?? true;
+
+    if (mounted) {
+      setState(() {
+        // Automatically turns Green if they are in their schedule AND haven't manually turned it off
+        _isAvailable = autoAvailable && manualSwitch;
+      });
+
+      // Sync it immediately to the database so users see the correct status
+      await _db.collection('specialists').doc(uid).update({
+        'isAvailable': _isAvailable,
+      });
+    }
   }
 
   // ── قبول الطلب ─────────────────────────────────────────────
+  // Inside RequestsScreen - Accept Logic
+  // Inside RequestsScreen - Accept Logic
   Future<void> _acceptRequest(Map<String, dynamic> request) async {
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final String chatId = request['chatId'];
 
-    // إذا عنده chatId من قبل (اليوزر فتح شات مسبقاً) — وافق عليه
-    final existingChatId = request['chatId'] ?? '';
+    await _db.collection('chats').doc(chatId).update({
+      'expertApproved': true,
+      'status': 'active',
+    });
 
-    if (existingChatId.isNotEmpty) {
-      // وافق على الشات الموجود
-      await _db.collection('chats').doc(existingChatId).update({
-        'expertApproved': true,
-        'lastMessage': 'تم قبول طلبك',
-        'time': timeStr,
-      });
-      await _db.collection('requests').doc(request['id']).update({
-        'status': 'accepted',
-      });
+    await _db.collection('requests').doc(request['id']).update({
+      'status': 'accepted',
+    });
 
-      if (mounted) {
-        setState(() => _selectedRequest = null);
-        _showSnack('تم قبول الطلب');
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ExpertChatScreen(
-                chatId: existingChatId,
-                userName: request['userName'] ?? '',
-                isOnline: false,
-              ),
-            ),
-          );
-        }
-      }
-    } else {
-      // إنشاء شات جديد
-      final chatRef = await _db.collection('chats').add({
-        'specialistId': _uid,
-        'specialistName': request['specialistName'] ?? '',
-        'userId': request['userId'] ?? '',
-        'userName': request['userName'] ?? '',
-        'lastMessage': 'تم قبول طلبك',
-        'time': timeStr,
-        'online': false,
-        'unread': 1,
-        'expertApproved': true,
-        'requestId': request['id'],
-        'createdAt': now.toIso8601String(),
-        'messages': [
-          {
-            'id': 'msg-${now.millisecondsSinceEpoch}',
-            'sender': 'expert',
-            'content': 'مرحباً، تم قبول طلبك. كيف يمكنني مساعدتك؟',
-            'time': timeStr,
-            'type': 'text',
-          },
-        ],
-      });
-
-      await _db.collection('requests').doc(request['id']).update({
-        'status': 'accepted',
-        'chatId': chatRef.id,
-      });
-
-      if (mounted) {
-        setState(() => _selectedRequest = null);
-        _showSnack('تم قبول الطلب وإنشاء محادثة');
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ExpertChatScreen(
-                chatId: chatRef.id,
-                userName: request['userName'] ?? '',
-                isOnline: false,
-              ),
-            ),
-          );
-        }
-      }
+    // 3. Navigate to the chat
+    // 3. Navigate to the chat
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExpertChatScreen(
+            chatId: chatId,
+            userName: request['userName'] ?? 'مستخدم',
+            userId: request['userId'] ?? '', // 🔥 ADD THIS LINE!
+          ),
+        ),
+      );
     }
   }
 
@@ -508,8 +496,13 @@ class _RequestsScreenState extends State<RequestsScreen>
                             Switch(
                               value: _isAvailable,
                               activeColor: const Color(0xFF16a34a),
-                              onChanged: (v) =>
-                                  setState(() => _isAvailable = v),
+                              onChanged: (v) async {
+                                setState(() => _isAvailable = v);
+                                // 3. Save the new status to Firestore so users can see it!
+                                await _db.collection('specialists').doc(_uid).update({
+                                  'isAvailable': v,
+                                });
+                              },
                             ),
                           ],
                         ),

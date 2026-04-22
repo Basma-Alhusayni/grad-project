@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
-import 'requests_screen.dart';
 import 'expert_chat_screen.dart';
 import 'expert_schedule_screen.dart';
 import 'dart:io';
@@ -28,6 +27,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   String _certificates = '';
   double _rating = 0.0;
   int _reviewCount = 0;
+  List<Map<String, dynamic>> _reports = []; // 🔥 ADD THIS LINE
   List<String> _certificateImages = [];
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true;
@@ -36,6 +36,23 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   void initState() {
     super.initState();
     _fetchData();
+
+    // 🔥 NEW: Mark expert online immediately when app opens!
+    _setOnlineStatus();
+  }
+
+  // 🔥 NEW: The function that updates Firestore
+  Future<void> _setOnlineStatus() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance.collection('specialists').doc(uid).update({
+          'isOnline': true,
+        });
+      } catch (e) {
+        debugPrint('Error updating online status: $e');
+      }
+    }
   }
 
   Future<void> _fetchData() async {
@@ -84,14 +101,22 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       // ── جلب التقييمات ──
       List<Map<String, dynamic>> reviews = [];
       try {
-        final reviewsSnap = await FirebaseFirestore.instance
-            .collection('specialists')
-            .doc(uid)
-            .collection('reviews')
-            .limit(10)
-            .get();
+        final reviewsSnap = await FirebaseFirestore.instance.collection('specialists').doc(uid).collection('reviews').limit(10).get();
         reviews = reviewsSnap.docs.map((e) => e.data()).toList();
       } catch (_) {}
+
+      // 🔥 NEW: جلب التقارير من الكوليكشن الجديد
+      List<Map<String, dynamic>> reports = [];
+      try {
+        final reportsSnap = await FirebaseFirestore.instance
+            .collection('specialist_reports')
+            .where('specialistId', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .get();
+        reports = reportsSnap.docs.map((e) => e.data()).toList();
+      } catch (e) {
+        debugPrint('Error fetching reports: $e');
+      }
 
       // ── جلب الإيميل من Auth ──
       await FirebaseAuth.instance.currentUser?.reload();
@@ -109,6 +134,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             : 0;
         _certificateImages = certImages;
         _reviews = reviews;
+        _reports = reports; // 🔥 ADD THIS
         _loading = false;
       });
     } catch (e) {
@@ -118,13 +144,17 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   }
 
   Future<void> _logout() async {
+    // 🔥 NEW: Set expert to offline before logging out
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('specialists').doc(uid).update({
+        'isOnline': false,
+      });
+    }
+
     await AuthService().signOut();
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const SplashScreen()),
-      (_) => false,
-    );
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const SplashScreen()), (_) => false);
   }
 
   // ── عرض صورة الشهادة كاملة ──────────────────────────────────
@@ -283,12 +313,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 0:
-        return const RequestsScreen();
-      case 1:
         return const _ChatsPage();
-      case 2:
+      case 1:
         return const ExpertScheduleScreen();
-      case 3:
+      case 2:
         return _buildProfileTab();
       default:
         return const SizedBox();
@@ -307,11 +335,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       selectedFontSize: 12,
       unselectedFontSize: 12,
       items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.assignment_outlined),
-          activeIcon: Icon(Icons.assignment),
-          label: 'الطلبات',
-        ),
+        // REMOVED REQUESTS TAB
         BottomNavigationBarItem(
           icon: Icon(Icons.chat_bubble_outline),
           activeIcon: Icon(Icons.chat_bubble),
@@ -333,19 +357,66 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
   // ── تاب الملف الشخصي ─────────────────────────────────────────
   Widget _buildProfileTab() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildProfileHeader(),
-          _buildTabBar(),
-          _profileTabIndex == 0
-              ? _buildInfoContent()
-              : _profileTabIndex == 1
-              ? _buildReportsContent()
-              : _buildReviewsContent(),
-          const SizedBox(height: 24),
-        ],
-      ),
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    // 🔥 NEW: Listen to the Specialist document in real-time
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('specialists').doc(uid).snapshots(),
+      builder: (context, specSnapshot) {
+        if (!specSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        final d = specSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+
+        // Update local variables so the rest of your UI works
+        _rating = (d['rating'] ?? 0.0).toDouble();
+        _reviewCount = (d['reviewCount'] ?? 0).toInt();
+        _fullName = d['fullName'] ?? '';
+
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildProfileHeader(),
+              _buildTabBar(),
+              _profileTabIndex == 0
+                  ? _buildInfoContent()
+                  : _profileTabIndex == 1
+                  ? _buildReportsContent()
+                  : _buildReviewsStream(uid), // ✅ Use a Stream for reviews too
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// 🔥 NEW: Method to listen to reviews in real-time
+  Widget _buildReviewsStream(String uid) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('specialists')
+          .doc(uid)
+          .collection('reviews')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final reviews = snapshot.data!.docs;
+        if (reviews.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text('لا توجد تقييمات بعد', style: TextStyle(color: Colors.grey))),
+          );
+        }
+
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            ...reviews.map((doc) => _reviewCard(doc.data() as Map<String, dynamic>)),
+          ],
+        );
+      },
     );
   }
 
@@ -1259,14 +1330,208 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   }
 
   // ── تاب التقارير ─────────────────────────────────────────────
+  // ── تاب التقارير ─────────────────────────────────────────────
+  // ── تاب التقارير ─────────────────────────────────────────────
   Widget _buildReportsContent() {
-    return const Padding(
-      padding: EdgeInsets.all(24),
-      child: Center(
-        child: Text(
-          'لا توجد تقارير حالياً',
-          style: TextStyle(color: Colors.grey, fontSize: 14),
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return StreamBuilder<QuerySnapshot>(
+      // Listen to the reports collection specifically for this expert
+      stream: FirebaseFirestore.instance
+          .collection('specialist_reports')
+          .where('specialistId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // 1. Check for Errors (e.g., Missing Index or Permissions)
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                  const SizedBox(height: 12),
+                  Text(
+                    'حدث خطأ في جلب البيانات: \n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 2. Show Loading State
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(50.0),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+            ),
+          );
+        }
+
+        // 3. Handle Empty List
+        final reports = snapshot.data?.docs ?? [];
+        if (reports.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(60),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.description_outlined, size: 70, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'لا توجد تقارير طبية محفوظة حالياً',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 4. Build the List of Reports
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            ...reports.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return _reportCard(data);
+            }),
+            const SizedBox(height: 20),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- Report Card UI ---
+  Widget _reportCard(Map<String, dynamic> r) {
+    final hasImage = (r['plantImage'] ?? '').toString().isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Icon + Plant Name + Date
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.eco, color: Color(0xFF16A34A), size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r['plantName'] ?? 'نبات غير معروف',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF14532D),
+                      ),
+                    ),
+                    Text(
+                      'المستخدم: ${r['userName'] ?? 'مستخدم'}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                r['date'] ?? '',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Plant Image (if selected by expert)
+          if (hasImage) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                r['plantImage'],
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Diagnosis Content
+          _detailSection('التشخيص:', r['diagnosis'] ?? 'لا يوجد تشخيص'),
+          const SizedBox(height: 10),
+
+          // Treatment Content
+          _detailSection(
+            'العلاج المقترح:',
+            r['treatment'] ?? 'لا يوجد علاج مقترح',
+            isOrange: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for diagnosis/treatment boxes
+  Widget _detailSection(String label, String value, {bool isOrange = false}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isOrange ? const Color(0xFFFFFBEB) : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isOrange ? const Color(0xFFFDE68A) : const Color(0xFFE5E7EB),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isOrange ? const Color(0xFFD97706) : const Color(0xFF374151),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1364,159 +1629,249 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 }
 
 // ─── صفحة المحادثات ───────────────────────────────────────────
-class _ChatsPage extends StatelessWidget {
+class _ChatsPage extends StatefulWidget {
   const _ChatsPage();
+
+  @override
+  State<_ChatsPage> createState() => _ChatsPageState();
+}
+
+class _ChatsPageState extends State<_ChatsPage> {
+  String _chatFilter = 'pending'; // 'pending' = active, 'completed' = finished
 
   @override
   Widget build(BuildContext context) {
     final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: StreamBuilder<QuerySnapshot>(
-        stream: db.collection('chats').snapshots(),
+        // ✅ Only fetch chats assigned to this specific expert
+        stream: db.collection('chats').where('specialistId', isEqualTo: uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)));
           }
-          final chats = snapshot.data?.docs ?? [];
-          if (chats.isEmpty) {
-            return const Center(
-              child: Text(
-                'لا توجد محادثات',
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: chats.length,
-            itemBuilder: (context, index) {
-              final data = chats[index].data() as Map<String, dynamic>;
-              final chatId = chats[index].id;
-              final userName = data['userName'] ?? '';
-              final lastMessage = data['lastMessage'] ?? '';
-              final time = data['time'] ?? '';
-              final unread = data['unread'] ?? 0;
-              final online = data['online'] ?? false;
 
-              return GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ExpertChatScreen(
-                      chatId: chatId,
-                      userName: userName,
-                      isOnline: online,
-                    ),
-                  ),
-                ),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFbbf7d0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+          final allChats = snapshot.data?.docs ?? [];
+
+          // Calculate counts for filters
+          final activeCount = allChats.where((d) => (d.data() as Map<String, dynamic>)['completed'] != true).length;
+          final completedCount = allChats.where((d) => (d.data() as Map<String, dynamic>)['completed'] == true).length;
+
+          // Apply filters
+          List<QueryDocumentSnapshot> filtered = allChats.where((d) {
+            final data = d.data() as Map<String, dynamic>;
+            if (_chatFilter == 'pending') return data['completed'] != true;
+            if (_chatFilter == 'completed') return data['completed'] == true;
+            return true;
+          }).toList();
+          // 🔥 SAFELY PARSED SORTING BLOCK:
+          filtered.sort((a, b) {
+            final dataA = a.data() as Map<String, dynamic>;
+            final dataB = b.data() as Map<String, dynamic>;
+
+            // Helper function to safely convert any time format to DateTime
+            DateTime parseTime(dynamic timeVal) {
+              if (timeVal is Timestamp) {
+                return timeVal.toDate();
+              } else if (timeVal is String && timeVal.isNotEmpty) {
+                return DateTime.tryParse(timeVal) ?? DateTime(2000);
+              }
+              return DateTime(2000); // Fallback
+            }
+
+            final timeA = parseTime(dataA['updatedAt'] ?? dataA['createdAt']);
+            final timeB = parseTime(dataB['updatedAt'] ?? dataB['createdAt']);
+
+            return timeB.compareTo(timeA);
+          });
+          return CustomScrollView(
+            slivers: [
+              // ── Filters ──────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                  child: Row(
+                    children: [
+                      _filterChip(
+                        'محادثات جارية ($activeCount)',
+                        _chatFilter == 'pending',
+                            () => setState(() => _chatFilter = 'pending'),
+                        activeColor: Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      _filterChip(
+                        'مكتملة ($completedCount)',
+                        _chatFilter == 'completed',
+                            () => setState(() => _chatFilter = 'completed'),
+                        activeColor: const Color(0xFF16A34A),
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      Stack(
+                ),
+              ),
+
+              if (filtered.isEmpty)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundColor: const Color(0xFFdcfce7),
-                            child: Text(
-                              userName.isNotEmpty ? userName[0] : '؟',
-                              style: const TextStyle(
-                                color: Color(0xFF15803d),
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                          if (online)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
+                          Icon(Icons.chat_bubble_outline, size: 60, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          const Text('لا توجد دردشات حالياً', style: TextStyle(color: Colors.grey, fontSize: 15)),
                         ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  userName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        final data = filtered[index].data() as Map<String, dynamic>;
+                        final chatId = filtered[index].id;
+                        final userName = data['userName'] ?? 'مستخدم';
+                        final userId = data['userId'] ?? ''; // 🔥 GRABBING THE ID
+                        final lastMessage = data['lastMessage'] ?? '';
+                        final time = data['time'] ?? '';
+                        final unread = data['expertUnread'] ?? 0;
+                        final isCompleted = data['completed'] == true;
+
+                        return GestureDetector(
+                            onTap: () {
+                              FirebaseFirestore.instance.collection('chats').doc(chatId).update({'expertUnread': 0});
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ExpertChatScreen(
+                                    chatId: chatId,
+                                    userName: userName,
+                                    userId: userId, // 🔥 THIS IS REQUIRED NOW (Remove isOnline if it's here!)
                                   ),
                                 ),
-                                Text(
-                                  time,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey[500],
-                                  ),
+                              );
+                            },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFE1F1E4)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              lastMessage,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (unread > 0) ...[
-                        const SizedBox(width: 8),
-                        CircleAvatar(
-                          radius: 11,
-                          backgroundColor: const Color(0xFF16A34A),
-                          child: Text(
-                            '$unread',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: const Color(0xFFDDF7DD),
+                                  child: Text(
+                                    userName.isNotEmpty ? userName[0] : 'م',
+                                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              userName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2F3A33)),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: isCompleted ? const Color(0xFF16A34A) : Colors.orange,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              isCompleted ? 'مكتملة' : 'جارية',
+                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              lastMessage,
+                                              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Text(time, style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (unread > 0) ...[
+                                  const SizedBox(width: 10),
+                                  CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: const Color(0xFF16A34A),
+                                    child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ],
+                        );
+                      },
+                      childCount: filtered.length,
+                    ),
                   ),
                 ),
-              );
-            },
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {Color activeColor = const Color(0xFF16A34A)}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? activeColor : Colors.grey[300]!),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? activeColor : Colors.grey[600],
+          ),
+        ),
       ),
     );
   }

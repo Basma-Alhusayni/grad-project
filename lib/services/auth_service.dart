@@ -49,6 +49,7 @@ class AuthService {
         'fullName': fullName,
         'profileImage': null,
         'userReportId': null,
+        'isOnline': true,
       });
 
       await cred.user!.sendEmailVerification();
@@ -211,6 +212,7 @@ class AuthService {
         'rating': 0.0,
         'reviewCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
       }, SetOptions(merge: true));
 
       await _db

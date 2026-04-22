@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
@@ -172,11 +174,25 @@ class _UserAuthScreenState extends State<UserAuthScreen>
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _loginEmail.text.trim())));
       return;
     }
+
     if (res['error'] != null) {
       setState(() => _error = res['error']);
     } else {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('remember_me', _rememberMe);
+
+      // 🔥 ADD IT HERE: Set user to online before going to the home screen
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        try {
+          await FirebaseFirestore.instance.collection('users').doc(uid).update({
+            'isOnline': true,
+          });
+        } catch (e) {
+          debugPrint('Error updating online status: $e');
+        }
+      }
+
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const UserHomeScreen()), (_) => false);
     }
   }

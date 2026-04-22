@@ -1,165 +1,98 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../theme/app_theme.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
 import 'chat_with_user_screen.dart';
 
 class ExpertSelectionScreen extends StatelessWidget {
   final String? failedImage;
-
   const ExpertSelectionScreen({super.key, this.failedImage});
 
-  /// Logic to filter specialists by checking the 'expertSchedules' collection
+  // Theme Colors
+  static const Color primaryGreen = Color(0xFF16A34A);
+  static const Color darkGreen = Color(0xFF14532D);
+  static const Color bgGreen = Color(0xFFF0FDF4);
+
   Future<List<QueryDocumentSnapshot>> _getAvailableExperts() async {
-    // Note: This date matches your Firestore format "yyyy-MM-dd"
-    final String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final now = DateTime.now();
+    final todayKey = DateFormat('yyyy-MM-dd').format(now);
 
-    final specialistsSnapshot =
-    await FirebaseFirestore.instance.collection('specialists').get();
+    try {
+      final specialists = await FirebaseFirestore.instance.collection('specialists').get();
+      List<QueryDocumentSnapshot> available = [];
 
-    List<QueryDocumentSnapshot> availableExperts = [];
+      for (var doc in specialists.docs) {
+        final sched = await FirebaseFirestore.instance.collection('expertSchedules').doc(doc.id).get();
 
-    for (var doc in specialistsSnapshot.docs) {
-      final scheduleDoc = await FirebaseFirestore.instance
-          .collection('expertSchedules')
-          .doc(doc.id)
-          .get();
+        if (sched.exists) {
+          final scheduleData = sched.data();
+          final todayData = scheduleData?[todayKey]; // 🔥 FIX: Properly access today's data
 
-      if (scheduleDoc.exists) {
-        final scheduleData = scheduleDoc.data() as Map<String, dynamic>;
+          if (todayData != null && todayData['isAvailable'] == true) {
+            try {
+              final startParts = (todayData['startTime'] ?? '00:00').split(':');
+              final endParts = (todayData['endTime'] ?? '23:59').split(':');
 
-        if (scheduleData.containsKey(todayDate)) {
-          final dayData = scheduleData[todayDate] as Map<String, dynamic>;
-          // Show only if isAvailable is true for today
-          if (dayData['isAvailable'] == true) {
-            availableExperts.add(doc);
+              final startTime = DateTime(now.year, now.month, now.day, int.parse(startParts[0]), int.parse(startParts[1]));
+              final endTime = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+
+              if (now.isAfter(startTime) && now.isBefore(endTime)) {
+                available.add(doc);
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error parsing time for expert ${doc.id}: $e');
+            }
           }
         }
       }
+      return available;
+    } catch (e) {
+      debugPrint('❌ Firestore Error: $e');
+      return [];
     }
-    return availableExperts;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Explicitly using the material TextDirection to avoid ambiguous import errors
-    const TextDirection rtlDirection = TextDirection.rtl;
-
     return Directionality(
-      textDirection: rtlDirection,
+      textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: bgGreen,
         appBar: AppBar(
-          title: const Text('خبراء متاحون الآن'),
-          centerTitle: true,
-          elevation: 0,
           backgroundColor: Colors.white,
-          foregroundColor: AppTheme.darkGreen,
+          elevation: 1,
+          centerTitle: true,
+          title: const Text('الخبراء المتاحون',
+              style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: primaryGreen),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         body: FutureBuilder<List<QueryDocumentSnapshot>>(
           future: _getAvailableExperts(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-              );
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: primaryGreen));
             }
-
-            if (snapshot.hasError) {
-              return const Center(child: Text('حدث خطأ أثناء تحميل الخبراء'));
+            if (snap.hasError) {
+              return Center(child: Text('حدث خطأ: ${snap.error}'));
             }
-
-            final docs = snapshot.data ?? [];
-
+            final docs = snap.data ?? [];
             if (docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('👨‍🌾', style: TextStyle(fontSize: 60)),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'لا يوجد خبراء متاحون حالياً',
-                      style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'يرجى المحاولة مرة أخرى لاحقاً',
-                      style: TextStyle(color: Colors.grey, fontSize: 13),
-                    ),
-                  ],
-                ),
+              return const Center(
+                child: Text('لا يوجد خبراء متاحين حالياً ضمن ساعات العمل',
+                    style: TextStyle(color: Colors.grey, fontSize: 16)),
               );
             }
-
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: docs.length,
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final String name = data['fullName'] ?? 'خبير';
-                final String certificates = data['certificates'] ?? 'متخصص زراعي';
-                final String rating = (data['rating'] ?? 0).toString();
-                final String reviewCount = (data['reviewCount'] ?? 0).toString();
-                final String specialistId = docs[index].id;
-
-                return Card(
-                  key: ValueKey(specialistId),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryGreen.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text('👨‍🌾', style: TextStyle(fontSize: 28)),
-                      ),
-                    ),
-                    title: Text(
-                        name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(
-                            'التخصص: $certificates',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey)
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                            Text(' $rating ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text('($reviewCount تقييم)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 18,
-                        color: AppTheme.primaryGreen
-                    ),
-                    onTap: () => _showDetailsPopup(context, data, specialistId),
-                  ),
-                ).animate().fadeIn(delay: (index * 100).ms).slideY(begin: 0.1, curve: Curves.easeOut);
+              itemBuilder: (context, i) {
+                final data = docs[i].data() as Map<String, dynamic>;
+                return _buildExpertCard(context, data, docs[i].id);
               },
             );
           },
@@ -168,52 +101,109 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
-  void _showDetailsPopup(BuildContext context, Map<String, dynamic> data, String specialistId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
+  Widget _buildExpertCard(BuildContext context, Map<String, dynamic> data, String id) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: ListTile(
+        onTap: () => _showExpertDetails(context, data, id),
+        leading: CircleAvatar(
+          radius: 25,
+          backgroundColor: const Color(0xFFDCFCE7),
+          child: Text(data['fullName']?[0] ?? 'خ',
+              style: const TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 18)),
+        ),
+        title: Text(data['fullName'] ?? 'خبير', style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Row(
+          children: [
+            const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+            const SizedBox(width: 4),
+            Text('${data['rating'] ?? 5.0}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 10),
+            const Text('متاح الآن', style: TextStyle(color: primaryGreen, fontSize: 11, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+      ),
+    );
+  }
+
+  void _showExpertDetails(BuildContext context, Map<String, dynamic> data, String specId) {
+    showModalBottomSheet(
+      context: context, // Outer screen context
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      // 1. Rename the inner context to 'sheetContext'
+      builder: (sheetContext) => Directionality(
         textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          content: Column(
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.85),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('👨‍🌾', style: TextStyle(fontSize: 60)),
-              const SizedBox(height: 16),
-              Text(
-                  data['fullName'] ?? 'خبير',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.darkGreen)
-              ),
-              Text(
-                  data['certificates'] ?? '',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey, fontSize: 14)
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(),
-              ),
-              _detailItem(Icons.history_edu_rounded, 'الخبرة: ${data['experience'] ?? 'غير محدد'}'),
-              _detailItem(Icons.email_outlined, data['email'] ?? ''),
-              _detailItem(Icons.verified_user_rounded, 'خبير معتمد في التطبيق'),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _handleStartChat(context, data, specialistId);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              const SizedBox(height: 12),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Column(
+                          children: [
+                            const CircleAvatar(radius: 40, backgroundColor: bgGreen, child: Icon(Icons.person, size: 50, color: primaryGreen)),
+                            const SizedBox(height: 12),
+                            Text(data['fullName'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text('حول الخبير', style: TextStyle(fontWeight: FontWeight.bold, color: darkGreen, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      Text(data['experience'] ?? 'لا توجد معلومات إضافية', style: const TextStyle(height: 1.5)),
+                      const SizedBox(height: 20),
+                      const Text('المؤهلات العلمية', style: TextStyle(fontWeight: FontWeight.bold, color: darkGreen, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      Text(data['certificates'] ?? '—'),
+                      const SizedBox(height: 20),
+                      const Text('الشهادات الموثقة', style: TextStyle(fontWeight: FontWeight.bold, color: darkGreen, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      _buildCertGrid(data['certificateImages']),
+                      const SizedBox(height: 30),
+                    ],
                   ),
-                  child: const Text(
-                      'بدء المحادثة الآن',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // 2. Pop using the sheetContext
+                        Navigator.pop(sheetContext);
+                        // 3. Pass the original outer screen 'context' to start the chat
+                        _handleStartChat(context, data, specId);
+                      },
+                      icon: const Icon(Icons.chat_bubble_rounded, color: Colors.white),
+                      label: const Text('بدء استشارة مباشرة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -224,60 +214,91 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailItem(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppTheme.primaryGreen),
-          const SizedBox(width: 12),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14, color: Colors.black87))),
-        ],
+  Widget _buildCertGrid(dynamic images) {
+    final List certs = images is List ? images : [];
+    if (certs.isEmpty) return const Text('لم يتم إرفاق صور شهادات', style: TextStyle(color: Colors.grey, fontSize: 12));
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
+      itemCount: certs.length,
+      itemBuilder: (ctx, i) => ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(certs[i], fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: Colors.grey[200])),
       ),
     );
   }
 
-  Future<void> _handleStartChat(BuildContext context, Map<String, dynamic> data, String specialistId) async {
+  Future<void> _handleStartChat(BuildContext context, Map<String, dynamic> data, String specId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    String chatId = 'chat_${user.uid}_$specialistId';
-    final now = DateTime.now();
-    final String timeStr = DateFormat('HH:mm').format(now);
+    // Show loading overlay
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator(color: primaryGreen))
+    );
 
-    List<Map<String, dynamic>> initialMessages = [];
-    if (failedImage != null && failedImage!.isNotEmpty) {
-      initialMessages.add({
-        'id': 'msg_auto_${now.millisecondsSinceEpoch}',
-        'sender': 'user',
-        'content': failedImage,
+    try {
+      // 1. Fetch User Name
+      String userName = 'مستخدم';
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
+      }
+
+      // 2. Upload Image to Cloudinary (If exists)
+      String finalImageUrl = '';
+      if (failedImage != null && failedImage!.isNotEmpty) {
+        final cloudinary = CloudinaryPublic('dicojx5rg', 'bioshield_preset', cache: false);
+        CloudinaryResponse response = await cloudinary.uploadFile(CloudinaryFile.fromFile(failedImage!));
+        finalImageUrl = response.secureUrl;
+      }
+
+      // 3. Create Chat
+      final chatRef = FirebaseFirestore.instance.collection('chats').doc();
+      final now = DateTime.now();
+      final timeStr = DateFormat('HH:mm').format(now);
+
+      await chatRef.set({
+        'userId': user.uid,
+        'userName': userName,
+        'specialistId': specId,
+        'specialistName': data['fullName'],
+        'expertName': data['fullName'],
+        'expertRating': data['rating'] ?? 5.0,
+        'expertApproved': true,
+        'completed': false,
+        'plantImage': finalImageUrl,
+        'createdAt': now.toIso8601String(),
+        'updatedAt': now.toIso8601String(),
         'time': timeStr,
-        'type': 'image',
+        'userUnread': 0,
+        'expertUnread': 1,
+        'lastMessage': finalImageUrl.isNotEmpty ? '📷 صورة' : 'محادثة جديدة',
+        'messages': finalImageUrl.isNotEmpty ? [{
+          'id': 'img-${now.millisecondsSinceEpoch}',
+          'sender': 'user',
+          'content': finalImageUrl,
+          'type': 'image',
+          'time': timeStr
+        }] : [],
       });
-    }
 
-    await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
-      'userId': user.uid,
-      'expertId': specialistId,
-      'expertName': data['fullName'] ?? 'خبير',
-      'lastMessage': failedImage != null ? '📷 صورة نبات للتشخيص' : 'بدأ المحادثة',
-      'time': timeStr,
-      'createdAt': FieldValue.serverTimestamp(),
-      'messages': FieldValue.arrayUnion(initialMessages),
-      'expertApproved': false,
-    }, SetOptions(merge: true));
-
-    if (context.mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatWithUserScreen(
-            chatId: chatId,
-            expertName: data['fullName'] ?? 'خبير',
-            expertRating: double.tryParse(data['rating'].toString()) ?? 0.0,
-          ),
-        ),
-      );
+      if (context.mounted) {
+        Navigator.pop(context); // remove loading
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ChatWithUserScreen(
+          chatId: chatRef.id,
+          expertName: data['fullName'] ?? 'خبير',
+          expertRating: ((data['rating'] ?? 5.0) as num).toDouble(),
+          isOnline: true,
+        )));
+      }
+    } catch (e) {
+      Navigator.pop(context); // remove loading
+      debugPrint('❌ Error starting chat: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل بدء المحادثة: $e')));
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:cloudinary_public/cloudinary_public.dart';
 
 class ChatWithUserScreen extends StatefulWidget {
   final String chatId;
@@ -39,6 +40,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     _listenToChat();
   }
 
+
   @override
   void dispose() {
     _messageController.dispose();
@@ -48,25 +50,22 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
 
   // ── مراقبة حالة الشات ─────────────────────────────────────
   void _listenToChat() {
-    _db.collection('chats').doc(widget.chatId).snapshots().listen(
-          (snap) {
-        if (snap.exists && mounted) {
-          final data = snap.data() ?? {};
-          final approved = data['expertApproved'] == true;
-          final completed = data['completed'] == true;
-          final specId = data['specialistId'] ?? '';
-          if (approved != _isApproved ||
-              completed != _isCompleted ||
-              specId != _specialistId) {
-            setState(() {
-              _isApproved = approved;
-              _isCompleted = completed;
-              _specialistId = specId;
-            });
-          }
+    _db.collection('chats').doc(widget.chatId).snapshots().listen((snap) {
+      if (snap.exists && mounted) {
+        final data = snap.data() ?? {};
+        setState(() {
+          _isApproved = data['expertApproved'] == true;
+          _isCompleted = data['completed'] == true;
+          _specialistId = data['specialistId'] ?? '';
+        });
+
+        // Show rating if just completed
+        if (_isCompleted && !_hasRated) {
+          _showRatingDialog();
         }
-      },
-    );
+      }
+    });
+
 
     // تحقق إذا اليوزر سبق وقيّم
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -119,7 +118,8 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
       'messages': FieldValue.arrayUnion([msg]),
       'lastMessage': text,
       'time': _now(),
-      'unread': FieldValue.increment(1),
+      'updatedAt': DateTime.now().toIso8601String(),
+      'expertUnread': FieldValue.increment(1), // ✅ Alerts the Expert
     });
 
     _scrollToBottom();
@@ -129,10 +129,30 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
+    // ✅ Show a loading circle while uploading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A))),
+    );
+
+    String finalImageUrl = '';
+    try {
+      final cloudinary = CloudinaryPublic('dicojx5rg', 'bioshield_preset', cache: false);
+      CloudinaryResponse response = await cloudinary.uploadFile(CloudinaryFile.fromFile(picked.path));
+      finalImageUrl = response.secureUrl;
+    } catch (e) {
+      debugPrint('Upload failed: $e');
+      Navigator.pop(context); // Close loading
+      return; // Stop if upload fails
+    }
+
+    Navigator.pop(context); // Close loading dialog
+
     final msg = {
       'id': 'img-${DateTime.now().millisecondsSinceEpoch}',
       'sender': 'user',
-      'content': picked.path,
+      'content': finalImageUrl, // ✅ Sending the CLOUD link, not the local path
       'time': _now(),
       'type': 'image',
     };
@@ -141,12 +161,13 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
       'messages': FieldValue.arrayUnion([msg]),
       'lastMessage': '📷 صورة',
       'time': _now(),
-      'unread': FieldValue.increment(1),
+      'expertUnread': FieldValue.increment(1), // ✅ Alerts the Expert
     });
 
     _scrollToBottom();
   }
 
+  // ── ديالوج التقييم ─────────────────────────────────────────
   // ── ديالوج التقييم ─────────────────────────────────────────
   void _showRatingDialog() {
     int selectedRating = 0;
@@ -161,129 +182,139 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
           builder: (context, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20)),
+            contentPadding: const EdgeInsets.all(20), // Clean, even padding around the whole dialog
             title: const Text(
               'قيّم الخبير',
               textAlign: TextAlign.center,
-              style:
-              TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // أفاتار الخبير
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFFDDF7DD),
-                  child: Text(
-                    widget.expertName.isNotEmpty
-                        ? widget.expertName[0]
-                        : 'خ',
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // أفاتار الخبير
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: const Color(0xFFDDF7DD),
+                    child: Text(
+                      widget.expertName.isNotEmpty
+                          ? widget.expertName[0]
+                          : 'خ',
+                      style: const TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.expertName,
                     style: const TextStyle(
-                        color: Color(0xFF2E7D32),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24),
+                        fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.expertName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'كيف كانت تجربتك مع هذا الخبير؟',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'كيف كانت تجربتك مع هذا الخبير؟',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
 
-                // النجوم
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    final star = i + 1;
-                    return GestureDetector(
-                      onTap: () =>
-                          setDialogState(() => selectedRating = star),
-                      child: Padding(
-                        padding:
-                        const EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(
-                          star <= selectedRating
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: star <= selectedRating
-                              ? Colors.amber
-                              : Colors.grey[400],
-                          size: 36,
+                  // النجوم
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      final star = i + 1;
+                      return GestureDetector(
+                        onTap: () =>
+                            setDialogState(() => selectedRating = star),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            star <= selectedRating
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: star <= selectedRating
+                                ? Colors.amber
+                                : Colors.grey[400],
+                            size: 36,
+                          ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  selectedRating == 0
-                      ? 'اضغط لتحديد التقييم'
-                      : selectedRating == 1
-                      ? 'سيء'
-                      : selectedRating == 2
-                      ? 'مقبول'
-                      : selectedRating == 3
-                      ? 'جيد'
-                      : selectedRating == 4
-                      ? 'جيد جداً'
-                      : 'ممتاز!',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: selectedRating == 0
-                        ? Colors.grey
-                        : Colors.amber[700],
-                    fontWeight: FontWeight.w600,
+                      );
+                    }),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 6),
+                  Text(
+                    selectedRating == 0
+                        ? 'اضغط لتحديد التقييم'
+                        : selectedRating == 1
+                        ? 'سيء'
+                        : selectedRating == 2
+                        ? 'مقبول'
+                        : selectedRating == 3
+                        ? 'جيد'
+                        : selectedRating == 4
+                        ? 'جيد جداً'
+                        : 'ممتاز!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: selectedRating == 0
+                          ? Colors.grey
+                          : Colors.amber[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
-                // تعليق
-                TextField(
-                  controller: commentController,
-                  maxLines: 3,
-                  textDirection: TextDirection.rtl,
-                  decoration: InputDecoration(
-                    hintText: 'اكتب تعليقك (اختياري)...',
-                    hintStyle: const TextStyle(fontSize: 12),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.all(10),
+                  // تعليق
+                  TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    textDirection: TextDirection.rtl,
+                    decoration: InputDecoration(
+                      hintText: 'اكتب تعليقك (اختياري)...',
+                      hintStyle: const TextStyle(fontSize: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.all(10),
+                    ),
                   ),
-                ),
-              ],
+
+                  // 👇 BIGGER GAP: Forces breathing room below the text field
+                  const SizedBox(height: 24),
+
+                  // 👇 BUTTONS MOVED INSIDE THE SCROLL VIEW 👇
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('تخطي'),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedRating > 0
+                              ? const Color(0xFF16a34a)
+                              : Colors.grey[300],
+                          foregroundColor: selectedRating > 0
+                              ? Colors.white
+                              : Colors.grey,
+                        ),
+                        icon: const Icon(Icons.send, size: 16),
+                        label: const Text('إرسال التقييم'),
+                        onPressed: selectedRating > 0
+                            ? () => _submitRating(
+                          selectedRating,
+                          commentController.text.trim(),
+                        )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('تخطي'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: selectedRating > 0
-                      ? const Color(0xFF16a34a)
-                      : Colors.grey[300],
-                  foregroundColor: selectedRating > 0
-                      ? Colors.white
-                      : Colors.grey,
-                ),
-                icon: const Icon(Icons.send, size: 16),
-                label: const Text('إرسال التقييم'),
-                onPressed: selectedRating > 0
-                    ? () => _submitRating(
-                  selectedRating,
-                  commentController.text.trim(),
-                )
-                    : null,
-              ),
-            ],
+            // Notice: The "actions" array has been completely removed from the AlertDialog!
           ),
         ),
       ),
@@ -295,24 +326,36 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     if (_specialistId.isEmpty) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final userName =
-        FirebaseAuth.instance.currentUser?.displayName ?? 'مستخدم';
+
+    // 🔥 NEW: Fetch the real name from the 'users' collection
+    String realUserName = 'مستخدم';
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        realUserName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
+      }
+    } catch (e) {
+      debugPrint('Error fetching name for rating: $e');
+    }
+
     final now = DateTime.now();
 
-    // ١ — حفظ التقييم في sub-collection
+    // 1 — Save to reviews sub-collection
     await _db
         .collection('specialists')
         .doc(_specialistId)
         .collection('reviews')
         .add({
       'userId': uid,
-      'userName': userName,
+      'userName': realUserName, // ✅ Now uses "بسمة" instead of "مستخدم"
       'rating': rating,
       'comment': comment,
       'chatId': widget.chatId,
       'date': '${now.day}/${now.month}/${now.year}',
       'createdAt': now.toIso8601String(),
     });
+
+    // ... (keep the rest of your current logic for updating averages)
 
     // ٢ — تحديث متوسط التقييم في بروفايل الخبير
     final specDoc = await _db
@@ -489,36 +532,66 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.expertName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(widget.expertName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.star, size: 13, color: Colors.amber),
-                    const SizedBox(width: 3),
-                    Text('${widget.expertRating}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
-                    const SizedBox(width: 8),
+                    // 🔥 UPDATED: Real-time Stream for BOTH Online Status and Rating
+                    if (_specialistId.isNotEmpty)
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: _db.collection('specialists').doc(_specialistId).snapshots(),
+                        builder: (context, snapshot) {
+                          // Extract data safely
+                          final data = snapshot.data?.data() as Map<String, dynamic>?;
+
+                          // Check online status
+                          final isOnline = data?['isOnline'] == true;
+
+                          // Get live rating, fallback to the widget's rating if null
+                          final liveRating = data != null && data['rating'] != null
+                              ? (data['rating'] as num).toDouble()
+                              : widget.expertRating;
+
+                          return Row(
+                            children: [
+                              // 1. Online Indicator
+                              if (isOnline) ...[
+                                const Icon(Icons.circle, color: Color(0xFF16A34A), size: 8),
+                                const SizedBox(width: 4),
+                                const Text('متصل الآن', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                              ],
+
+                              // 2. Live Rating
+                              const Icon(Icons.star, size: 13, color: Colors.amber),
+                              const SizedBox(width: 3),
+                              Text('$liveRating', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              const SizedBox(width: 8),
+                            ],
+                          );
+                        },
+                      )
+                    else
+                    // Fallback UI while the _specialistId is loading
+                      Row(
+                        children: [
+                          const Icon(Icons.star, size: 13, color: Colors.amber),
+                          const SizedBox(width: 3),
+                          Text('${widget.expertRating}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+
+                    // 3. Chat Status (جارية / مكتملة)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _isCompleted
-                            ? const Color(0xFF16a34a)
-                            : _isApproved
-                            ? const Color(0xFF16a34a)
-                            : Colors.orange,
+                        color: _isCompleted ? const Color(0xFF16a34a) : Colors.orange,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        _isCompleted
-                            ? 'مكتملة'
-                            : _isApproved
-                            ? 'مقبول'
-                            : 'قيد المراجعة',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 10),
+                        _isCompleted ? 'مكتملة' : 'جارية',
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
                       ),
                     ),
                   ],
@@ -577,6 +650,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
 
   // ── شريط الإدخال ────────────────────────────────────────────
   Widget _buildInputBar() {
+    if (_isCompleted) return const SizedBox();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

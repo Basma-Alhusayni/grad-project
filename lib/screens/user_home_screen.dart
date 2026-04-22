@@ -30,7 +30,26 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       const UserReportsScreen(),
       const UserProfileScreen(),
     ];
+
+    // 🔥 NEW: Mark user online immediately when app opens!
+    _setOnlineStatus();
   }
+
+  // 🔥 NEW: The function that updates Firestore
+  Future<void> _setOnlineStatus() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+          'isOnline': true,
+        });
+      } catch (e) {
+        debugPrint('Error updating online status: $e');
+      }
+    }
+  }
+
+  // ... rest of your build method ...
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +89,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 ),
               ),
               onPressed: () async {
+                // 🔥 NEW: Set user to offline before logging out
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid != null) {
+                  try {
+                    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                      'isOnline': false,
+                    });
+                  } catch (e) {
+                    debugPrint('Error updating online status: $e');
+                  }
+                }
+
                 await AuthService().signOut();
                 if (!mounted) return;
                 Navigator.pushAndRemoveUntil(

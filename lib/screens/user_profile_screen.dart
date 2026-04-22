@@ -36,14 +36,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         .doc(user.uid)
         .get();
 
-    String name = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? '';
+    String name =
+        userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? '';
 
     if (name.isEmpty) {
       final accountDoc = await FirebaseFirestore.instance
           .collection('accounts')
           .doc(user.uid)
           .get();
-      name = accountDoc.data()?['fullName'] ?? accountDoc.data()?['username'] ?? '';
+      name =
+          accountDoc.data()?['fullName'] ??
+          accountDoc.data()?['username'] ??
+          '';
     }
 
     if (name.isEmpty) {
@@ -68,10 +72,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text(
               'تعديل المعلومات الشخصية',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _green900),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _green900,
+              ),
             ),
             content: TextField(
               controller: nameController,
@@ -79,31 +89,52 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               decoration: InputDecoration(
                 labelText: 'الاسم',
                 prefixIcon: const Icon(Icons.person_outline, color: _green600),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
               ElevatedButton(
-                onPressed: saving ? null : () async {
-                  final newName = nameController.text.trim();
-                  if (newName.isEmpty) return;
-                  setDialogState(() => saving = true);
-                  try {
-                    final uid = FirebaseAuth.instance.currentUser?.uid;
-                    if (uid != null) {
-                      await FirebaseFirestore.instance.collection('users').doc(uid).update({'username': newName, 'fullName': newName});
-                      await FirebaseFirestore.instance.collection('accounts').doc(uid).update({'username': newName, 'fullName': newName});
-                    }
-                    if (!mounted) return;
-                    setState(() => _name = newName);
-                    Navigator.pop(ctx);
-                  } catch (e) {
-                    setDialogState(() => saving = false);
-                  }
-                },
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final newName = nameController.text.trim();
+                        if (newName.isEmpty) return;
+                        setDialogState(() => saving = true);
+                        try {
+                          final uid = FirebaseAuth.instance.currentUser?.uid;
+                          if (uid != null) {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(uid)
+                                .update({
+                                  'username': newName,
+                                  'fullName': newName,
+                                });
+                            await FirebaseFirestore.instance
+                                .collection('accounts')
+                                .doc(uid)
+                                .update({
+                                  'username': newName,
+                                  'fullName': newName,
+                                });
+                          }
+                          if (!mounted) return;
+                          setState(() => _name = newName);
+                          Navigator.pop(ctx);
+                        } catch (e) {
+                          setDialogState(() => saving = false);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(backgroundColor: _green600),
-                child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ', style: TextStyle(color: Colors.white)),
+                child: saving
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('حفظ', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -120,20 +151,41 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _green900)),
-            content: Text('سيتم إرسال رابط إعادة تعيين كلمة المرور إلى: \n$_email'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'تغيير كلمة المرور',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _green900,
+              ),
+            ),
+            content: Text(
+              'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى: \n$_email',
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
               ElevatedButton(
-                onPressed: sending ? null : () async {
-                  setDialogState(() => sending = true);
-                  await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
-                  if (!mounted) return;
-                  Navigator.pop(ctx);
-                },
+                onPressed: sending
+                    ? null
+                    : () async {
+                        setDialogState(() => sending = true);
+                        await FirebaseAuth.instance.sendPasswordResetEmail(
+                          email: _email,
+                        );
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                      },
                 style: ElevatedButton.styleFrom(backgroundColor: _green600),
-                child: const Text('إرسال', style: TextStyle(color: Colors.white)),
+                child: const Text(
+                  'إرسال',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -158,7 +210,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         // هذه الخاصية تضمن أن الشاشة لا تضغط العناصر بشكل سيء عند ظهور الكيبورد
         resizeToAvoidBottomInset: true,
         body: SafeArea(
-          child: LayoutBuilder( // يستخدم لضمان توزيع العناصر بشكل صحيح في المساحات المختلفة
+          child: LayoutBuilder(
+            // يستخدم لضمان توزيع العناصر بشكل صحيح في المساحات المختلفة
             builder: (context, constraints) {
               return SingleChildScrollView(
                 // نعيد السكرول ولكن نجعله يعمل فقط إذا ضاقت الشاشة (مثل عند ظهور الكيبورد)
@@ -208,16 +261,33 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   decoration: BoxDecoration(
                                     color: _green100,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: _green600, width: 2),
+                                    border: Border.all(
+                                      color: _green600,
+                                      width: 2,
+                                    ),
                                   ),
-                                  child: const Icon(Icons.person, color: _green600, size: 45),
+                                  child: const Icon(
+                                    Icons.person,
+                                    color: _green600,
+                                    size: 45,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
                                   _name,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _green900),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: _green900,
+                                  ),
                                 ),
-                                const Text('مستخدم BioShield', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                const Text(
+                                  'مستخدم BioShield',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -234,16 +304,40 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             child: Column(
                               children: [
                                 ListTile(
-                                  title: const Text('المعلومات الشخصية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  title: const Text(
+                                    'المعلومات الشخصية',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                   trailing: TextButton.icon(
                                     onPressed: _showEditDialog,
-                                    icon: const Icon(Icons.edit_outlined, size: 16, color: _green600),
-                                    label: const Text('تعديل', style: TextStyle(color: _green600, fontSize: 12)),
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      size: 16,
+                                      color: _green600,
+                                    ),
+                                    label: const Text(
+                                      'تعديل',
+                                      style: TextStyle(
+                                        color: _green600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                _buildInfoRow('الاسم', _name, Icons.person_outline),
+                                _buildInfoRow(
+                                  'الاسم',
+                                  _name,
+                                  Icons.person_outline,
+                                ),
                                 const Divider(indent: 16, endIndent: 16),
-                                _buildInfoRow('البريد الإلكتروني', _email, Icons.email_outlined),
+                                _buildInfoRow(
+                                  'البريد الإلكتروني',
+                                  _email,
+                                  Icons.email_outlined,
+                                ),
                               ],
                             ),
                           ),
@@ -257,15 +351,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: ListTile(
-                              leading: const Icon(Icons.lock_outline, color: _green600),
-                              title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 14)),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                              leading: const Icon(
+                                Icons.lock_outline,
+                                color: _green600,
+                              ),
+                              title: const Text(
+                                'تغيير كلمة المرور',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: Colors.grey,
+                              ),
                               onTap: _showChangePasswordDialog,
                             ),
                           ),
 
                           const Spacer(),
 
+                          // ── زر تسجيل الخروج ──
                           // ── زر تسجيل الخروج ──
                           Padding(
                             padding: const EdgeInsets.only(top: 24),
@@ -274,20 +379,46 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               height: 55,
                               child: ElevatedButton.icon(
                                 onPressed: () async {
+                                  // 🔥 NEW: Set user to offline before logging out
+                                  final uid =
+                                      FirebaseAuth.instance.currentUser?.uid;
+                                  if (uid != null) {
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(uid)
+                                          .update({'isOnline': false});
+                                    } catch (e) {
+                                      debugPrint(
+                                        'Error updating online status: $e',
+                                      );
+                                    }
+                                  }
+
                                   await AuthService().signOut();
                                   if (!context.mounted) return;
                                   Navigator.pushAndRemoveUntil(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const SplashScreen()),
-                                        (_) => false,
+                                    MaterialPageRoute(
+                                      builder: (_) => const SplashScreen(),
+                                    ),
+                                    (_) => false,
                                   );
                                 },
                                 icon: const Icon(Icons.logout),
-                                label: const Text('تسجيل الخروج', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                label: const Text(
+                                  'تسجيل الخروج',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFCC0000),
                                   foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
                                   elevation: 0,
                                 ),
                               ),
@@ -316,8 +447,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ],

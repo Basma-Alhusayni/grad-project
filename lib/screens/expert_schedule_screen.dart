@@ -53,9 +53,13 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
 
   // ── حفظ الجدول في Firestore ────────────────────────────────
   Future<void> _saveToFirestore() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // This ensures the schedule is locked to THIS specific expert
     await _db
         .collection('expertSchedules')
-        .doc(_uid)
+        .doc(uid)
         .set(_scheduleData);
   }
 
