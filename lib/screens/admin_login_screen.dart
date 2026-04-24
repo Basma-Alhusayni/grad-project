@@ -196,125 +196,142 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFFF0FDF4),
       body: SafeArea(
         child: Directionality(
           textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // 1. زر الرجوع (نفس ستايل الخبير والمستخدم)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Color(0xFF16A34A)),
-                    label: const Text('رجوع', style: TextStyle(color: Color(0xFF16A34A))),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
                   ),
-                ),
-
-                const Spacer(),
-
-                // 2. الأيقونة والنصوص العلوية (نفس التنسيق المطلوب)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFDCFCE7),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shield, size: 40, color: Color(0xFF16A34A)),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                    'حساب الإدارة',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF14532D))
-                ),
-                const Text(
-                    'سجل دخولك لإدارة النظام',
-                    style: TextStyle(color: Colors.grey)
-                ),
-
-                const SizedBox(height: 24),
-
-                // 3. بطاقة تسجيل الدخول
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, 4))
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _label('البريد الإلكتروني'),
-                      const SizedBox(height: 6),
-                      ValidatedField(
-                        hint: 'admin@bioshield.com',
-                        icon: Icons.email_outlined,
-                        controller: _loginEmail,
-                        errorText: _emailError,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
-
-                      _label('كلمة المرور'),
-                      const SizedBox(height: 6),
-                      PasswordField(
-                        hint: '••••••••',
-                        controller: _loginPass,
-                        visible: _loginPassVisible,
-                        errorText: _passError,
-                        onToggle: () => setState(() => _loginPassVisible = !_loginPassVisible),
-                      ),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
                         children: [
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _rememberMe,
-                                onChanged: (v) => setState(() => _rememberMe = v!),
-                                activeColor: const Color(0xFF16A34A),
-                              ),
-                              const Text('تذكرني', style: TextStyle(fontSize: 12)),
-                            ],
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: TextButton.icon(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                  Icons.arrow_back, color: Color(0xFF16A34A)),
+                              label: const Text('رجوع',
+                                  style: TextStyle(color: Color(0xFF16A34A))),
+                            ),
                           ),
-                          TextButton(
-                            onPressed: _forgotPassword,
-                            child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFF16A34A), fontSize: 12)),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFDCFCE7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.shield, size: 64,
+                                color: Color(0xFF16A34A)),
                           ),
+                          const SizedBox(height: 24),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black12,
+                                    blurRadius: 20,
+                                    offset: Offset(0, 4))
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      _label('البريد الإلكتروني'),
+                                      const SizedBox(height: 6),
+                                      ValidatedField(
+                                        hint: 'admin@bioshield.com',
+                                        icon: Icons.email_outlined,
+                                        controller: _loginEmail,
+                                        errorText: _emailError,
+                                        keyboardType: TextInputType
+                                            .emailAddress,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _label('كلمة المرور'),
+                                      const SizedBox(height: 6),
+                                      PasswordField(
+                                        hint: '••••••••',
+                                        controller: _loginPass,
+                                        visible: _loginPassVisible,
+                                        errorText: _passError,
+                                        onToggle: () =>
+                                            setState(() =>
+                                            _loginPassVisible =
+                                            !_loginPassVisible),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Checkbox(
+                                                value: _rememberMe,
+                                                onChanged: (v) =>
+                                                    setState(() =>
+                                                    _rememberMe = v!),
+                                                activeColor: const Color(
+                                                    0xFF16A34A),
+                                              ),
+                                              const Text('تذكرني',
+                                                  style: TextStyle(
+                                                      fontSize: 12)),
+                                            ],
+                                          ),
+                                          TextButton(
+                                            onPressed: _forgotPassword,
+                                            child: const Text(
+                                                'نسيت كلمة المرور؟',
+                                                style: TextStyle(
+                                                    color: Color(0xFF16A34A),
+                                                    fontSize: 12)),
+                                          ),
+                                        ],
+                                      ),
+                                      if (_error != null) _errorBox(_error!),
+                                      const SizedBox(height: 10),
+                                      GreenButton(label: 'تسجيل الدخول',
+                                          onPressed: _login,
+                                          isLoading: _loading),
+                                      const SizedBox(height: 8),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // --- ADDED SPACER HERE ---
+                          const Spacer(),
+
+                          const Text(
+                              'جميع الحقوق محفوظة © 2026 BioShield',
+                              style: TextStyle(color: Colors.grey, fontSize: 12)
+                          ),
+                          const SizedBox(height: 8),
+                          // Match the login screen padding
                         ],
                       ),
-
-                      if (_error != null) _errorBox(_error!),
-
-                      const SizedBox(height: 16),
-                      GreenButton(
-                        label: 'دخول النظام',
-                        icon: Icons.login,
-                        onPressed: _login,
-                        isLoading: _loading,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-
-                const Spacer(),
-
-                // 4. تذييل الصفحة (جميع الحقوق محفوظة) بنفس ستايل الصفحة الرئيسية
-                const Text(
-                    'جميع الحقوق محفوظة © 2026 BioShield',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

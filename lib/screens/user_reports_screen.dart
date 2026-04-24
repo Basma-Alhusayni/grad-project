@@ -17,7 +17,6 @@ class UserReportsScreen extends StatefulWidget {
 
 class _UserReportsScreenState extends State<UserReportsScreen> {
   static const _green600 = Color(0xFF16A34A);
-  static const _green900 = Color(0xFF14532D);
 
   String _filter = 'الكل';
   String _search = '';
@@ -93,18 +92,26 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
         final allReports = allDocs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           return {
-            'id':         doc.id,
-            'plantName':  data['plantName'] ?? '',
-            'disease':    data['diagnosis'] ?? '',
-            'status':     data['status'] ?? '',
-            'date':       data['date'] ?? '',
-            'confidence': data['confidence'] ?? 0,
-            'treatment':  data['treatment'] ?? '',
-            'plantType':  data['plantType'] ?? '',
-            'icon':       _iconForPlant(data['plantType'] ?? ''),
-            'feedDocId':  data['feedDocId'] ?? '',
-            'details':    data['details'] ?? '',
-            'imageUrl':   data['imageUrl'] ?? '',
+            'id':                  doc.id,
+            'plantName':           data['plantName'] ?? '',
+            'disease':             data['diagnosis'] ?? '',
+            'status':              data['status'] ?? '',
+            'date':                data['date'] ?? '',
+            'confidence':          data['confidence'] ?? 0,
+            // ─── two separate confidence fields ───
+            'plantNameConfidence': data['plantNameConfidence'] ?? data['confidence'] ?? 0,
+            'diseaseConfidence':   data['diseaseConfidence'] ?? data['confidence'] ?? 0,
+            'plantNetLabel':       data['plantNetLabel'] ?? '',
+            'modelDiseaseLabel':   data['modelDiseaseLabel'] ?? '',
+            // ──────────────────────────────────────
+            'treatment':           data['treatment'] ?? '',
+            'plantType':           data['plantType'] ?? '',
+            'icon':                _iconForPlant(data['plantType'] ?? ''),
+            'feedDocId':           data['feedDocId'] ?? '',
+            'details':             data['details'] ?? '',
+            'imageUrl':            data['imageUrl'] ?? '',
+            'userName':            data['userName'] ?? '',
+            'userId':              data['userId'] ?? '',
           };
         }).toList();
 
@@ -222,8 +229,11 @@ class _ReportCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: imageUrl.isNotEmpty
-                ? Image.network(imageUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 52, height: 52, color: sb, child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))))
-                : Container(width: 52, height: 52, color: sb, child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))),
+                ? Image.network(imageUrl, width: 52, height: 52, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(width: 52, height: 52, color: sb,
+                    child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))))
+                : Container(width: 52, height: 52, color: sb,
+                child: Center(child: Text(report['icon'], style: const TextStyle(fontSize: 26)))),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -231,10 +241,15 @@ class _ReportCard extends StatelessWidget {
             const SizedBox(height: 3),
             Text(report['disease'], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
             const SizedBox(height: 4),
-            Row(children: [Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)), if (isShared) ...[const SizedBox(width: 8), _SharedBadge()]]),
+            Row(children: [
+              Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+              if (isShared) ...[const SizedBox(width: 8), _SharedBadge()],
+            ]),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(20)), child: Text(report['status'], style: TextStyle(color: sc, fontSize: 11, fontWeight: FontWeight.bold))),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(20)),
+                child: Text(report['status'], style: TextStyle(color: sc, fontSize: 11, fontWeight: FontWeight.bold))),
             const SizedBox(height: 8),
             Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey[400]),
           ]),
@@ -250,11 +265,18 @@ class _SharedBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(color: const Color(0xFFF3F0FF), borderRadius: BorderRadius.circular(10)),
-      child: const Row(children: [Icon(Icons.share_rounded, color: Color(0xFF7C3AED), size: 10), SizedBox(width: 3), Text('مشارك', style: TextStyle(color: Color(0xFF7C3AED), fontSize: 10, fontWeight: FontWeight.bold))]),
+      child: const Row(children: [
+        Icon(Icons.share_rounded, color: Color(0xFF7C3AED), size: 10),
+        SizedBox(width: 3),
+        Text('مشارك', style: TextStyle(color: Color(0xFF7C3AED), fontSize: 10, fontWeight: FontWeight.bold)),
+      ]),
     );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  REPORT DETAIL PAGE
+// ═══════════════════════════════════════════════════════════════
 class ReportDetailPage extends StatefulWidget {
   final Map<String, dynamic> report;
   const ReportDetailPage({super.key, required this.report});
@@ -291,37 +313,64 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       if (user == null) return;
 
       if (_isShared && _feedDocId != null) {
+        // ── UNSHARE: delete from both community_feed and shared_reports ──
         await FirebaseFirestore.instance.collection('community_feed').doc(_feedDocId).delete();
+
+        // Also delete from shared_reports if it exists there
+        final sharedQuery = await FirebaseFirestore.instance
+            .collection('shared_reports')
+            .where('feedDocId', isEqualTo: _feedDocId)
+            .get();
+        for (final doc in sharedQuery.docs) {
+          await doc.reference.delete();
+        }
+
         await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
-          'feedDocId': FieldValue.delete(),
+          'feedDocId': '',
           'isSharedToCommunity': false,
         });
         setState(() { _isShared = false; _feedDocId = null; });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تم إلغاء المشاركة', textDirection: TextDirection.rtl)));
-      } else {
-        // --- THE FIX IS HERE ---
-        // Changed collection from 'accounts' to 'users' based on your screenshot
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ تم إلغاء المشاركة', textDirection: TextDirection.rtl)));
 
-        // Fetching the name from 'fullName' or 'username' as seen in your screenshot
+      } else {
+        // ── SHARE ──
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
 
-        final ref = await FirebaseFirestore.instance.collection('community_feed').add({
-          'plantName':  widget.report['plantName'],
-          'ImageUrl':   widget.report['imageUrl'],
-          'diagnosis':  widget.report['disease'],
-          'details':    widget.report['details'],
-          'treatment':  widget.report['treatment'],
-          'isHealthy':  _isHealthy,
-          'confidence': widget.report['confidence'],
-          'status':     widget.report['status'],
-          'date':       widget.report['date'],
-          'createdAt':  FieldValue.serverTimestamp(),
-          'sharedBy':   userName, // Now this will correctly say "بسمة" or the user's name
-          'userId':     user.uid,
-          'reportId':   widget.report['id'],
+        // Shared payload includes both confidence values
+        final sharedData = {
+          'plantName':           widget.report['plantName'],
+          'ImageUrl':            widget.report['imageUrl'],
+          'diagnosis':           widget.report['disease'],
+          'details':             widget.report['details'],
+          'treatment':           widget.report['treatment'],
+          'isHealthy':           _isHealthy,
+          'confidence':          widget.report['confidence'],
+          // ─── NEW: two percentages ───────────────────────────
+          'plantNameConfidence': widget.report['plantNameConfidence'] ?? widget.report['confidence'],
+          'diseaseConfidence':   widget.report['diseaseConfidence'] ?? widget.report['confidence'],
+          'plantNetLabel':       widget.report['plantNetLabel'] ?? '',
+          'modelDiseaseLabel':   widget.report['modelDiseaseLabel'] ?? '',
+          // ────────────────────────────────────────────────────
+          'status':              widget.report['status'],
+          'date':                widget.report['date'],
+          'createdAt':           FieldValue.serverTimestamp(),
+          'sharedBy':            userName,     // ← person's real name
+          'userId':              user.uid,
+          'reportId':            widget.report['id'],
+        };
+
+        // Write to community_feed (for the home feed)
+        final ref = await FirebaseFirestore.instance.collection('community_feed').add(sharedData);
+
+        // Write to shared_reports (for admin management)
+        await FirebaseFirestore.instance.collection('shared_reports').add({
+          ...sharedData,
+          'feedDocId': ref.id,
         });
 
+        // Update the report document
         await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
           'feedDocId': ref.id,
           'isSharedToCommunity': true,
@@ -329,11 +378,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
         setState(() { _isShared = true; _feedDocId = ref.id; });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تمت المشاركة مع المجتمع!', textDirection: TextDirection.rtl), backgroundColor: _green600));
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ تمت المشاركة مع المجتمع!', textDirection: TextDirection.rtl),
+                  backgroundColor: _green600));
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _sharingLoading = false);
     }
@@ -341,7 +393,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
   Future<void> _exportPDF() async {
     try {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري حفظ التقرير...', textDirection: TextDirection.rtl), duration: Duration(seconds: 2)));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('جاري حفظ التقرير...', textDirection: TextDirection.rtl),
+              duration: Duration(seconds: 2)));
       final pdf = pw.Document();
       final fontData = await rootBundle.load("assets/fonts/Amiri-Regular.ttf");
       final arabicFont = pw.Font.ttf(fontData);
@@ -352,28 +406,62 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         if (resp.statusCode == 200) reportImage = pw.MemoryImage(resp.bodyBytes);
       }
 
+      // Values are already stored with the minimum-25 rule applied at save time
+      final int plantNameConf  = ((widget.report['plantNameConfidence'] ?? widget.report['confidence'] ?? 0) as num).toInt();
+      final int diseaseConf    = ((widget.report['diseaseConfidence']   ?? widget.report['confidence'] ?? 0) as num).toInt();
+      final String plantLabelPdf   = (widget.report['plantNetLabel']     ?? '').toString();
+      final String diseaseLabelPdf = (widget.report['modelDiseaseLabel'] ?? '').toString();
+      final bool isHealthyPdf = widget.report['status'] == 'سليم';
+      final String diseaseSublabel = diseaseLabelPdf.isNotEmpty
+          ? (isHealthyPdf ? 'النبات سليم' : 'تم رصد علامات مرضية: $diseaseLabelPdf')
+          : '—';
+
       pdf.addPage(pw.Page(
         theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFont),
-        build: (ctx) => pw.Directionality(textDirection: pw.TextDirection.rtl, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Center(child: pw.Text('تقرير تشخيص BioShield', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
-          pw.Divider(),
-          if (reportImage != null) pw.Center(child: pw.Container(height: 200, width: 300, child: pw.Image(reportImage, fit: pw.BoxFit.cover))),
-          _pdfResultRow('اسم النبات:', widget.report['plantName']),
-          _pdfResultRow('الحالة الصحية:', widget.report['status']),
-          _pdfResultRow('تاريخ الفحص:', widget.report['date']),
-          _pdfResultRow('دقة التشخيص:', '${widget.report['confidence']}%'),
-          pw.SizedBox(height: 15),
-          pw.Text('التشخيص الملحوظ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(widget.report['disease'], style: const pw.TextStyle(fontSize: 12)),
-          pw.SizedBox(height: 10),
-          pw.Text('التفاصيل والمعلومات:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(widget.report['details'], style: const pw.TextStyle(fontSize: 12)),
-          pw.SizedBox(height: 10),
-          pw.Text('العلاج الموصى به:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(widget.report['treatment'], style: const pw.TextStyle(fontSize: 12)),
-          pw.Spacer(),
-          pw.Center(child: pw.Text('تم إنشاء هذا التقرير بواسطة تطبيق BioShield', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey))),
-        ])),
+        build: (ctx) => pw.Directionality(
+          textDirection: pw.TextDirection.rtl,
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Center(child: pw.Text('تقرير تشخيص BioShield',
+                style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold))),
+            pw.Divider(),
+            if (reportImage != null)
+              pw.Center(child: pw.Container(height: 200, width: 300,
+                  child: pw.Image(reportImage, fit: pw.BoxFit.cover))),
+            _pdfRow('اسم النبات:', widget.report['plantName']),
+            _pdfRow('الحالة الصحية:', widget.report['status']),
+            _pdfRow('تاريخ الفحص:', widget.report['date']),
+            pw.SizedBox(height: 10),
+            // ─── Plant name confidence block ───────────────────
+            _pdfConfidenceBlock(
+              arabicFont: arabicFont,
+              label: 'دقة تحديد الاسم العلمي للنبات:',
+              percent: plantNameConf,
+              sublabel: plantLabelPdf.isNotEmpty ? plantLabelPdf : '—',
+              barColor: PdfColors.green700,
+            ),
+            pw.SizedBox(height: 10),
+            // ─── Disease confidence block ──────────────────────
+            _pdfConfidenceBlock(
+              arabicFont: arabicFont,
+              label: 'دقة تشخيص المرض:',
+              percent: diseaseConf,
+              sublabel: diseaseSublabel,
+              barColor: isHealthyPdf ? PdfColors.green700 : PdfColors.red700,
+            ),
+            pw.SizedBox(height: 15),
+            pw.Text('التشخيص الملحوظ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(widget.report['disease'], style: const pw.TextStyle(fontSize: 12)),
+            pw.SizedBox(height: 10),
+            pw.Text('التفاصيل والمعلومات:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(widget.report['details'], style: const pw.TextStyle(fontSize: 12)),
+            pw.SizedBox(height: 10),
+            pw.Text('العلاج الموصى به:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(widget.report['treatment'], style: const pw.TextStyle(fontSize: 12)),
+            pw.Spacer(),
+            pw.Center(child: pw.Text('تم إنشاء هذا التقرير بواسطة تطبيق BioShield',
+                style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey))),
+          ]),
+        ),
       ));
 
       final output = await getTemporaryDirectory();
@@ -381,15 +469,73 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       await file.writeAsBytes(await pdf.save());
       await Share.shareXFiles([XFile(file.path)], text: 'تقرير BioShield');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ فشل تصدير الملف'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ فشل تصدير الملف'), backgroundColor: Colors.red));
     }
   }
 
-  pw.Widget _pdfResultRow(String label, String value) => pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4), child: pw.Row(children: [pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)), pw.SizedBox(width: 5), pw.Text(value, style: const pw.TextStyle(fontSize: 12))]));
+  pw.Widget _pdfRow(String label, String value) =>
+      pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4),
+          child: pw.Row(children: [
+            pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+            pw.SizedBox(width: 5),
+            pw.Text(value, style: const pw.TextStyle(fontSize: 12)),
+          ]));
+
+  // ── PDF confidence bar block (label + bar + sublabel) ─────────
+  pw.Widget _pdfConfidenceBlock({
+    required pw.Font arabicFont,
+    required String label,
+    required int percent,
+    required String sublabel,
+    required PdfColor barColor,
+  }) {
+    final fraction = (percent / 100).clamp(0.0, 1.0);
+    // A4 usable width ≈ 515 pt (595 − 40 margins each side)
+    const double totalWidth = 515.0;
+    final double filledWidth = totalWidth * fraction;
+
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      // Header row: label + percent
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(label, style: pw.TextStyle(font: arabicFont, fontSize: 11, color: PdfColors.grey700)),
+        pw.Text('$percent%', style: pw.TextStyle(font: arabicFont, fontSize: 11,
+            fontWeight: pw.FontWeight.bold, color: barColor)),
+      ]),
+      pw.SizedBox(height: 4),
+      // Progress bar — track
+      pw.Stack(children: [
+        pw.Container(
+          height: 8,
+          width: totalWidth,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.grey300,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+        ),
+        // Filled portion — only render when non-zero to avoid zero-width artefact
+        if (filledWidth > 0)
+          pw.Container(
+            height: 8,
+            width: filledWidth,
+            decoration: pw.BoxDecoration(
+              color: barColor,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+          ),
+      ]),
+      pw.SizedBox(height: 3),
+      // Sublabel
+      pw.Text(sublabel, style: pw.TextStyle(font: arabicFont, fontSize: 10,
+          fontStyle: pw.FontStyle.italic, color: barColor)),
+    ]);
+  }
 
   Future<void> _deleteReport() async {
     if (_isShared) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن حذف التقرير المشارك', textDirection: TextDirection.rtl), backgroundColor: _darkBg));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا يمكن حذف التقرير المشارك', textDirection: TextDirection.rtl),
+              backgroundColor: _darkBg));
       return;
     }
     final confirm = await showDialog<bool>(
@@ -401,7 +547,10 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           content: const Text('هل أنت متأكد من الحذف؟'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('حذف', style: TextStyle(color: Colors.white))),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('حذف', style: TextStyle(color: Colors.white))),
           ],
         ),
       ),
@@ -409,15 +558,27 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     if (confirm == true) {
       try {
         await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).delete();
-        if (mounted) { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ تم الحذف', textDirection: TextDirection.rtl), backgroundColor: _darkBg)); }
-      } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl))); }
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('🗑️ تم الحذف', textDirection: TextDirection.rtl),
+                  backgroundColor: _darkBg));
+        }
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl)));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = widget.report['imageUrl'] ?? '';
-    final double confidence = (widget.report['confidence'] as num).toDouble();
+    final imageUrl            = widget.report['imageUrl'] ?? '';
+    final double confidence   = (widget.report['confidence'] as num).toDouble();
+    final int plantNameConf   = (widget.report['plantNameConfidence'] as num?)?.toInt() ?? confidence.toInt();
+    final int diseaseConf     = (widget.report['diseaseConfidence'] as num?)?.toInt() ?? confidence.toInt();
+    final String plantLabel   = (widget.report['plantNetLabel'] ?? '').toString();
+    final String diseaseLabel = (widget.report['modelDiseaseLabel'] ?? '').toString();
 
     return Scaffold(
       backgroundColor: _green50,
@@ -425,24 +586,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
-        automaticallyImplyLeading: false, // Disables the standard left button
-        title: const Text(
-          'تفاصيل التقرير',
-          style: TextStyle(
-            color: _green900,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
+        automaticallyImplyLeading: false,
+        title: const Text('تفاصيل التقرير',
+            style: TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
-          // 1. Wrapping the IconButton in a Transform.rotate widget
           Transform.rotate(
-            // 2. Rotating by pi (180 degrees) so it points to the right
-            angle: 3.14159, // Standard 'pi' constant value
+            angle: 3.14159,
             child: IconButton(
-              // 3. Using the standard ios back icon
               icon: const Icon(Icons.arrow_back_ios_new),
-              // 4. Making the color black
               color: Colors.black,
               onPressed: () => Navigator.pop(context),
             ),
@@ -454,45 +605,59 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (imageUrl.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(imageUrl, height: 180, fit: BoxFit.cover)),
+            if (imageUrl.isNotEmpty)
+              ClipRRect(borderRadius: BorderRadius.circular(16),
+                  child: Image.network(imageUrl, height: 180, fit: BoxFit.cover)),
             const SizedBox(height: 12),
+
+            // ── Status card ──
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)]),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18),
+                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)]),
               child: Column(children: [
                 Icon(_isHealthy ? Icons.check_circle : Icons.error, color: _sc, size: 60),
                 const SizedBox(height: 12),
-                Text(widget.report['plantName'], style: const TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 20)),
+                Text(widget.report['plantName'],
+                    style: const TextStyle(color: _green900, fontWeight: FontWeight.bold, fontSize: 20)),
                 const SizedBox(height: 6),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), decoration: BoxDecoration(color: _sb, borderRadius: BorderRadius.circular(20)), child: Text(widget.report['status'], style: TextStyle(color: _sc, fontWeight: FontWeight.bold))),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(color: _sb, borderRadius: BorderRadius.circular(20)),
+                    child: Text(widget.report['status'], style: TextStyle(color: _sc, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 16),
+
+                // ─── Two confidence bars ──────────────────────
+                _ConfidenceRow(
+                  label: '🌿 دقة تحديد اسم النبات',
+                  value: plantNameConf,
+                  color: _green600,
+                  sublabel: plantLabel.isNotEmpty ? plantLabel : '—',
+                ),
+                const SizedBox(height: 10),
+                _ConfidenceRow(
+                  label: '🧬 دقة تشخيص المرض',
+                  value: diseaseConf,
+                  color: _isHealthy ? _green600 : const Color(0xFFDC2626),
+                  sublabel: diseaseLabel.isNotEmpty
+                      ? (_isHealthy ? 'النبات سليم' : 'تم رصد علامات مرضية: $diseaseLabel')
+                      : '—',
+                ),
+                // ─────────────────────────────────────────────
+
                 const SizedBox(height: 12),
-                Column(children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('دقة التشخيص', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    Text('${confidence.toInt()}%', style: TextStyle(color: _sc, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ]),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(value: confidence / 100, backgroundColor: _sc.withOpacity(0.1), color: _sc, minHeight: 8),
-                  ),
-                ]),
-                const SizedBox(height: 12),
-                Text('📅 ${widget.report['date']}', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                Text('📅 ${widget.report['date']}',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
               ]),
             ),
             const SizedBox(height: 12),
-            // التشخيص بألوان متناسقة
+
             _InfoCard(
               title: _isHealthy ? 'الحالة الصحية' : 'التشخيص',
               icon: _isHealthy ? Icons.check_circle_outline : Icons.biotech,
-              titleColor: _sc,
-              backgroundColor: _sb,
-              borderColor: _sc.withOpacity(0.3),
+              titleColor: _sc, backgroundColor: _sb, borderColor: _sc.withOpacity(0.3),
               child: Text(widget.report['disease']),
             ),
             const SizedBox(height: 12),
-            // التفاصيل بألوان متناسقة (أزرق)
             if (widget.report['details'].toString().isNotEmpty)
               _InfoCard(
                 title: 'التفاصيل والمعلومات',
@@ -503,7 +668,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 child: Text(widget.report['details']),
               ),
             const SizedBox(height: 12),
-            // العلاج بألوان متناسقة (برتقالي/أصفر)
             _InfoCard(
               title: _isHealthy ? 'نصائح العناية' : 'العلاج الموصى به',
               icon: _isHealthy ? Icons.eco_outlined : Icons.healing,
@@ -513,10 +677,20 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               child: Text(widget.report['treatment']),
             ),
             const SizedBox(height: 24),
+
             Row(children: [
               Expanded(child: _ActionBtn(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.blue, onTap: _exportPDF)),
               const SizedBox(width: 10),
-              Expanded(child: _sharingLoading ? const Center(child: CircularProgressIndicator()) : _ActionBtn(icon: _isShared ? Icons.cancel : Icons.share, label: _isShared ? 'إلغاء المشاركة' : 'مشاركة', color: _isShared ? Colors.orange : _green600, onTap: _shareToggle)),
+              Expanded(
+                child: _sharingLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _ActionBtn(
+                  icon: _isShared ? Icons.cancel : Icons.share,
+                  label: _isShared ? 'إلغاء المشاركة' : 'مشاركة',
+                  color: _isShared ? Colors.orange : _green600,
+                  onTap: _shareToggle,
+                ),
+              ),
             ]),
             const SizedBox(height: 10),
             _ActionBtn(icon: Icons.delete_forever, label: 'حذف التقرير', color: Colors.red, onTap: _deleteReport),
@@ -528,6 +702,53 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 }
 
+// ─── Reusable confidence bar with sublabel ────────────────────
+class _ConfidenceRow extends StatelessWidget {
+  final String label;
+  final String sublabel;
+  final int value;
+  final Color color;
+  const _ConfidenceRow({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.sublabel = '',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Text('$value%', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+      ]),
+      const SizedBox(height: 6),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: LinearProgressIndicator(
+          value: (value / 100).clamp(0.0, 1.0),
+          backgroundColor: color.withOpacity(0.1),
+          color: color,
+          minHeight: 8,
+        ),
+      ),
+      if (sublabel.isNotEmpty) ...[
+        const SizedBox(height: 5),
+        Text(
+          sublabel,
+          style: TextStyle(
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+            color: color.withOpacity(0.8),
+          ),
+        ),
+      ],
+    ]);
+  }
+}
+
+
+// ─── Shared helpers ───────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final String value, label;
   final Color color, bgColor;
@@ -536,7 +757,8 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.2))),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.2))),
       child: Column(children: [
         Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
@@ -550,40 +772,27 @@ class _InfoCard extends StatelessWidget {
   final String title;
   final Widget child;
   final IconData icon;
-  final Color titleColor;
-  final Color backgroundColor;
-  final Color borderColor;
-
-  const _InfoCard({
-    required this.title,
-    required this.child,
-    required this.icon,
-    required this.titleColor,
-    required this.backgroundColor,
-    required this.borderColor,
-  });
+  final Color titleColor, backgroundColor, borderColor;
+  const _InfoCard({required this.title, required this.child, required this.icon,
+    required this.titleColor, required this.backgroundColor, required this.borderColor});
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: borderColor),
-    ),
+    decoration: BoxDecoration(color: backgroundColor, borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor)),
     margin: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Icon(icon, color: titleColor, size: 18),
         const SizedBox(width: 6),
-        Text(title, style: TextStyle(color: titleColor, fontSize: 13, fontWeight: FontWeight.bold))
+        Text(title, style: TextStyle(color: titleColor, fontSize: 13, fontWeight: FontWeight.bold)),
       ]),
       const SizedBox(height: 10),
       DefaultTextStyle(
-        style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.6),
-        child: child,
-      ),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.6),
+          child: child),
     ]),
   );
 }
@@ -595,8 +804,14 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      height: 52, decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.4))),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: color, size: 20), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
+      height: 52,
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.4))),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      ]),
     ),
   );
 }

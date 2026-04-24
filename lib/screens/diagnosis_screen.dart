@@ -21,7 +21,16 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
   File? _imageFile;
   bool _isAnalyzing = false;
   DiagnosisStep? _currentStep;
+  int? _selectedCategoryIndex;
   final ImagePicker _picker = ImagePicker();
+
+  // ─── Plant Categories ───────────────────────────────────────
+  final List<Map<String, String>> _categories = [
+    {'label': 'خضار\nوفواكه', 'emoji': '🥦'},
+    {'label': 'سعف\nالنخل',   'emoji': '🌴'},
+    {'label': 'ورق\nالنعناع', 'emoji': '🌿'},
+    {'label': 'أخرى',         'emoji': '🔍'},
+  ];
 
   Future<bool> _onWillPop() async {
     final shouldExit = await showDialog<bool>(
@@ -116,9 +125,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
       final result = await DiagnosisService.instance.analyze(
         imageFile: _imageFile!,
         onProgress: (step) {
-          if (mounted) {
-            setState(() => _currentStep = step);
-          }
+          if (mounted) setState(() => _currentStep = step);
         },
       );
 
@@ -164,24 +171,28 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // ─── Category Buttons Row ───────────────────────────
+                SizedBox(
+                  height: 80,
+                  child: _CategoryRow(
+                    categories: _categories,
+                    selectedIndex: _selectedCategoryIndex,
+                    onSelected: (index) {
+                      setState(() => _selectedCategoryIndex = index);
+                      // immediately launch camera when category is tapped
+                      _pickImage(ImageSource.camera);
+                    },
+                  ).animate().fadeIn(duration: 350.ms),
+                ),
+
+                const SizedBox(height: 12),
+
                 Expanded(
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'تشخيص النبات',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.darkGreen,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           Expanded(
                             child: _imageFile == null
                                 ? _buildPlaceholder()
@@ -206,11 +217,15 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                                   child: SizedBox(
                                     height: 54,
                                     child: OutlinedButton.icon(
-                                      onPressed: () => _pickImage(ImageSource.gallery),
-                                      icon: const Icon(Icons.photo_library_rounded, size: 20),
+                                      onPressed: () =>
+                                          _pickImage(ImageSource.gallery),
+                                      icon: const Icon(
+                                          Icons.photo_library_rounded,
+                                          size: 20),
                                       label: const Text(
                                         'المعرض',
-                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
                                       style: OutlinedButton.styleFrom(
                                         side: const BorderSide(
@@ -218,7 +233,8 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                                           width: 1.5,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                          BorderRadius.circular(12),
                                         ),
                                         foregroundColor: AppTheme.primaryGreen,
                                         backgroundColor: Colors.transparent,
@@ -237,11 +253,14 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                                     child: OutlinedButton.icon(
                                       onPressed: _isAnalyzing
                                           ? null
-                                          : () => setState(() => _imageFile = null),
-                                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                                          : () => setState(
+                                              () => _imageFile = null),
+                                      icon: const Icon(Icons.refresh_rounded,
+                                          size: 20),
                                       label: const Text(
                                         'إعادة التقاط',
-                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
                                       style: OutlinedButton.styleFrom(
                                         side: const BorderSide(
@@ -249,7 +268,8 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                                           width: 1.5,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                          BorderRadius.circular(12),
                                         ),
                                         foregroundColor: AppTheme.primaryGreen,
                                       ),
@@ -257,40 +277,44 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // --- Clean, sun-kissed Marigold Analysis Button ---
-                                // --- Clean, fresh Yellow Analysis Button ---
                                 Expanded(
                                   child: SizedBox(
                                     height: 54,
                                     child: ElevatedButton.icon(
-                                      onPressed: _isAnalyzing ? null : _analyzeImage,
+                                      onPressed: _isAnalyzing
+                                          ? null
+                                          : _analyzeImage,
                                       icon: _isAnalyzing
                                           ? const SizedBox(
                                         width: 20,
                                         height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Color(0xFFF59E0B), // Standard Vibrant Amber (like Marigold)
+                                          color: Color(0xFFF59E0B),
                                         ),
                                       )
-                                          : const Icon(Icons.search_rounded, size: 20),
+                                          : const Icon(Icons.search_rounded,
+                                          size: 20),
                                       label: Text(
-                                        _isAnalyzing ? 'جاري التحليل...' : 'تحليل الصورة',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        _isAnalyzing
+                                            ? 'جاري التحليل...'
+                                            : 'تحليل الصورة',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
                                       style: ElevatedButton.styleFrom(
-                                        // Very light golden tint (almost cream)
-                                        backgroundColor: const Color(0xFFFFFBEB),
-                                        // Clear, bright yellow/amber (no orange tint)
-                                        foregroundColor: const Color(0xFFF59E0B),
+                                        backgroundColor:
+                                        const Color(0xFFFFFBEB),
+                                        foregroundColor:
+                                        const Color(0xFFF59E0B),
                                         elevation: 0,
-                                        // Border matches the text for a sharp look, subtly transparent
                                         side: const BorderSide(
                                           color: Color(0xFFF59E0B),
                                           width: 1.5,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                          BorderRadius.circular(12),
                                         ),
                                       ),
                                     ),
@@ -302,16 +326,11 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                         ],
                       ),
                     ),
-                  ).animate().fadeIn(
-                    duration: 400.ms,
-                    delay: 100.ms,
-                  ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
                 ),
+
                 const SizedBox(height: 16),
-                _TipsCard().animate().fadeIn(
-                  duration: 400.ms,
-                  delay: 200.ms,
-                ),
+                _TipsCard().animate().fadeIn(duration: 400.ms, delay: 200.ms),
               ],
             ),
           ),
@@ -364,10 +383,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
             const SizedBox(height: 6),
             const Text(
               'أو استخدم الكاميرا لالتقاط صورة جديدة',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.grey,
-              ),
+              style: TextStyle(fontSize: 12, color: AppTheme.grey),
             ),
           ],
         ),
@@ -398,9 +414,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
+                      color: Colors.white, strokeWidth: 3),
                   const SizedBox(height: 12),
                   Text(
                     _currentStep?.labelAr ?? 'جاري التحليل...',
@@ -419,6 +433,83 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
   }
 }
 
+// ─── Category Buttons Row ─────────────────────────────────────
+class _CategoryRow extends StatelessWidget {
+  final List<Map<String, String>> categories;
+  final int? selectedIndex;
+  final void Function(int index) onSelected;
+
+  const _CategoryRow({
+    required this.categories,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(categories.length, (i) {
+        final isSelected = selectedIndex == i;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onSelected(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.primaryGreen.withOpacity(0.12)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? AppTheme.primaryGreen
+                      : AppTheme.primaryGreen.withOpacity(0.25),
+                  width: isSelected ? 2 : 1.2,
+                ),
+                boxShadow: isSelected
+                    ? [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+                    : [],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    categories[i]['emoji']!,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    categories[i]['label']!.replaceAll('\n', ' '),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppTheme.darkGreen
+                          : AppTheme.primaryGreen,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ─── Tips Card ────────────────────────────────────────────────
 class _TipsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -427,9 +518,7 @@ class _TipsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.lightBlue,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.blue.withOpacity(0.2),
-        ),
+        border: Border.all(color: AppTheme.blue.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +544,6 @@ class _TipsCard extends StatelessWidget {
 
 class _Tip extends StatelessWidget {
   final String text;
-
   const _Tip(this.text);
 
   @override
@@ -468,17 +556,13 @@ class _Tip extends StatelessWidget {
           const Text(
             '• ',
             style: TextStyle(
-              color: AppTheme.blue,
-              fontWeight: FontWeight.bold,
-            ),
+                color: AppTheme.blue, fontWeight: FontWeight.bold),
           ),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF1D4ED8),
-              ),
+                  fontSize: 12, color: Color(0xFF1D4ED8)),
             ),
           ),
         ],

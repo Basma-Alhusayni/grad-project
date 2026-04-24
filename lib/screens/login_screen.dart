@@ -137,7 +137,7 @@ class LoginScreen extends StatelessWidget {
                                 size: 24),
                           ),
                           const SizedBox(width: 12),
-                          const Text('دخول الإدارة',
+                          const Text('إدارة',
                               style: TextStyle(
                                   color: Color(0xFF15803D),
                                   fontWeight: FontWeight.w600,

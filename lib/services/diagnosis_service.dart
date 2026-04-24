@@ -80,13 +80,16 @@ class DiagnosisService {
           openAIPlantResult['confidence']?.toString() ?? '0') ?? 0.0;
     }
 
-    final String finalPlantName   = openAIPlantConf >= plantNetConf
+    final String finalPlantName = openAIPlantConf >= plantNetConf
         ? plantNameOpenAI : plantNamePlantNet;
-    final String finalPlantNameAr = openAIPlantConf >= plantNetConf
-        ? plantNameArOpenAI : _translateToArabic(plantNamePlantNet);
+
+    // ── Always use OpenAI's Arabic name for display ───────────────────────────
+    final String finalPlantNameAr = plantNameArOpenAI.isNotEmpty && plantNameArOpenAI != 'نبات'
+        ? plantNameArOpenAI
+        : _translateToArabic(plantNamePlantNet);
 
     debugPrint('🌿 PlantNet: $plantNamePlantNet (${plantNetConf.toStringAsFixed(1)}%)');
-    debugPrint('🌿 OpenAI:   $plantNameOpenAI (${openAIPlantConf.toStringAsFixed(1)}%)');
+    debugPrint('🌿 OpenAI:   $plantNameOpenAI / $plantNameArOpenAI (${openAIPlantConf.toStringAsFixed(1)}%)');
 
     // ── Check if plant is outside supported categories ────────────────────────
     final category = openAIPlantResult['category'] as String? ?? 'other';
@@ -190,7 +193,6 @@ class DiagnosisService {
       openAIDetails   = _stripBrackets(openAIVision['details']   as String? ?? '');
       openAITreatment = _stripBrackets(openAIVision['treatment'] as String? ?? '');
 
-      // Sanity check: OpenAI says healthy but diagnosis text mentions disease
       const diseaseKeywords = [
         'مرض', 'إصابة', 'عفن', 'فطر', 'بكتيريا', 'فيروس', 'تلف', 'ضرر',
         'بقع', 'لفحة', 'اصفرار', 'ذبول', 'rot', 'blight', 'mold', 'spot',
@@ -290,7 +292,7 @@ class DiagnosisService {
       case 'palm':       return PlantType.palm;
       case 'mint':       return PlantType.mint;
       case 'vegetables': return PlantType.vegetablesFruits;
-      default:           return PlantType.vegetablesFruits; // safe fallback
+      default:           return PlantType.vegetablesFruits;
     }
   }
 

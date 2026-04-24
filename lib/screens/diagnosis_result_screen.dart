@@ -66,17 +66,15 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'لم نتمكن من الحصول على نتائج دقيقة\nماذا تريد أن تفعل؟', // إضافة سطر جديد هنا
+                  'لم نتمكن من الحصول على نتائج دقيقة\nماذا تريد أن تفعل؟',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.black, // نص أسود
-                    fontSize: 16,       // حجم أكبر
-                    height: 1.5,        // مسافة بين الأسطر
+                    color: Colors.black,
+                    fontSize: 16,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // زر التواصل مع خبير (الأخضر)
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -100,8 +98,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // زر حاول مرة أخرى (أبيض)
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -113,9 +109,9 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                     icon: const Icon(Icons.refresh_rounded, color: Colors.grey),
                     label: const Text('حاول مرة أخرى', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white, // خلفية بيضاء
+                      backgroundColor: Colors.white,
                       foregroundColor: Colors.black87,
-                      side: BorderSide(color: Colors.grey.shade300, width: 1.2), // إطار خفيف
+                      side: BorderSide(color: Colors.grey.shade300, width: 1.2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -148,41 +144,52 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // Fetch user's full name to store alongside the report
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
+
       final remoteUrl = await _uploadImage();
       if (remoteUrl == null) throw Exception("فشل رفع الصورة للسحابة");
 
-      // الحقول التي سيتم حفظها في مجموعة reports
+      // Apply the same minimum-25 display rule before saving.
+      // Use round() to match toStringAsFixed(0) which rounds, not truncates.
+      int display(double raw) => (raw > 0 && raw < 25) ? 25 : raw.round();
+
       await FirebaseFirestore.instance.collection('reports').add({
         'userId': user.uid,
-        'plantName': widget.result.plantNameAr,      // اسم النبات
-        'diagnosis': widget.result.diagnosis,        // التشخيص
-        'details': widget.result.details,            // التفاصيل والمعلومات (تمت إضافتها هنا)
+        'userName': userName,
+        'plantName': widget.result.plantNameAr,
+        'diagnosis': widget.result.diagnosis,
+        'details': widget.result.details,
         'status': widget.result.status == DiagnosisStatus.healthy ? 'سليم' : 'مريض',
-        'confidence': widget.result.confidence.toInt(),
-        'treatment': widget.result.treatment,        // العلاج الموصى به
+        'confidence': widget.result.confidence.round(),
+        'plantNameConfidence': display(widget.result.plantNetConfidence),
+        'diseaseConfidence':   display(widget.result.modelDiseaseConfidence),
+        'plantNetLabel':       widget.result.plantNetLabel,
+        'modelDiseaseLabel':   widget.result.modelDiseaseLabel,
+        'treatment': widget.result.treatment,
         'imageUrl': remoteUrl,
         'date': DateTime.now().toString().split(' ')[0],
         'createdAt': FieldValue.serverTimestamp(),
         'isHealthy': widget.result.status == DiagnosisStatus.healthy,
         'plantType': widget.result.plantNetLabel,
         'isSharedToCommunity': false,
+        'feedDocId': '',
       });
 
       if (!mounted) return;
 
-      setState(() {
-        _isAlreadySaved = true;
-      });
+      setState(() { _isAlreadySaved = true; });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('✅ تم حفظ التقرير في ملفك الشخصي', textDirection: TextDirection.rtl),
-            backgroundColor: Color(0xFF16A34A)
+          content: Text('✅ تم حفظ التقرير في ملفك الشخصي', textDirection: TextDirection.rtl),
+          backgroundColor: Color(0xFF16A34A),
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ خطأ في الحفظ: $e', textDirection: TextDirection.rtl))
+        SnackBar(content: Text('❌ خطأ في الحفظ: $e', textDirection: TextDirection.rtl)),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -200,6 +207,32 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       if (await imageFile.exists()) {
         profileImage = pw.MemoryImage(imageFile.readAsBytesSync());
       }
+
+      final bool isHealthy = widget.result.status == DiagnosisStatus.healthy;
+
+      // Use round() to match toStringAsFixed(0) rounding shown on screen
+      int display(double raw) => (raw > 0 && raw < 25) ? 25 : raw.round();
+
+      final int plantConf   = display(widget.result.plantNetConfidence);
+      final int diseaseConf = display(widget.result.modelDiseaseConfidence);
+      final String plantLbl   = widget.result.plantNetLabel;
+      final String diseaseLbl = widget.result.modelDiseaseLabel;
+
+      // Mirror the same isDiseased logic used in _StatusHeader
+      bool isDiseased(String label) {
+        final l = label.toLowerCase();
+        return l.isNotEmpty &&
+            !l.contains('healthy') &&
+            !l.contains('fresh') &&
+            !l.contains('سليم') &&
+            !l.contains('طازج');
+      }
+
+      final String diseaseSublabel = diseaseLbl.isNotEmpty
+          ? (isDiseased(diseaseLbl)
+          ? 'تم رصد علامات مرضية: $diseaseLbl'
+          : 'النبات سليم')
+          : '—';
 
       pdf.addPage(
         pw.Page(
@@ -231,19 +264,40 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                     ),
                   pw.SizedBox(height: 20),
                   _pdfResultRow('اسم النبات:', widget.result.plantNameAr),
-                  _pdfResultRow('الحالة الصحية:', widget.result.status == DiagnosisStatus.healthy ? "سليم" : "مريض"),
-                  _pdfResultRow('دقة التشخيص:', '${widget.result.confidence.toInt()}%'),
-                  pw.SizedBox(height: 15),
-                  pw.Text('التشخيص الملحوظ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 5),
-                    child: pw.Text(widget.result.diagnosis, style: const pw.TextStyle(fontSize: 12)),
+                  _pdfResultRow('الحالة الصحية:', isHealthy ? 'سليم' : 'مريض'),
+                  pw.SizedBox(height: 12),
+                  // ─── Plant name confidence bar ─────────────────
+                  _pdfConfidenceBlock(
+                    arabicFont: arabicFont,
+                    label: 'دقة تحديد الاسم العلمي للنبات:',
+                    percent: plantConf,
+                    sublabel: plantLbl.isNotEmpty ? plantLbl : '—',
+                    barColor: PdfColors.green700,
+                  ),
+                  pw.SizedBox(height: 10),
+                  // ─── Disease confidence bar ────────────────────
+                  _pdfConfidenceBlock(
+                    arabicFont: arabicFont,
+                    label: 'دقة تشخيص المرض:',
+                    percent: diseaseConf,
+                    sublabel: diseaseSublabel,
+                    barColor: isDiseased(diseaseLbl) ? PdfColors.red700 : PdfColors.green700,
                   ),
                   pw.SizedBox(height: 15),
-                  pw.Text('العلاج الموصى به:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text('التشخيص الملحوظ:',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(top: 5),
-                    child: pw.Text(widget.result.treatment, style: const pw.TextStyle(fontSize: 12)),
+                    child: pw.Text(widget.result.diagnosis,
+                        style: const pw.TextStyle(fontSize: 12)),
+                  ),
+                  pw.SizedBox(height: 15),
+                  pw.Text('العلاج الموصى به:',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 5),
+                    child: pw.Text(widget.result.treatment,
+                        style: const pw.TextStyle(fontSize: 12)),
                   ),
                   pw.Spacer(),
                   pw.Divider(thickness: 0.5),
@@ -262,7 +316,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       final file = File("${output.path}/bioshield_report.pdf");
       await file.writeAsBytes(await pdf.save());
       await Share.shareXFiles([XFile(file.path)], text: 'تقرير BioShield');
-
     } catch (e) {
       debugPrint("PDF Error: $e");
     }
@@ -279,6 +332,57 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
         ],
       ),
     );
+  }
+
+  // ── PDF confidence bar: header + coloured bar + italic sublabel ─
+  pw.Widget _pdfConfidenceBlock({
+    required pw.Font arabicFont,
+    required String label,
+    required int percent,
+    required String sublabel,
+    required PdfColor barColor,
+  }) {
+    final double fraction = (percent / 100).clamp(0.0, 1.0);
+    // A4 usable width ≈ 515 pt (595 − 40 pt margin each side)
+    const double totalWidth = 515.0;
+    final double filledWidth = totalWidth * fraction;
+
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      // Label row + percent
+      pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(label,
+            style: pw.TextStyle(font: arabicFont, fontSize: 11, color: PdfColors.grey700)),
+        pw.Text('$percent%',
+            style: pw.TextStyle(
+                font: arabicFont, fontSize: 11,
+                fontWeight: pw.FontWeight.bold, color: barColor)),
+      ]),
+      pw.SizedBox(height: 4),
+      // Track + filled bar
+      pw.Stack(children: [
+        pw.Container(
+          height: 8,
+          width: totalWidth,
+          decoration: pw.BoxDecoration(
+              color: PdfColors.grey300,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4))),
+        ),
+        if (filledWidth > 0)
+          pw.Container(
+            height: 8,
+            width: filledWidth,
+            decoration: pw.BoxDecoration(
+                color: barColor,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4))),
+          ),
+      ]),
+      pw.SizedBox(height: 3),
+      // Sublabel in italic
+      pw.Text(sublabel,
+          style: pw.TextStyle(
+              font: arabicFont, fontSize: 10,
+              fontStyle: pw.FontStyle.italic, color: barColor)),
+    ]);
   }
 
   Color get _statusColor {
@@ -299,7 +403,9 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
-  String get _statusIcon => widget.result.status == DiagnosisStatus.healthy ? '✅' : (widget.result.status == DiagnosisStatus.diseased ? '🔴' : '❌');
+  String get _statusIcon =>
+      widget.result.status == DiagnosisStatus.healthy ? '✅' :
+      widget.result.status == DiagnosisStatus.diseased ? '🔴' : '❌';
 
   String get _statusText {
     switch (widget.result.status) {
@@ -329,7 +435,8 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (widget.result.imagePath.isNotEmpty)
-                _FullWidthImage(imagePath: widget.result.imagePath).animate().fadeIn(duration: 400.ms),
+                _FullWidthImage(imagePath: widget.result.imagePath)
+                    .animate().fadeIn(duration: 400.ms),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -353,7 +460,13 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                     const SizedBox(height: 14),
                     _FullWidthInfoCard(
                       title: 'اسم النبات',
-                      content: widget.result.plantNameAr,
+                      content: widget.result.status == DiagnosisStatus.failed
+                          ? '—'
+                          : (widget.result.plantNameAr.isNotEmpty && widget.result.plantNameAr != 'نبات')
+                          ? widget.result.plantNameAr
+                          : (widget.result.plantName.isNotEmpty && widget.result.plantName != 'نبات')
+                          ? widget.result.plantName
+                          : '—',
                       backgroundColor: AppTheme.lightPurple,
                       borderColor: AppTheme.purple.withOpacity(0.3),
                       titleColor: AppTheme.purple,
@@ -361,33 +474,63 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                     ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
                     const SizedBox(height: 12),
                     _FullWidthInfoCard(
-                      title: widget.result.status == DiagnosisStatus.healthy ? 'الحالة الصحية' : 'التشخيص',
-                      content: widget.result.diagnosis,
-                      backgroundColor: widget.result.status == DiagnosisStatus.healthy ? AppTheme.bgGreen : AppTheme.lightRed,
+                      title: widget.result.status == DiagnosisStatus.healthy
+                          ? 'الحالة الصحية'
+                          : widget.result.status == DiagnosisStatus.failed
+                          ? 'نتيجة التشخيص'
+                          : 'التشخيص',
+                      content: widget.result.status == DiagnosisStatus.failed
+                          ? '—'
+                          : widget.result.diagnosis.isNotEmpty
+                          ? widget.result.diagnosis
+                          : '—',
+                      backgroundColor: widget.result.status == DiagnosisStatus.healthy
+                          ? AppTheme.bgGreen
+                          : widget.result.status == DiagnosisStatus.failed
+                          ? AppTheme.lightOrange
+                          : AppTheme.lightRed,
                       borderColor: _statusColor.withOpacity(0.3),
                       titleColor: _statusColor,
-                      icon: widget.result.status == DiagnosisStatus.healthy ? '💚' : '🔬',
+                      icon: widget.result.status == DiagnosisStatus.healthy
+                          ? '💚'
+                          : widget.result.status == DiagnosisStatus.failed
+                          ? '⚠️'
+                          : '🔬',
                     ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
                     const SizedBox(height: 12),
-                    if (widget.result.details.trim().isNotEmpty)
-                      _FullWidthInfoCard(
-                        title: 'التفاصيل والمعلومات',
-                        content: widget.result.details,
-                        backgroundColor: AppTheme.lightBlue,
-                        borderColor: AppTheme.blue.withOpacity(0.3),
-                        titleColor: AppTheme.blue,
-                        icon: 'ℹ️',
-                      ).animate().fadeIn(duration: 400.ms, delay: 280.ms),
+                    _FullWidthInfoCard(
+                      title: 'التفاصيل والمعلومات',
+                      content: widget.result.status == DiagnosisStatus.failed
+                          ? '—'
+                          : widget.result.details.trim().isNotEmpty
+                          ? widget.result.details
+                          : '—',
+                      backgroundColor: AppTheme.lightBlue,
+                      borderColor: AppTheme.blue.withOpacity(0.3),
+                      titleColor: AppTheme.blue,
+                      icon: 'ℹ️',
+                    ).animate().fadeIn(duration: 400.ms, delay: 280.ms),
                     const SizedBox(height: 12),
-                    if (widget.result.treatment.trim().isNotEmpty)
-                      _FullWidthInfoCard(
-                        title: widget.result.status == DiagnosisStatus.healthy ? 'نصائح العناية' : 'العلاج الموصى به',
-                        content: widget.result.treatment,
-                        backgroundColor: const Color(0xFFFFFBEB),
-                        borderColor: AppTheme.orange.withOpacity(0.3),
-                        titleColor: AppTheme.orange,
-                        icon: widget.result.status == DiagnosisStatus.healthy ? '🌿' : '💊',
-                      ).animate().fadeIn(duration: 400.ms, delay: 320.ms),
+                    _FullWidthInfoCard(
+                      title: widget.result.status == DiagnosisStatus.healthy
+                          ? 'نصائح العناية'
+                          : widget.result.status == DiagnosisStatus.failed
+                          ? 'التوصيات'
+                          : 'العلاج الموصى به',
+                      content: widget.result.status == DiagnosisStatus.failed
+                          ? '—'
+                          : widget.result.treatment.trim().isNotEmpty
+                          ? widget.result.treatment
+                          : '—',
+                      backgroundColor: const Color(0xFFFFFBEB),
+                      borderColor: AppTheme.orange.withOpacity(0.3),
+                      titleColor: AppTheme.orange,
+                      icon: widget.result.status == DiagnosisStatus.healthy
+                          ? '🌿'
+                          : widget.result.status == DiagnosisStatus.failed
+                          ? '💡'
+                          : '💊',
+                    ).animate().fadeIn(duration: 400.ms, delay: 320.ms),
                     const SizedBox(height: 24),
                     _isSaving
                         ? const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)))
@@ -469,17 +612,27 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
   }
 }
 
-// ─── HELPER UI CLASSES ───────────────────────────────────────
+// ─── HELPER UI CLASSES ────────────────────────────────────────
 class _FullWidthImage extends StatelessWidget {
   final String imagePath;
   const _FullWidthImage({required this.imagePath});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxHeight: 280),
       color: Colors.black,
-      child: Image.file(File(imagePath), width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 200, color: AppTheme.bgGreen, child: const Center(child: Icon(Icons.broken_image_rounded, color: AppTheme.grey, size: 48)))),
+      child: Image.file(
+        File(imagePath),
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: 200,
+          color: AppTheme.bgGreen,
+          child: const Center(child: Icon(Icons.broken_image_rounded, color: AppTheme.grey, size: 48)),
+        ),
+      ),
     );
   }
 }
@@ -487,43 +640,231 @@ class _FullWidthImage extends StatelessWidget {
 class _FullWidthInfoCard extends StatelessWidget {
   final String title, content, icon;
   final Color backgroundColor, borderColor, titleColor;
-  const _FullWidthInfoCard({required this.title, required this.content, required this.backgroundColor, required this.borderColor, required this.titleColor, required this.icon});
+
+  const _FullWidthInfoCard({
+    required this.title,
+    required this.content,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.titleColor,
+    required this.icon,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(color: backgroundColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
       padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(icon, style: const TextStyle(fontSize: 16)), const SizedBox(width: 6), Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: titleColor))]), const SizedBox(height: 10), SizedBox(width: double.infinity, child: Text(content, style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.7), textAlign: TextAlign.start))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text(icon, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: titleColor)),
+          ]),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              content,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF374151), height: 1.7),
+              textAlign: TextAlign.start,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ─── Status Header with TFLite-only confidence bars ───────────
 class _StatusHeader extends StatelessWidget {
   final String statusText, statusIcon;
   final Color statusColor, statusBgColor;
-  final double confidence, plantNetConfidence, openAIPlantConfidence, modelDiseaseConfidence, openAIDiseaseConfidence;
+  final double confidence, plantNetConfidence, openAIPlantConfidence,
+      modelDiseaseConfidence, openAIDiseaseConfidence;
   final String plantNetLabel, openAIPlantLabel, modelDiseaseLabel, openAIDiseaseLabel;
-  const _StatusHeader({required this.statusText, required this.statusIcon, required this.statusColor, required this.statusBgColor, required this.confidence, required this.plantNetConfidence, required this.plantNetLabel, required this.openAIPlantConfidence, required this.openAIPlantLabel, required this.modelDiseaseConfidence, required this.modelDiseaseLabel, required this.openAIDiseaseConfidence, required this.openAIDiseaseLabel});
+
+  const _StatusHeader({
+    required this.statusText,
+    required this.statusIcon,
+    required this.statusColor,
+    required this.statusBgColor,
+    required this.confidence,
+    required this.plantNetConfidence,
+    required this.plantNetLabel,
+    required this.openAIPlantConfidence,
+    required this.openAIPlantLabel,
+    required this.modelDiseaseConfidence,
+    required this.modelDiseaseLabel,
+    required this.openAIDiseaseConfidence,
+    required this.openAIDiseaseLabel,
+  });
+
+  double _display(double raw) => (raw > 0 && raw < 25) ? 25.0 : raw;
+
+  bool get _tfliteIsDiseased {
+    final label = modelDiseaseLabel.toLowerCase();
+    if (label.isEmpty) return false;
+    return !label.contains('healthy') &&
+        !label.contains('fresh') &&
+        !label.contains('سليم') &&
+        !label.contains('طازج');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: statusBgColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withOpacity(0.2)), boxShadow: [BoxShadow(color: statusColor.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4))]), child: Column(children: [Text(statusIcon, style: const TextStyle(fontSize: 48)), const SizedBox(height: 8), Text('نتيجة التشخيص', style: TextStyle(fontSize: 13, color: statusColor.withOpacity(0.7))), Text(statusText, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: statusColor)), const SizedBox(height: 16), _SectionLabel(label: 'تحديد النوع', icon: '🌿'), const SizedBox(height: 8), Row(children: [Expanded(child: _ConfidenceItem(label: 'PlantNet', icon: '🌍', value: plantNetConfidence, sublabel: _shortLabel(plantNetLabel))), Container(width: 1, height: 56, color: statusColor.withOpacity(0.15)), Expanded(child: _ConfidenceItem(label: 'OpenAI', icon: '🤖', value: openAIPlantConfidence, sublabel: _shortLabel(openAIPlantLabel)))]), const SizedBox(height: 14), Divider(color: statusColor.withOpacity(0.15)), const SizedBox(height: 8), _SectionLabel(label: 'تشخيص المرض', icon: '🔬'), const SizedBox(height: 8), Row(children: [Expanded(child: _ConfidenceItem(label: 'النموذج', icon: '🧬', value: modelDiseaseConfidence, sublabel: _shortLabel(modelDiseaseLabel), isDisease: modelDiseaseConfidence >= 20 && !modelDiseaseLabel.toLowerCase().contains('healthy'))), Container(width: 1, height: 56, color: statusColor.withOpacity(0.15)), Expanded(child: _ConfidenceItem(label: 'OpenAI', icon: '🤖', value: openAIDiseaseConfidence, sublabel: _shortLabel(openAIDiseaseLabel), isDisease: statusColor == AppTheme.red && openAIDiseaseConfidence >= 20))])]));
+    final isFailed = statusColor == AppTheme.orange;
+    final plantDisplay    = isFailed ? 0.0 : _display(plantNetConfidence);
+    final diseaseDisplay  = isFailed ? 0.0 : _display(modelDiseaseConfidence);
+    final diseaseBarColor = _tfliteIsDiseased ? AppTheme.red : AppTheme.primaryGreen;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: statusBgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: statusColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(statusIcon, style: const TextStyle(fontSize: 48)),
+          const SizedBox(height: 8),
+          Text(
+            'نتيجة التشخيص',
+            style: TextStyle(fontSize: 13, color: statusColor.withOpacity(0.7)),
+          ),
+          Text(
+            statusText,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: statusColor,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _ConfidenceBar(
+            label: 'دقة تحديد الاسم العلمي للنبات',
+            icon: '🌿',
+            value: plantDisplay,
+            barColor: AppTheme.primaryGreen,
+            trackColor: statusColor.withOpacity(0.1),
+            sublabel: isFailed ? '—' : (plantNetLabel.isNotEmpty ? plantNetLabel : '—'),
+          ),
+          const SizedBox(height: 14),
+          Divider(color: statusColor.withOpacity(0.15)),
+          const SizedBox(height: 14),
+          _ConfidenceBar(
+            label: 'دقة تشخيص المرض',
+            icon: '🧬',
+            value: diseaseDisplay,
+            barColor: diseaseBarColor,
+            trackColor: statusColor.withOpacity(0.1),
+            sublabel: isFailed
+                ? '—'
+                : (_tfliteIsDiseased
+                ? 'تم رصد علامات مرضية: $modelDiseaseLabel'
+                : 'النبات سليم'),
+          ),
+        ],
+      ),
+    );
   }
-  String _shortLabel(String label) { if (label.isEmpty || label == '—') return '—'; String clean = label.replaceAll('___', ' — ').replaceAll('__', ' ').replaceAll('_', ' ').trim(); if (!clean.runes.any((r) => r >= 0x0600 && r <= 0x06FF)) clean = clean.replaceAll(RegExp(r'\s+[A-Z][a-z]*\..*$'), '').trim(); return clean.length > 24 ? '${clean.substring(0, 22)}..' : clean; }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String label, icon;
-  const _SectionLabel({required this.label, required this.icon});
-  @override
-  Widget build(BuildContext context) { return Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(icon, style: const TextStyle(fontSize: 13)), const SizedBox(width: 4), Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.grey))]); }
-}
-
-class _ConfidenceItem extends StatelessWidget {
+class _ConfidenceBar extends StatelessWidget {
   final String label, icon, sublabel;
   final double value;
-  final bool isDisease;
-  const _ConfidenceItem({required this.label, required this.value, required this.icon, required this.sublabel, this.isDisease = false});
+  final Color barColor, trackColor;
+
+  const _ConfidenceBar({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.barColor,
+    required this.trackColor,
+    required this.sublabel,
+  });
+
   @override
-  Widget build(BuildContext context) { return Column(children: [Text(icon, style: const TextStyle(fontSize: 18)), const SizedBox(height: 2), Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.grey)), Text('${value.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))), const SizedBox(height: 2), Text(sublabel, style: const TextStyle(fontSize: 9, color: Color(0xFF374151), fontStyle: FontStyle.italic, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)]); }
+  Widget build(BuildContext context) {
+    final fraction = (value / 100).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              value > 0 ? '${value.toStringAsFixed(0)}%' : '—',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: barColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              Container(
+                height: 10,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: trackColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: fraction,
+                child: Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: barColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          sublabel,
+          style: TextStyle(
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+            color: barColor.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
 }

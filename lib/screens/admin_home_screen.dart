@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
+import 'admin_shared_reports_screen.dart'; // ← NEW IMPORT
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -185,6 +186,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
           ],
         ),
+        // ── UPDATED BODY SWITCH ──────────────────────────────────
         body: _loading
             ? const Center(
             child: CircularProgressIndicator(color: Color(0xFF16A34A)))
@@ -196,7 +198,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ? _buildRequestsTab()
             : _currentIndex == 3
             ? _buildEditRequestsTab()
+            : _currentIndex == 4
+            ? const AdminSharedReportsScreen()   // ← NEW TAB
             : _buildProfileTab(),
+        // ── UPDATED BOTTOM NAV (6 items) ────────────────────────
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
@@ -205,15 +210,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           backgroundColor: Colors.white,
           elevation: 8,
           type: BottomNavigationBarType.fixed,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
+          selectedFontSize: 10,
+          unselectedFontSize: 10,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
               label: 'المستخدمين',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
+              icon: Icon(Icons.verified_user_outlined),
+              activeIcon: Icon(Icons.verified_user),
               label: 'الخبراء',
             ),
             BottomNavigationBarItem(
@@ -226,7 +233,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               activeIcon: Icon(Icons.edit_note),
               label: 'طلبات التعديل',
             ),
-            BottomNavigationBarItem(
+            BottomNavigationBarItem(          // ← NEW
+              icon: Icon(Icons.public_outlined),
+              activeIcon: Icon(Icons.public),
+              label: 'المنشورات',
+            ),
+            BottomNavigationBarItem(          // ← Profile shifted to index 5
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'الملف الشخصي',
@@ -236,6 +248,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
 // ── Users management Tab ────────────────────────────────────────────
   Widget _buildUsersTab() {
     return Column(
@@ -419,7 +432,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     );
                   }
 
-                  // display the list
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
@@ -629,7 +641,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       isScrollControlled: true,
       builder: (_) {
         return Padding(
-          // إضافة مسافة سفلية لتجنب شريط الجهاز
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -648,13 +659,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               _detailRow('تاريخ الانضمام', createdAt),
               _detailRow('عدد التقارير', reportsCount.toString()),
 
-              // صف حالة الحساب المحدث
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // الحالة على اليسار
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -666,7 +675,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         style: const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
-                    // العنوان على اليمين
                     const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
@@ -674,7 +682,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
               const SizedBox(height: 20),
 
-              // زر الإغلاق باللون الأخضر
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -701,7 +708,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(value ?? ''),
+          Text(value),
           Text(title, style: const TextStyle(color: Colors.grey)),
         ],
       ),
@@ -720,7 +727,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     setState(() {});
   }
-  // ── Specialists management Tab ────────────────────────────────────────────
+
+// ── Specialists management Tab ────────────────────────────────────────────
   Widget _buildSpecialistsTab() {
     return Column(
       children: [
@@ -1057,10 +1065,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      isScrollControlled: true, // لضمان ظهور المحتوى بشكل كامل
+      isScrollControlled: true,
       builder: (_) {
         return Padding(
-          // رفع المحتوى عن شريط النظام السفلي (Gesture Bar)
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1085,13 +1092,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
               const SizedBox(height: 10),
 
-              // صف حالة الحساب المحدث: العنوان يمين والبطاقة يسار
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // البطاقة (تظهر في اليسار)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -1106,7 +1111,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         style: const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
-                    // العنوان (يظهر في اليمين)
                     const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
@@ -1114,7 +1118,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
               const SizedBox(height: 20),
 
-              // زر الإغلاق باللون الأخضر المتناسق مع BioShield
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1140,7 +1143,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       },
     );
   }
-  // ── Requests Tab ────────────────────────────────────────────
+
+// ── Requests Tab ────────────────────────────────────────────
   Widget _buildRequestsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1849,7 +1853,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
-  // ── Edit requests Tab ────────────────────────────────────────────
+
+// ── Edit requests Tab ────────────────────────────────────────────
   Widget _buildEditRequestsTab() {
     return Column(
       children: [
@@ -2025,40 +2030,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   border: Border.all(color: statusColor.withOpacity(0.4)),
                 ),
                 child: Text(
-                  status == 'pending'
-                      ? 'معلق'
-                      : status == 'approved'
-                      ? 'موافق عليه'
-                      : 'مرفوض',
+                  status == 'pending' ? 'معلق' : status == 'approved' ? 'موافق عليه' : 'مرفوض',
                   style: TextStyle(fontSize: 11, color: statusColor),
                 ),
               ),
             ]),
           ),
-
-          // Comparison content
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _editComparisonRow('الاسم الكامل',
-                    data['oldFullName'], data['newFullName']),
-                _editComparisonRow('الخبرة',
-                    data['oldExperience'], data['newExperience']),
-                _editComparisonRow('الشهادات',
-                    data['oldCertificates'], data['newCertificates']),
-                _editComparisonRow('البريد الإلكتروني',
-                    data['oldEmail'], data['newEmail']),
-
-                // Certificate images comparison
+                _editComparisonRow('الاسم الكامل', data['oldFullName'], data['newFullName']),
+                _editComparisonRow('الخبرة', data['oldExperience'], data['newExperience']),
+                _editComparisonRow('الشهادات', data['oldCertificates'], data['newCertificates']),
+                _editComparisonRow('البريد الإلكتروني', data['oldEmail'], data['newEmail']),
                 if (oldImages.isNotEmpty || newImages.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Text('صور الشهادات',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2067,58 +2057,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('قبل',
-                                style: TextStyle(fontSize: 11, color: Colors.red)),
+                            const Text('قبل', style: TextStyle(fontSize: 11, color: Colors.red)),
                             const SizedBox(height: 4),
                             oldImages.isEmpty
-                                ? const Text('—',
-                                style: TextStyle(color: Colors.grey))
+                                ? const Text('—', style: TextStyle(color: Colors.grey))
                                 : Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: oldImages
-                                  .map((url) => ClipRRect(
-                                borderRadius:
-                                BorderRadius.circular(6),
-                                child: Image.network(url,
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover),
-                              ))
-                                  .toList(),
+                              spacing: 4, runSpacing: 4,
+                              children: oldImages.map((url) => ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(url, width: 60, height: 60, fit: BoxFit.cover),
+                              )).toList(),
                             ),
                           ],
                         ),
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 6),
-                        child: Icon(Icons.arrow_forward,
-                            size: 14, color: Colors.grey),
+                        child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
                       ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('بعد',
-                                style: TextStyle(
-                                    fontSize: 11, color: Color(0xFF16A34A))),
+                            const Text('بعد', style: TextStyle(fontSize: 11, color: Color(0xFF16A34A))),
                             const SizedBox(height: 4),
                             newImages.isEmpty
-                                ? const Text('لم يتم تغييرها',
-                                style: TextStyle(color: Colors.grey))
+                                ? const Text('لم يتم تغييرها', style: TextStyle(color: Colors.grey))
                                 : Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: newImages
-                                  .map((url) => ClipRRect(
-                                borderRadius:
-                                BorderRadius.circular(6),
-                                child: Image.network(url,
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover),
-                              ))
-                                  .toList(),
+                              spacing: 4, runSpacing: 4,
+                              children: newImages.map((url) => ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(url, width: 60, height: 60, fit: BoxFit.cover),
+                              )).toList(),
                             ),
                           ],
                         ),
@@ -2126,10 +2096,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ],
                   ),
                 ],
-
-                // Rejection reason
-                if (status == 'rejected' &&
-                    (data['rejectionReason'] ?? '').isNotEmpty) ...[
+                if (status == 'rejected' && (data['rejectionReason'] ?? '').isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
@@ -2142,15 +2109,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('سبب الرفض:',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold)),
+                        const Text('سبب الرفض:', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(data['rejectionReason'],
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.red)),
+                        Text(data['rejectionReason'], style: const TextStyle(fontSize: 13, color: Colors.red)),
                       ],
                     ),
                   ),
@@ -2158,7 +2119,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
-
           if (status == 'pending')
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -2168,13 +2128,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     onPressed: () => _approveEditRequest(data, docId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
                     icon: const Icon(Icons.check, color: Colors.white, size: 16),
-                    label: const Text('قبول',
-                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                    label: const Text('قبول', style: TextStyle(color: Colors.white, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2184,13 +2142,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFCC0000),
                       side: const BorderSide(color: Color(0xFFCC0000)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.close,
-                        color: Color(0xFFCC0000), size: 16),
-                    label: const Text('رفض',
-                        style: TextStyle(color: Color(0xFFCC0000), fontSize: 13)),
+                    icon: const Icon(Icons.close, color: Color(0xFFCC0000), size: 16),
+                    label: const Text('رفض', style: TextStyle(color: Color(0xFFCC0000), fontSize: 13)),
                   ),
                 ),
               ]),
@@ -2201,32 +2156,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _editComparisonRow(String label, String? oldVal, String? newVal) {
-    final changed =
-        (oldVal ?? '') != (newVal ?? '') && (newVal ?? '').isNotEmpty;
+    final changed = (oldVal ?? '') != (newVal ?? '') && (newVal ?? '').isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Row(children: [
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(oldVal ?? '—',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: changed ? Colors.red : Colors.grey,
-                    )),
+                decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(6)),
+                child: Text(oldVal ?? '—', style: TextStyle(fontSize: 12, color: changed ? Colors.red : Colors.grey)),
               ),
             ),
             const Padding(
@@ -2244,8 +2187,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     style: TextStyle(
                         fontSize: 12,
                         color: changed ? const Color(0xFF16A34A) : Colors.grey,
-                        fontWeight:
-                        changed ? FontWeight.bold : FontWeight.normal)),
+                        fontWeight: changed ? FontWeight.bold : FontWeight.normal)),
               ),
             ),
           ]),
@@ -2253,9 +2195,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
 // ── Approve edit request ──────────────────────────────────────────────
-  Future<void> _approveEditRequest(
-      Map<String, dynamic> data, String docId) async {
+  Future<void> _approveEditRequest(Map<String, dynamic> data, String docId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -2263,21 +2205,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('تأكيد القبول',
-              style: TextStyle(
-                  color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
-          content: Text(
-              'هل تريد قبول تعديلات ${data['specialistName'] ?? ''}؟ سيتم تحديث بياناته تلقائياً.'),
+              style: TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
+          content: Text('هل تريد قبول تعديلات ${data['specialistName'] ?? ''}؟ سيتم تحديث بياناته تلقائياً.'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A)),
-              child:
-              const Text('قبول', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+              child: const Text('قبول', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -2289,77 +2224,41 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final specialistId = data['specialistId'] as String;
     final batch = FirebaseFirestore.instance.batch();
 
-    batch.update(
-      FirebaseFirestore.instance
-          .collection('Specialist_edit_request')
-          .doc(docId),
-      {'status': 'approved' },
-    );
+    batch.update(FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId), {'status': 'approved'});
 
     final updates = <String, dynamic>{};
-
-    if ((data['newFullName'] ?? '').isNotEmpty &&
-        data['newFullName'] != data['oldFullName'])
-      updates['fullName'] = data['newFullName'];
-
-    if ((data['newExperience'] ?? '').isNotEmpty &&
-        data['newExperience'] != data['oldExperience'])
-      updates['experience'] = data['newExperience'];
-
-    if ((data['newCertificates'] ?? '').isNotEmpty &&
-        data['newCertificates'] != data['oldCertificates'])
-      updates['certificates'] = data['newCertificates'];
-
-    if ((data['newEmail'] ?? '').isNotEmpty &&
-        data['newEmail'] != data['oldEmail'])
-      updates['email'] = data['newEmail'];
-
+    if ((data['newFullName'] ?? '').isNotEmpty && data['newFullName'] != data['oldFullName']) updates['fullName'] = data['newFullName'];
+    if ((data['newExperience'] ?? '').isNotEmpty && data['newExperience'] != data['oldExperience']) updates['experience'] = data['newExperience'];
+    if ((data['newCertificates'] ?? '').isNotEmpty && data['newCertificates'] != data['oldCertificates']) updates['certificates'] = data['newCertificates'];
+    if ((data['newEmail'] ?? '').isNotEmpty && data['newEmail'] != data['oldEmail']) updates['email'] = data['newEmail'];
     final newImages = List<String>.from(data['newCertificateImages'] ?? []);
-    if (newImages.isNotEmpty)
-      updates['certificateImages'] = newImages;
+    if (newImages.isNotEmpty) updates['certificateImages'] = newImages;
 
     if (updates.isEmpty) {
-      await FirebaseFirestore.instance
-          .collection('Specialist_edit_request')
-          .doc(docId)
-          .update({'status': 'approved'});
+      await FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId).update({'status': 'approved'});
       return;
     }
 
-    batch.update(
-      FirebaseFirestore.instance.collection('specialists').doc(specialistId),
-      updates,
-    );
+    batch.update(FirebaseFirestore.instance.collection('specialists').doc(specialistId), updates);
 
     final accountUpdates = <String, dynamic>{};
-    if ((data['newEmail'] ?? '').isNotEmpty &&
-        data['newEmail'] != data['oldEmail']) {
-      accountUpdates['email'] = data['newEmail'];
-    }
-    if ((data['newFullName'] ?? '').isNotEmpty &&
-        data['newFullName'] != data['oldFullName']) {
-      accountUpdates['username'] = data['newFullName'];
-    }
+    if ((data['newEmail'] ?? '').isNotEmpty && data['newEmail'] != data['oldEmail']) accountUpdates['email'] = data['newEmail'];
+    if ((data['newFullName'] ?? '').isNotEmpty && data['newFullName'] != data['oldFullName']) accountUpdates['username'] = data['newFullName'];
     if (accountUpdates.isNotEmpty) {
-      batch.update(
-        FirebaseFirestore.instance
-            .collection('accounts')
-            .doc(specialistId),
-        accountUpdates,
-      );
+      batch.update(FirebaseFirestore.instance.collection('accounts').doc(specialistId), accountUpdates);
     }
 
     await batch.commit();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            '✅ تم قبول تعديلات ${data['specialistName'] ?? ''} وتحديث بياناته'),
+        content: Text('✅ تم قبول تعديلات ${data['specialistName'] ?? ''} وتحديث بياناته'),
         backgroundColor: const Color(0xFF16A34A),
         duration: const Duration(seconds: 3),
       ));
     }
   }
+
 // ── Reject edit request ──────────────────────────────────────────────
   void _showEditRejectDialog(Map<String, dynamic> data, String docId) {
     final reasonController = TextEditingController();
@@ -2371,83 +2270,54 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialog) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(children: [
-              const Icon(Icons.cancel_outlined,
-                  color: Color(0xFFCC0000), size: 22),
+              const Icon(Icons.cancel_outlined, color: Color(0xFFCC0000), size: 22),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'رفض تعديل ${data['specialistName'] ?? ''}',
-                  style: const TextStyle(
-                      color: Color(0xFF14532D),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
-                ),
-              ),
+              Expanded(child: Text('رفض تعديل ${data['specialistName'] ?? ''}',
+                  style: const TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold, fontSize: 16))),
             ]),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('سبب الرفض *',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151))),
+                const Text('سبب الرفض *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
                 const SizedBox(height: 6),
                 TextField(
                   controller: reasonController,
                   maxLines: 4,
                   textDirection: TextDirection.rtl,
-                  onChanged: (v) => setDialog(() {
-                    reasonError = v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
-                  }),
+                  onChanged: (v) => setDialog(() { reasonError = v.trim().isEmpty ? 'سبب الرفض مطلوب' : null; }),
                   decoration: InputDecoration(
                     hintText: 'أدخل سبب الرفض...',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     errorText: reasonError,
                   ),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child:
-                const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
               ElevatedButton.icon(
                 onPressed: () async {
                   final reason = reasonController.text.trim();
-                  if (reason.isEmpty) {
-                    setDialog(() => reasonError = 'سبب الرفض مطلوب');
-                    return;
-                  }
+                  if (reason.isEmpty) { setDialog(() => reasonError = 'سبب الرفض مطلوب'); return; }
                   Navigator.pop(ctx);
-                  await FirebaseFirestore.instance
-                      .collection('Specialist_edit_request')
-                      .doc(docId)
-                      .update({
+                  await FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId).update({
                     'status': 'rejected',
                     'rejectionReason': reason,
                     'rejectedAt': FieldValue.serverTimestamp(),
                   });
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(
-                          '❌ تم رفض تعديلات ${data['specialistName'] ?? ''}'),
+                      content: Text('❌ تم رفض تعديلات ${data['specialistName'] ?? ''}'),
                       backgroundColor: Colors.orange,
                     ));
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFCC0000)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFCC0000)),
                 icon: const Icon(Icons.close, color: Colors.white, size: 16),
-                label: const Text('رفض',
-                    style: TextStyle(color: Colors.white)),
+                label: const Text('رفض', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2456,12 +2326,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Profile Tab ──────────────────────────────────────────────
+// ── Profile Tab ──────────────────────────────────────────────
   Widget _buildProfileTab() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // ── Header ──
           Container(
             width: double.infinity,
             color: Colors.white,
@@ -2469,167 +2338,88 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: Column(
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 72, height: 72,
                   decoration: BoxDecoration(
                     color: const Color(0xFFDCFCE7),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                        color: const Color(0xFF16A34A), width: 2),
+                    border: Border.all(color: const Color(0xFF16A34A), width: 2),
                   ),
-                  child: const Icon(Icons.shield,
-                      color: Color(0xFF16A34A), size: 38),
+                  child: const Icon(Icons.shield, color: Color(0xFF16A34A), size: 38),
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  _name.isNotEmpty ? _name : 'مدير النظام',
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF14532D)),
-                ),
+                Text(_name.isNotEmpty ? _name : 'مدير النظام',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
                 const SizedBox(height: 4),
-                const Text('مدير النظام',
-                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const Text('مدير النظام', style: TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // ── المعلومات الشخصية ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8E8E8))),
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('المعلومات الشخصية',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87)),
+                      const Text('المعلومات الشخصية', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                       GestureDetector(
                         onTap: _showEditDialog,
-                        child: const Row(
-                          children: [
-                            Icon(Icons.edit_outlined,
-                                color: Color(0xFF16A34A), size: 17),
-                            SizedBox(width: 4),
-                            Text('تعديل',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF16A34A))),
-                          ],
-                        ),
+                        child: const Row(children: [
+                          Icon(Icons.edit_outlined, color: Color(0xFF16A34A), size: 17),
+                          SizedBox(width: 4),
+                          Text('تعديل', style: TextStyle(fontSize: 13, color: Color(0xFF16A34A))),
+                        ]),
                       ),
                     ],
                   ),
                 ),
                 const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                _buildInfoRow(
-                    label: 'الاسم',
-                    value: _name.isNotEmpty ? _name : 'مدير النظام',
-                    icon: Icons.person_outline,
-                    iconColor: const Color(0xFF16A34A)),
-                const Divider(
-                    height: 1,
-                    color: Color(0xFFEEEEEE),
-                    indent: 16,
-                    endIndent: 16),
-                _buildInfoRow(
-                    label: 'البريد الإلكتروني',
-                    value: _email.isNotEmpty
-                        ? _email
-                        : 'admin@bioshield.com',
-                    icon: Icons.email_outlined,
-                    iconColor: const Color(0xFF16A34A)),
-                const Divider(
-                    height: 1,
-                    color: Color(0xFFEEEEEE),
-                    indent: 16,
-                    endIndent: 16),
-                _buildInfoRow(
-                    label: 'الصلاحيات',
-                    value: 'صلاحيات: كاملة',
-                    icon: Icons.settings_outlined,
-                    iconColor: const Color(0xFF16A34A)),
+                _buildInfoRow(label: 'الاسم', value: _name.isNotEmpty ? _name : 'مدير النظام', icon: Icons.person_outline, iconColor: const Color(0xFF16A34A)),
+                const Divider(height: 1, color: Color(0xFFEEEEEE), indent: 16, endIndent: 16),
+                _buildInfoRow(label: 'البريد الإلكتروني', value: _email.isNotEmpty ? _email : 'admin@bioshield.com', icon: Icons.email_outlined, iconColor: const Color(0xFF16A34A)),
+                const Divider(height: 1, color: Color(0xFFEEEEEE), indent: 16, endIndent: 16),
+                _buildInfoRow(label: 'الصلاحيات', value: 'صلاحيات: كاملة', icon: Icons.settings_outlined, iconColor: const Color(0xFF16A34A)),
               ],
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // ── قسم الأمان ──
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8E8E8))),
             child: Column(
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'الأمان',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87),
-                    ),
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Align(alignment: Alignment.centerRight, child: Text('الأمان', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
                 ),
                 const Divider(height: 1, color: Color(0xFFEEEEEE)),
                 ListTile(
-                  leading: const Icon(Icons.lock_outline,
-                      color: Color(0xFF16A34A)),
-                  title: const Text('تغيير كلمة المرور',
-                      style: TextStyle(fontSize: 14)),
-                  trailing: const Icon(Icons.arrow_back_ios,
-                      size: 14, color: Colors.grey),
+                  leading: const Icon(Icons.lock_outline, color: Color(0xFF16A34A)),
+                  title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey),
                   onTap: _showChangePasswordDialog,
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // ── زر تسجيل الخروج ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
-              width: double.infinity,
-              height: 48,
+              width: double.infinity, height: 48,
               child: ElevatedButton.icon(
                 onPressed: _logout,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFCC0000),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
-                icon: const Icon(Icons.logout,
-                    color: Colors.white, size: 20),
-                label: const Text('تسجيل الخروج',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+                label: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -2639,109 +2429,52 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── تغيير كلمة المرور (أدمن) ──────────────────────────────
   void _showChangePasswordDialog() {
     bool sending = false;
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text(
-              'تغيير كلمة المرور',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF14532D)),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
-                  textAlign: TextAlign.right,
-                ),
+                const Text('سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني', style: TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.right),
                 const SizedBox(height: 12),
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.email_outlined,
-                          color: Color(0xFF16A34A), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _email,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF166534),
-                              fontWeight: FontWeight.w500),
-                          textDirection: TextDirection.ltr,
-                        ),
-                      ),
-                    ],
-                  ),
+                  width: double.infinity, padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF86EFAC))),
+                  child: Row(children: [
+                    const Icon(Icons.email_outlined, color: Color(0xFF16A34A), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_email, style: const TextStyle(fontSize: 14, color: Color(0xFF166534), fontWeight: FontWeight.w500), textDirection: TextDirection.ltr)),
+                  ]),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء',
-                    style: TextStyle(color: Colors.grey)),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
               ElevatedButton(
-                onPressed: sending
-                    ? null
-                    : () async {
+                onPressed: sending ? null : () async {
                   setDialogState(() => sending = true);
                   try {
-                    await FirebaseAuth.instance
-                        .sendPasswordResetEmail(email: _email);
+                    await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
                     if (!mounted) return;
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            '✅ تم إرسال رابط إعادة التعيين إلى بريدك'),
-                        backgroundColor: Color(0xFF16A34A),
-                      ),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تم إرسال رابط إعادة التعيين إلى بريدك'), backgroundColor: Color(0xFF16A34A)));
                   } catch (e) {
                     setDialogState(() => sending = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('حدث خطأ: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red));
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 child: sending
-                    ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                    : const Text('إرسال',
-                    style: TextStyle(color: Colors.white)),
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('إرسال', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2750,25 +2483,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── تعديل المعلومات الشخصية (أدمن) ──────────────────────────
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
     bool saving = false;
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text('تعديل المعلومات الشخصية',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF14532D))),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('تعديل المعلومات الشخصية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2780,17 +2506,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: 'الاسم',
-                    labelStyle:
-                    const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.person_outline,
-                        color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                          color: Color(0xFF16A34A), width: 2),
-                    ),
+                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2800,89 +2519,40 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: 'البريد الإلكتروني',
-                    labelStyle:
-                    const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.email_outlined,
-                        color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                          color: Color(0xFF16A34A), width: 2),
-                    ),
+                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2)),
                   ),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء',
-                    style: TextStyle(color: Colors.grey)),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
               ElevatedButton(
-                onPressed: saving
-                    ? null
-                    : () async {
+                onPressed: saving ? null : () async {
                   setDialogState(() => saving = true);
                   try {
-                    final uid =
-                        FirebaseAuth.instance.currentUser?.uid;
-                    final newName =
-                    nameController.text.trim();
-                    final newEmail =
-                    emailController.text.trim();
+                    final uid = FirebaseAuth.instance.currentUser?.uid;
+                    final newName = nameController.text.trim();
+                    final newEmail = emailController.text.trim();
                     if (uid != null) {
-                      await FirebaseFirestore.instance
-                          .collection('admins')
-                          .doc(uid)
-                          .update({
-                        'username': newName,
-                        'email': newEmail
-                      });
-                      await FirebaseFirestore.instance
-                          .collection('accounts')
-                          .doc(uid)
-                          .update({
-                        'username': newName,
-                        'email': newEmail
-                      });
-                      if (newEmail != _email) {
-                        await FirebaseAuth
-                            .instance.currentUser
-                            ?.verifyBeforeUpdateEmail(
-                            newEmail);
-                      }
+                      await FirebaseFirestore.instance.collection('admins').doc(uid).update({'username': newName, 'email': newEmail});
+                      await FirebaseFirestore.instance.collection('accounts').doc(uid).update({'username': newName, 'email': newEmail});
+                      if (newEmail != _email) await FirebaseAuth.instance.currentUser?.verifyBeforeUpdateEmail(newEmail);
                     }
                     if (!mounted) return;
-                    setState(() {
-                      _name = newName;
-                      _email = newEmail;
-                    });
+                    setState(() { _name = newName; _email = newEmail; });
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(const SnackBar(
-                      content: Text('تم حفظ التعديلات بنجاح ✓'),
-                      backgroundColor: Color(0xFF16A34A),
-                    ));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ التعديلات بنجاح ✓'), backgroundColor: Color(0xFF16A34A)));
                   } catch (e) {
                     setDialogState(() => saving = false);
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 child: saving
-                    ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                    : const Text('حفظ',
-                    style: TextStyle(color: Colors.white)),
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('حفظ', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2891,31 +2561,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildInfoRow({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-  }) {
+  Widget _buildInfoRow({required String label, required String value, required IconData icon, required Color iconColor}) {
     return Padding(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 3),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 14, color: Colors.black87)),
-              ],
-            ),
-          ),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              const SizedBox(height: 3),
+              Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87)),
+            ],
+          )),
           Icon(icon, color: iconColor, size: 22),
         ],
       ),
