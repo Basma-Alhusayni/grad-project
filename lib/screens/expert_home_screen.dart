@@ -46,9 +46,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
-        await FirebaseFirestore.instance.collection('specialists').doc(uid).update({
-          'isOnline': true,
-        });
+        await FirebaseFirestore.instance
+            .collection('specialists')
+            .doc(uid)
+            .update({'isOnline': true});
       } catch (e) {
         debugPrint('Error updating online status: $e');
       }
@@ -101,7 +102,12 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       // ── جلب التقييمات ──
       List<Map<String, dynamic>> reviews = [];
       try {
-        final reviewsSnap = await FirebaseFirestore.instance.collection('specialists').doc(uid).collection('reviews').limit(10).get();
+        final reviewsSnap = await FirebaseFirestore.instance
+            .collection('specialists')
+            .doc(uid)
+            .collection('reviews')
+            .limit(10)
+            .get();
         reviews = reviewsSnap.docs.map((e) => e.data()).toList();
       } catch (_) {}
 
@@ -122,6 +128,18 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       await FirebaseAuth.instance.currentUser?.reload();
       final authEmail = FirebaseAuth.instance.currentUser?.email ?? '';
 
+      // sync email from Auth to Firestore if different
+      final firestoreEmail = d['email'] ?? '';
+      if (authEmail.isNotEmpty && authEmail != firestoreEmail) {
+        await FirebaseFirestore.instance
+            .collection('specialists')
+            .doc(uid)
+            .update({'email': authEmail});
+        await FirebaseFirestore.instance.collection('accounts').doc(uid).update(
+          {'email': authEmail},
+        );
+      }
+
       if (!mounted) return;
       setState(() {
         _fullName = d['fullName'] ?? '';
@@ -134,7 +152,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             : 0;
         _certificateImages = certImages;
         _reviews = reviews;
-        _reports = reports; // 🔥 ADD THIS
+        _reports = reports;
         _loading = false;
       });
     } catch (e) {
@@ -147,14 +165,19 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     // 🔥 NEW: Set expert to offline before logging out
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
-      await FirebaseFirestore.instance.collection('specialists').doc(uid).update({
-        'isOnline': false,
-      });
+      await FirebaseFirestore.instance
+          .collection('specialists')
+          .doc(uid)
+          .update({'isOnline': false});
     }
 
     await AuthService().signOut();
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const SplashScreen()), (_) => false);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SplashScreen()),
+      (_) => false,
+    );
   }
 
   // ── عرض صورة الشهادة كاملة ──────────────────────────────────
@@ -361,9 +384,13 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
     // 🔥 NEW: Listen to the Specialist document in real-time
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('specialists').doc(uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('specialists')
+          .doc(uid)
+          .snapshots(),
       builder: (context, specSnapshot) {
-        if (!specSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!specSnapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
 
         final d = specSnapshot.data!.data() as Map<String, dynamic>? ?? {};
 
@@ -390,7 +417,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-// 🔥 NEW: Method to listen to reviews in real-time
+  // 🔥 NEW: Method to listen to reviews in real-time
   Widget _buildReviewsStream(String uid) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -406,14 +433,21 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         if (reviews.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(24),
-            child: Center(child: Text('لا توجد تقييمات بعد', style: TextStyle(color: Colors.grey))),
+            child: Center(
+              child: Text(
+                'لا توجد تقييمات بعد',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
           );
         }
 
         return Column(
           children: [
             const SizedBox(height: 12),
-            ...reviews.map((doc) => _reviewCard(doc.data() as Map<String, dynamic>)),
+            ...reviews.map(
+              (doc) => _reviewCard(doc.data() as Map<String, dynamic>),
+            ),
           ],
         );
       },
@@ -547,7 +581,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     final nameController = TextEditingController(text: _fullName);
     final certificatesController = TextEditingController(text: _certificates);
     final experienceController = TextEditingController(text: _experience);
-    final emailController = TextEditingController(text: _email);
     List<File> newImages = [];
     bool isLoading = false;
 
@@ -577,10 +610,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 const Center(
                   child: Text(
                     'طلب تعديل المعلومات',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -600,8 +630,11 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                       children: [
                         _editField('الاسم الكامل', nameController),
                         _editField('الخبرة', experienceController, maxLines: 3),
-                        _editField('الشهادات', certificatesController, maxLines: 3),
-                        _editField('البريد الإلكتروني', emailController),
+                        _editField(
+                          'الشهادات',
+                          certificatesController,
+                          maxLines: 3,
+                        ),
                         const SizedBox(height: 12),
 
                         const Text(
@@ -614,7 +647,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                             final picked = await ImagePicker().pickMultiImage();
                             if (picked.isNotEmpty) {
                               setSheet(
-                                    () => newImages = picked
+                                () => newImages = picked
                                     .map((e) => File(e.path))
                                     .toList(),
                               );
@@ -630,7 +663,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.upload_file, color: Colors.grey),
+                                const Icon(
+                                  Icons.upload_file,
+                                  color: Colors.grey,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   newImages.isNotEmpty
@@ -693,49 +729,52 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                         onPressed: isLoading
                             ? null
                             : () async {
-                          setSheet(() => isLoading = true);
-                          try {
-                            await _submitEditRequest(
-                              newFullName: nameController.text.trim(),
-                              newExperience: experienceController.text.trim(),
-                              newCertificates: certificatesController.text.trim(),
-                              newEmail: emailController.text.trim(),
-                              newImages: newImages,
-                            );
-                            if (mounted) Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('✅ تم إرسال طلب التعديل للمراجعة'),
-                                backgroundColor: Color(0xFF16A34A),
-                              ),
-                            );
-                          } catch (e) {
-                            setSheet(() => isLoading = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('حدث خطأ: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
+                                setSheet(() => isLoading = true);
+                                try {
+                                  await _submitEditRequest(
+                                    newFullName: nameController.text.trim(),
+                                    newExperience: experienceController.text
+                                        .trim(),
+                                    newCertificates: certificatesController.text
+                                        .trim(),
+                                    newImages: newImages,
+                                  );
+                                  if (mounted) Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        '✅ تم إرسال طلب التعديل للمراجعة',
+                                      ),
+                                      backgroundColor: Color(0xFF16A34A),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  setSheet(() => isLoading = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('حدث خطأ: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
                         child: isLoading
                             ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Text(
-                          'إرسال طلب التعديل',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                                'إرسال طلب التعديل',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -788,7 +827,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     required String newFullName,
     required String newExperience,
     required String newCertificates,
-    required String newEmail,
     required List<File> newImages,
   }) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -812,15 +850,304 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       'newFullName': newFullName,
       'newExperience': newExperience,
       'newCertificates': newCertificates,
-      'newEmail': newEmail,
       'newCertificateImages': newImageUrls,
       // القيم القديمة للمقارنة
       'oldFullName': _fullName,
       'oldExperience': _experience,
       'oldCertificates': _certificates,
-      'oldEmail': _email,
       'oldCertificateImages': _certificateImages,
     });
+  }
+
+  Future<void> _deleteAccount() async {
+    // Step 1 — Confirm dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'حذف الحساب نهائياً',
+            style: TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'هذا الإجراء لا يمكن التراجع عنه. سيتم حذف:',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 10),
+              _deleteItem('بياناتك الشخصية'),
+              _deleteItem('جميع تقاريرك'),
+              _deleteItem('تقييماتك من المستخدمين'),
+              _deleteItem('طلبات التعديل المعلقة'),
+              _deleteItem('حسابك بشكل كامل'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.red, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'لا يمكن استرجاع أي بيانات بعد الحذف',
+                        style: TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'حذف حسابي',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // Step 2 — Password re-authentication dialog
+    final passwordController = TextEditingController();
+    bool obscure = true;
+
+    final password = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'تأكيد الهوية',
+              style: TextStyle(
+                color: Color(0xFF14532D),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'أدخل كلمة المرور الحالية لتأكيد حذف الحساب.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscure,
+                  textDirection: TextDirection.ltr,
+                  decoration: InputDecoration(
+                    labelText: 'كلمة المرور',
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: Color(0xFF16A34A),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () => setDialogState(() => obscure = !obscure),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () =>
+                    Navigator.pop(ctx, passwordController.text.trim()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'تأكيد الحذف',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (password == null || password.isEmpty) return;
+
+    // Step 3 — Show loading
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+        ),
+      );
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final uid = user.uid;
+
+      // Step 4 — Re-authenticate
+      final credential = EmailAuthProvider.credential(
+        email: _email,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Step 5 — Delete all Firestore data in parallel
+      await Future.wait([
+        // Specialist profile
+        FirebaseFirestore.instance.collection('specialists').doc(uid).delete(),
+
+        // Account doc
+        FirebaseFirestore.instance.collection('accounts').doc(uid).delete(),
+
+        // Specialist reports
+        _deleteCollection('specialist_reports', 'specialistId', uid),
+
+        // Edit requests
+        _deleteCollection('Specialist_edit_request', 'specialistId', uid),
+      ]);
+
+      // Reviews sub-collection must be deleted separately
+      await _deleteSubCollection('specialists', uid, 'reviews');
+
+      // Step 6 — Delete Firebase Auth account
+      await user.delete();
+
+      // Step 7 — Navigate to splash
+      if (mounted) {
+        Navigator.pop(context); // close loading
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const SplashScreen()),
+          (_) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) Navigator.pop(context); // close loading
+      String msg = 'حدث خطأ أثناء الحذف';
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        msg = 'كلمة المرور غير صحيحة';
+      } else if (e.code == 'requires-recent-login') {
+        msg = 'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg, textDirection: TextDirection.rtl),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Helper: delete all docs in a collection matching a field ──
+  Future<void> _deleteCollection(
+    String collection,
+    String field,
+    String uid,
+  ) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(collection)
+        .where(field, isEqualTo: uid)
+        .get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // ── Helper: delete a Firestore sub-collection ─────────────────
+  Future<void> _deleteSubCollection(
+    String parent,
+    String docId,
+    String sub,
+  ) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(parent)
+        .doc(docId)
+        .collection(sub)
+        .get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // ── Helper: bullet point row in confirm dialog ────────────────
+  Widget _deleteItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.remove_circle_outline, color: Colors.red, size: 14),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
   }
 
   // ── تاب المعلومات ────────────────────────────────────────────
@@ -916,11 +1243,56 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 ),
                 onTap: _showChangePasswordDialog,
               ),
+              const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              ListTile(
+                leading: const Icon(
+                  Icons.email_outlined,
+                  color: Color(0xFF16A34A),
+                ),
+                title: const Text(
+                  'تغيير البريد الإلكتروني',
+                  style: TextStyle(fontSize: 14),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: Colors.grey,
+                ),
+                onTap: _showChangeEmailDialog,
+              ),
             ],
           ),
         ),
 
+        // ── زر حذف الحساب ——
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: _deleteAccount,
+              icon: const Icon(Icons.delete_forever, color: Colors.red),
+              label: const Text(
+                'حذف الحساب',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ),
+
         const SizedBox(height: 24),
+
         // ── زر تسجيل الخروج
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1071,6 +1443,174 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                       )
                     : const Text(
                         'إرسال',
+                        style: TextStyle(color: Colors.white),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── تغيير البريد الالكتروني ──────────────────────────────────────
+  void _showChangeEmailDialog() {
+    final emailController = TextEditingController();
+    String? emailError;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'تغيير البريد الإلكتروني',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF14532D),
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'أدخل بريدك الإلكتروني الجديد. سيتم إرسال رابط تحقق إليه.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textDirection: TextDirection.ltr,
+                  onChanged: (v) => setDialogState(() {
+                    emailError = v.trim().isEmpty
+                        ? 'البريد الإلكتروني مطلوب'
+                        : !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                        ? 'صيغة البريد غير صحيحة'
+                        : null;
+                  }),
+                  decoration: InputDecoration(
+                    labelText: 'البريد الإلكتروني الجديد',
+                    prefixIcon: const Icon(
+                      Icons.email_outlined,
+                      color: Color(0xFF16A34A),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    errorText: emailError,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'ستحتاج لإعادة تسجيل الدخول بعد تغيير البريد',
+                          style: TextStyle(fontSize: 12, color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final newEmail = emailController.text.trim();
+                        if (newEmail.isEmpty ||
+                            !RegExp(
+                              r'^[^@]+@[^@]+\.[^@]+',
+                            ).hasMatch(newEmail)) {
+                          setDialogState(
+                            () => emailError = 'أدخل بريداً صحيحاً',
+                          );
+                          return;
+                        }
+                        if (newEmail == _email) {
+                          setDialogState(
+                            () => emailError = 'هذا هو بريدك الحالي',
+                          );
+                          return;
+                        }
+                        setDialogState(() => saving = true);
+                        try {
+                          final user = FirebaseAuth.instance.currentUser!;
+
+                          // إرسال رابط تحقق للبريد الجديد فقط
+                          await user.verifyBeforeUpdateEmail(newEmail);
+
+                          if (!mounted) return;
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '✅ تم إرسال رابط التحقق إلى بريدك الجديد. تحقق منه لإتمام التغيير.',
+                              ),
+                              backgroundColor: Color(0xFF16A34A),
+                              duration: Duration(seconds: 5),
+                            ),
+                          );
+                        } on FirebaseAuthException catch (e) {
+                          setDialogState(() => saving = false);
+                          String msg = 'حدث خطأ';
+                          if (e.code == 'requires-recent-login') {
+                            msg =
+                                'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
+                          } else if (e.code == 'email-already-in-use') {
+                            msg = 'هذا البريد مستخدم بالفعل';
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(msg),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'إرسال رابط التحقق',
                         style: TextStyle(color: Colors.white),
                       ),
               ),
@@ -1377,7 +1917,11 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.description_outlined, size: 70, color: Colors.grey),
+                  Icon(
+                    Icons.description_outlined,
+                    size: 70,
+                    color: Colors.grey,
+                  ),
                   SizedBox(height: 16),
                   Text(
                     'لا توجد تقارير طبية محفوظة حالياً',
@@ -1420,7 +1964,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -1435,7 +1979,11 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                   color: const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.eco, color: Color(0xFF16A34A), size: 24),
+                child: const Icon(
+                  Icons.eco,
+                  color: Color(0xFF16A34A),
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1515,7 +2063,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: isOrange ? const Color(0xFFD97706) : const Color(0xFF374151),
+              color: isOrange
+                  ? const Color(0xFFD97706)
+                  : const Color(0xFF374151),
             ),
           ),
           const SizedBox(height: 4),
@@ -1644,17 +2194,30 @@ class _ChatsPageState extends State<_ChatsPage> {
       textDirection: TextDirection.rtl,
       child: StreamBuilder<QuerySnapshot>(
         // ✅ Only fetch chats assigned to this specific expert
-        stream: db.collection('chats').where('specialistId', isEqualTo: uid).snapshots(),
+        stream: db
+            .collection('chats')
+            .where('specialistId', isEqualTo: uid)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)));
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+            );
           }
 
           final allChats = snapshot.data?.docs ?? [];
 
           // Calculate counts for filters
-          final activeCount = allChats.where((d) => (d.data() as Map<String, dynamic>)['completed'] != true).length;
-          final completedCount = allChats.where((d) => (d.data() as Map<String, dynamic>)['completed'] == true).length;
+          final activeCount = allChats
+              .where(
+                (d) => (d.data() as Map<String, dynamic>)['completed'] != true,
+              )
+              .length;
+          final completedCount = allChats
+              .where(
+                (d) => (d.data() as Map<String, dynamic>)['completed'] == true,
+              )
+              .length;
 
           // Apply filters
           List<QueryDocumentSnapshot> filtered = allChats.where((d) {
@@ -1694,14 +2257,14 @@ class _ChatsPageState extends State<_ChatsPage> {
                       _filterChip(
                         'محادثات جارية ($activeCount)',
                         _chatFilter == 'pending',
-                            () => setState(() => _chatFilter = 'pending'),
+                        () => setState(() => _chatFilter = 'pending'),
                         activeColor: Colors.orange,
                       ),
                       const SizedBox(width: 8),
                       _filterChip(
                         'مكتملة ($completedCount)',
                         _chatFilter == 'completed',
-                            () => setState(() => _chatFilter = 'completed'),
+                        () => setState(() => _chatFilter = 'completed'),
                         activeColor: const Color(0xFF16A34A),
                       ),
                     ],
@@ -1717,9 +2280,16 @@ class _ChatsPageState extends State<_ChatsPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.chat_bubble_outline, size: 60, color: Colors.grey[300]),
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 60,
+                            color: Colors.grey[300],
+                          ),
                           const SizedBox(height: 12),
-                          const Text('لا توجد دردشات حالياً', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                          const Text(
+                            'لا توجد دردشات حالياً',
+                            style: TextStyle(color: Colors.grey, fontSize: 15),
+                          ),
                         ],
                       ),
                     ),
@@ -1729,118 +2299,156 @@ class _ChatsPageState extends State<_ChatsPage> {
                 SliverPadding(
                   padding: const EdgeInsets.all(16),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                        final data = filtered[index].data() as Map<String, dynamic>;
-                        final chatId = filtered[index].id;
-                        final userName = data['userName'] ?? 'مستخدم';
-                        final userId = data['userId'] ?? ''; // 🔥 GRABBING THE ID
-                        final lastMessage = data['lastMessage'] ?? '';
-                        final time = data['time'] ?? '';
-                        final unread = data['expertUnread'] ?? 0;
-                        final isCompleted = data['completed'] == true;
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final data =
+                          filtered[index].data() as Map<String, dynamic>;
+                      final chatId = filtered[index].id;
+                      final userName = data['userName'] ?? 'مستخدم';
+                      final userId = data['userId'] ?? ''; // 🔥 GRABBING THE ID
+                      final lastMessage = data['lastMessage'] ?? '';
+                      final time = data['time'] ?? '';
+                      final unread = data['expertUnread'] ?? 0;
+                      final isCompleted = data['completed'] == true;
 
-                        return GestureDetector(
-                            onTap: () {
-                              FirebaseFirestore.instance.collection('chats').doc(chatId).update({'expertUnread': 0});
+                      return GestureDetector(
+                        onTap: () {
+                          FirebaseFirestore.instance
+                              .collection('chats')
+                              .doc(chatId)
+                              .update({'expertUnread': 0});
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ExpertChatScreen(
-                                    chatId: chatId,
-                                    userName: userName,
-                                    userId: userId, // 🔥 THIS IS REQUIRED NOW (Remove isOnline if it's here!)
-                                  ),
-                                ),
-                              );
-                            },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE1F1E4)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.03),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ExpertChatScreen(
+                                chatId: chatId,
+                                userName: userName,
+                                userId:
+                                    userId, // 🔥 THIS IS REQUIRED NOW (Remove isOnline if it's here!)
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: const Color(0xFFDDF7DD),
-                                  child: Text(
-                                    userName.isNotEmpty ? userName[0] : 'م',
-                                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 18, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              userName,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2F3A33)),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: isCompleted ? const Color(0xFF16A34A) : Colors.orange,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              isCompleted ? 'مكتملة' : 'جارية',
-                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              lastMessage,
-                                              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Text(time, style: TextStyle(fontSize: 11, color: Colors.grey[400])),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (unread > 0) ...[
-                                  const SizedBox(width: 10),
-                                  CircleAvatar(
-                                    radius: 12,
-                                    backgroundColor: const Color(0xFF16A34A),
-                                    child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ],
-                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE1F1E4)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      childCount: filtered.length,
-                    ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: const Color(0xFFDDF7DD),
+                                child: Text(
+                                  userName.isNotEmpty ? userName[0] : 'م',
+                                  style: const TextStyle(
+                                    color: Color(0xFF2E7D32),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            userName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: Color(0xFF2F3A33),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isCompleted
+                                                ? const Color(0xFF16A34A)
+                                                : Colors.orange,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isCompleted ? 'مكتملة' : 'جارية',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            lastMessage,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[600],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Text(
+                                          time,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (unread > 0) ...[
+                                const SizedBox(width: 10),
+                                CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  child: Text(
+                                    '$unread',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }, childCount: filtered.length),
                   ),
                 ),
             ],
@@ -1850,7 +2458,12 @@ class _ChatsPageState extends State<_ChatsPage> {
     );
   }
 
-  Widget _filterChip(String label, bool isSelected, VoidCallback onTap, {Color activeColor = const Color(0xFF16A34A)}) {
+  Widget _filterChip(
+    String label,
+    bool isSelected,
+    VoidCallback onTap, {
+    Color activeColor = const Color(0xFF16A34A),
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1858,7 +2471,9 @@ class _ChatsPageState extends State<_ChatsPage> {
         decoration: BoxDecoration(
           color: isSelected ? activeColor.withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? activeColor : Colors.grey[300]!),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey[300]!,
+          ),
         ),
         child: Text(
           label,

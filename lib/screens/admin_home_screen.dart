@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
-import 'admin_shared_reports_screen.dart'; // ← NEW IMPORT
+import 'admin_shared_reports_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -2403,6 +2403,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   trailing: const Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey),
                   onTap: _showChangePasswordDialog,
                 ),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                ListTile(
+                  leading: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
+                  title: const Text('تغيير البريد الإلكتروني', style: TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey),
+                  onTap: _showChangeEmailDialog,
+                ),
               ],
             ),
           ),
@@ -2475,6 +2482,184 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 child: sending
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Text('إرسال', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showChangeEmailDialog() {
+    final emailController = TextEditingController();
+    String? emailError;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'تغيير البريد الإلكتروني',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D)),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'أدخل بريدك الإلكتروني الجديد. سيتم إرسال رابط تحقق إليه.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textDirection: TextDirection.ltr,
+                  onChanged: (v) => setDialogState(() {
+                    emailError = v.trim().isEmpty
+                        ? 'البريد الإلكتروني مطلوب'
+                        : !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                        ? 'صيغة البريد غير صحيحة'
+                        : null;
+                  }),
+                  decoration: InputDecoration(
+                    labelText: 'البريد الإلكتروني الجديد',
+                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2),
+                    ),
+                    errorText: emailError,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Current email display
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.email_outlined, color: Color(0xFF16A34A), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'الحالي: $_email',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF166534), fontWeight: FontWeight.w500),
+                        textDirection: TextDirection.ltr,
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 10),
+                // Warning banner
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Row(children: [
+                    Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'ستحتاج لإعادة تسجيل الدخول بعد تغيير البريد',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                  final newEmail = emailController.text.trim();
+                  if (newEmail.isEmpty ||
+                      !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(newEmail)) {
+                    setDialogState(() => emailError = 'أدخل بريداً صحيحاً');
+                    return;
+                  }
+                  if (newEmail == _email) {
+                    setDialogState(() => emailError = 'هذا هو بريدك الحالي');
+                    return;
+                  }
+                  setDialogState(() => saving = true);
+                  try {
+                    final user = FirebaseAuth.instance.currentUser!;
+                    final uid = user.uid;
+
+                    // 1. Send verification link to new email
+                    //    Firebase will only update Auth after the user
+                    //    clicks the link, so Firestore is updated via
+                    //    _fetchAdminData() on next login — but we also
+                    //    pre-write it so the UI reflects intent.
+                    await user.verifyBeforeUpdateEmail(newEmail);
+
+                    // 2. Pre-update Firestore with new email
+                    //    (will be confirmed once user verifies)
+                    await FirebaseFirestore.instance
+                        .collection('admins')
+                        .doc(uid)
+                        .update({'email': newEmail});
+                    await FirebaseFirestore.instance
+                        .collection('accounts')
+                        .doc(uid)
+                        .update({'email': newEmail});
+
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '✅ تم إرسال رابط التحقق إلى بريدك الجديد. تحقق منه لإتمام التغيير.',
+                          textDirection: TextDirection.rtl,
+                        ),
+                        backgroundColor: Color(0xFF16A34A),
+                        duration: Duration(seconds: 5),
+                      ),
+                    );
+                  } on FirebaseAuthException catch (e) {
+                    setDialogState(() => saving = false);
+                    String msg = 'حدث خطأ';
+                    if (e.code == 'requires-recent-login') {
+                      msg = 'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
+                    } else if (e.code == 'email-already-in-use') {
+                      msg = 'هذا البريد مستخدم بالفعل';
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: saving
+                    ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('إرسال رابط التحقق',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),

@@ -299,24 +299,31 @@ class _ReportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
-    final imageUrl  = report['ImageUrl'] ?? report['imageUrl'] ?? '';
+    final imageUrl = report['ImageUrl'] ?? report['imageUrl'] ?? '';
+    final isSpecialistReport = report['reportType'] == 'specialist';
 
-    final int plantConf   = (report['plantNameConfidence'] as num?)?.toInt()
-        ?? (report['confidence'] as num?)?.toInt() ?? 0;
-    final int diseaseConf = (report['diseaseConfidence'] as num?)?.toInt()
-        ?? (report['confidence'] as num?)?.toInt() ?? 0;
-    final String plantLbl   = (report['plantNetLabel']     ?? '').toString();
-    final String diseaseLbl = (report['modelDiseaseLabel'] ?? '').toString();
+    // Only get confidence data for AI reports
+    final int plantConf = isSpecialistReport ? 0 : ((report['plantNameConfidence'] ?? report['confidence'] ?? 0) as num).toInt();
+    final int diseaseConf = isSpecialistReport ? 0 : ((report['diseaseConfidence'] ?? report['confidence'] ?? 0) as num).toInt();
+    final String plantLbl = isSpecialistReport ? '' : (report['plantNetLabel'] ?? '').toString();
+    final String diseaseLbl = isSpecialistReport ? '' : (report['modelDiseaseLabel'] ?? '').toString();
     final Color diseaseColor = _isDiseased(diseaseLbl) ? Colors.red : const Color(0xFF16A34A);
+
+    // Specialist report colors
+    final specialistColor = const Color(0xFF8B5CF6);
 
     return GestureDetector(
       onTap: () => Navigator.push(context,
           MaterialPageRoute(builder: (c) => SharedReportDetailPage(report: report))),
       child: Container(
         decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: isSpecialistReport
+              ? Border.all(color: specialistColor.withOpacity(0.3), width: 1.5)
+              : null,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -330,15 +337,38 @@ class _ReportCard extends StatelessWidget {
                       fit: BoxFit.cover, errorBuilder: (_, __, ___) => _imgPlaceholder())
                       : _imgPlaceholder(),
                 ),
+                // Specialist badge (only for specialist reports)
+                if (isSpecialistReport)
+                  Positioned(
+                    top: 6, left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: specialistColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, color: Colors.white, size: 10),
+                          SizedBox(width: 4),
+                          Text('تقرير خبير', style: TextStyle(color: Colors.white, fontSize: 9)),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Status badge
                 Positioned(
                   top: 6, right: 6,
                   child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: isHealthy ? Colors.green : Colors.red,
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text(isHealthy ? 'سليم' : 'مريض',
-                          style: const TextStyle(color: Colors.white, fontSize: 10))),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isHealthy ? Colors.green : Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(isHealthy ? 'سليم' : 'مريض',
+                        style: const TextStyle(color: Colors.white, fontSize: 10)),
+                  ),
                 ),
               ]),
             ),
@@ -347,32 +377,65 @@ class _ReportCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Plant name
-                Text(report['plantName'] ?? 'نبات',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text('بواسطة: ${report['sharedBy'] ?? 'مستخدم'}',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey), maxLines: 1),
+                // Plant name with verified icon for specialist
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(report['plantName'] ?? 'نبات',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                    if (isSpecialistReport)
+                      Icon(Icons.verified, color: specialistColor, size: 14),
+                  ],
+                ),
+
+                // Shared by (different text for specialist)
+                if (isSpecialistReport)
+                  Text('بواسطة الخبير: ${report['specialistName'] ?? 'خبير'}',
+                      style: TextStyle(fontSize: 10, color: specialistColor), maxLines: 1)
+                else
+                  Text('بواسطة: ${report['sharedBy'] ?? 'مستخدم'}',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey), maxLines: 1),
+
                 const SizedBox(height: 6),
 
-                // ── Plant name confidence mini-bar ───────────────
-                _MiniConfidenceBar(
-                  icon: '🌿',
-                  percent: plantConf,
-                  sublabel: plantLbl.isNotEmpty ? plantLbl : '—',
-                  color: const Color(0xFF16A34A),
-                ),
-                const SizedBox(height: 5),
-
-                // ── Disease confidence mini-bar ──────────────────
-                _MiniConfidenceBar(
-                  icon: '🧬',
-                  percent: diseaseConf,
-                  sublabel: diseaseLbl.isNotEmpty
-                      ? (_isDiseased(diseaseLbl) ? 'مرضية: $diseaseLbl' : 'النبات سليم')
-                      : '—',
-                  color: diseaseColor,
-                ),
+                // Show different content based on report type
+                if (isSpecialistReport) ...[
+                  // Specialist report shows diagnosis preview
+                  Text(report['diagnosis'] ?? '',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  if (report['copyright'] != null)
+                    Text(report['copyright'],
+                        style: TextStyle(fontSize: 8, color: specialistColor.withOpacity(0.6)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                ] else ...[
+                  // AI Report shows confidence bars (only if data exists)
+                  if (plantConf > 0)
+                    _MiniConfidenceBar(
+                      icon: '🌿',
+                      percent: plantConf,
+                      sublabel: plantLbl.isNotEmpty ? plantLbl : '—',
+                      color: const Color(0xFF16A34A),
+                    ),
+                  if (plantConf > 0) const SizedBox(height: 5),
+                  if (diseaseConf > 0)
+                    _MiniConfidenceBar(
+                      icon: '🧬',
+                      percent: diseaseConf,
+                      sublabel: diseaseLbl.isNotEmpty
+                          ? (_isDiseased(diseaseLbl) ? 'مرضية: $diseaseLbl' : 'النبات سليم')
+                          : '—',
+                      color: diseaseColor,
+                    ),
+                  // If no confidence data, show diagnosis
+                  if (plantConf == 0 && diseaseConf == 0)
+                    Text(report['diagnosis'] ?? '',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                ],
 
                 const SizedBox(height: 4),
                 Align(
@@ -441,7 +504,7 @@ class _MiniConfidenceBar extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SHARED REPORT DETAIL PAGE  — with confidence bars + labels
+//  SHARED REPORT DETAIL PAGE  — with conditional confidence bars
 // ═══════════════════════════════════════════════════════════════
 class SharedReportDetailPage extends StatelessWidget {
   final Map<String, dynamic> report;
@@ -457,26 +520,23 @@ class SharedReportDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHealthy   = report['status'] == 'سليم' || report['isHealthy'] == true;
-    final imageUrl    = report['ImageUrl'] ?? report['imageUrl'] ?? '';
-    final Color pc    = isHealthy ? const Color(0xFF16A34A) : Colors.red;
+    final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
+    final imageUrl = report['ImageUrl'] ?? report['imageUrl'] ?? '';
+    final Color pc = isHealthy ? const Color(0xFF16A34A) : Colors.red;
+    final isSpecialistReport = report['reportType'] == 'specialist';
 
-    // ── Confidence data ───────────────────────────────────────────
-    final int plantNameConf   = (report['plantNameConfidence'] as num?)?.toInt()
-        ?? (report['confidence'] as num?)?.toInt() ?? 0;
-    final int diseaseConf     = (report['diseaseConfidence'] as num?)?.toInt()
-        ?? (report['confidence'] as num?)?.toInt() ?? 0;
-    final String plantLabel   = (report['plantNetLabel']     ?? '').toString();
-    final String diseaseLabel = (report['modelDiseaseLabel'] ?? '').toString();
+    // Specialist report colors
+    final specialistColor = const Color(0xFF8B5CF6);
 
-    // Plant bar is always green; disease bar colour depends on result
-    final Color diseaseBarColor = _isDiseaseLabel(diseaseLabel)
-        ? Colors.red
-        : const Color(0xFF16A34A);
+    // ── Confidence data (only for AI reports) ───────────────────
+    final int plantNameConf = isSpecialistReport ? 0 : ((report['plantNameConfidence'] as num?)?.toInt() ?? (report['confidence'] as num?)?.toInt() ?? 0);
+    final int diseaseConf = isSpecialistReport ? 0 : ((report['diseaseConfidence'] as num?)?.toInt() ?? (report['confidence'] as num?)?.toInt() ?? 0);
+    final String plantLabel = isSpecialistReport ? '' : (report['plantNetLabel'] ?? '').toString();
+    final String diseaseLabel = isSpecialistReport ? '' : (report['modelDiseaseLabel'] ?? '').toString();
+
+    final Color diseaseBarColor = _isDiseaseLabel(diseaseLabel) ? Colors.red : const Color(0xFF16A34A);
     final String diseaseSublabel = diseaseLabel.isNotEmpty
-        ? (_isDiseaseLabel(diseaseLabel)
-        ? 'تم رصد علامات مرضية: $diseaseLabel'
-        : 'النبات سليم')
+        ? (_isDiseaseLabel(diseaseLabel) ? 'تم رصد علامات مرضية: $diseaseLabel' : 'النبات سليم')
         : '—';
 
     return Directionality(
@@ -484,13 +544,19 @@ class SharedReportDetailPage extends StatelessWidget {
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAF8),
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: isSpecialistReport ? specialistColor : Colors.white,
           elevation: 1,
           centerTitle: true,
-          title: const Text('تفاصيل التقرير المشترك',
-              style: TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold, fontSize: 18)),
+          title: Text(
+            isSpecialistReport ? 'تقرير الخبير' : 'تفاصيل التقرير المشترك',
+            style: TextStyle(
+                color: isSpecialistReport ? Colors.white : const Color(0xFF14532D),
+                fontWeight: FontWeight.bold,
+                fontSize: 18
+            ),
+          ),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF16A34A)),
+            icon: Icon(Icons.arrow_back_ios_new, color: isSpecialistReport ? Colors.white : const Color(0xFF16A34A)),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -513,58 +579,147 @@ class SharedReportDetailPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: isSpecialistReport
+                      ? Border.all(color: specialistColor.withOpacity(0.3), width: 1.5)
+                      : null,
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(report['plantName'] ?? 'نبات',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
-                                color: Color(0xFF14532D))),
+                        Text(
+                          report['plantName'] ?? 'نبات',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: isSpecialistReport ? specialistColor : const Color(0xFF14532D)
+                          ),
+                        ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                              color: pc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                          child: Text(isHealthy ? 'سليم' : 'مريض',
-                              style: TextStyle(color: pc, fontWeight: FontWeight.bold)),
+                            color: isSpecialistReport ? specialistColor.withOpacity(0.1) : pc.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            isHealthy ? 'سليم' : 'مريض',
+                            style: TextStyle(
+                                color: isSpecialistReport ? specialistColor : pc,
+                                fontWeight: FontWeight.bold
+                            ),
+                          ),
                         ),
                       ],
                     ),
                     const Divider(height: 30),
-                    _detailRow(Icons.person_pin_rounded, 'تم النشر بواسطة', report['sharedBy'] ?? 'مستخدم'),
-                    _detailRow(Icons.calendar_month_rounded, 'تاريخ التقرير', report['date'] ?? '—'),
+
+                    // For specialist reports: Show BOTH sharer (user) AND specialist
+                    if (isSpecialistReport) ...[
+                      _detailRow(
+                        Icons.person_outline,
+                        'تمت المشاركة بواسطة',
+                        report['sharedBy'] ?? 'مستخدم',
+                        iconColor: specialistColor,
+                      ),
+                      const SizedBox(height: 4),
+                      _detailRow(
+                        Icons.verified,
+                        'الخبير المعتمد',
+                        report['specialistName'] ?? 'خبير',
+                        iconColor: specialistColor,
+                      ),
+                    ] else ...[
+                      _detailRow(
+                        Icons.person_pin_rounded,
+                        'تم النشر بواسطة',
+                        report['sharedBy'] ?? 'مستخدم',
+                      ),
+                    ],
+
+                    _detailRow(
+                      Icons.calendar_month_rounded,
+                      'تاريخ التقرير',
+                      report['date'] ?? '—',
+                      iconColor: isSpecialistReport ? specialistColor : null,
+                    ),
+
+                    // Only show copyright for specialist reports
+                    if (isSpecialistReport && report['copyright'] != null) ...[
+                      const SizedBox(height: 8),
+                      _detailRow(
+                        Icons.copyright,
+                        'حقوق النشر',
+                        report['copyright'] ?? '',
+                        iconColor: specialistColor,
+                      ),
+                    ],
+
                     const SizedBox(height: 16),
 
-                    // ── TWO CONFIDENCE BARS ─────────────────────
-                    _ConfidenceBar(
-                      label: '🌿 دقة تحديد اسم النبات',
-                      value: plantNameConf,
-                      barColor: const Color(0xFF16A34A),
-                      sublabel: plantLabel.isNotEmpty ? plantLabel : '—',
-                    ),
-                    const SizedBox(height: 14),
-                    Divider(color: Colors.grey.withOpacity(0.2)),
-                    const SizedBox(height: 14),
-                    _ConfidenceBar(
-                      label: '🧬 دقة تشخيص المرض',
-                      value: diseaseConf,
-                      barColor: diseaseBarColor,
-                      sublabel: diseaseSublabel,
-                    ),
-                    // ───────────────────────────────────────────
+                    // ── ONLY SHOW CONFIDENCE BARS FOR AI REPORTS ──
+                    if (!isSpecialistReport && plantNameConf > 0) ...[
+                      _ConfidenceBar(
+                        label: '🌿 دقة تحديد اسم النبات',
+                        value: plantNameConf,
+                        barColor: const Color(0xFF16A34A),
+                        sublabel: plantLabel.isNotEmpty ? plantLabel : '—',
+                      ),
+                      const SizedBox(height: 14),
+                      Divider(color: Colors.grey.withOpacity(0.2)),
+                      const SizedBox(height: 14),
+                      _ConfidenceBar(
+                        label: '🧬 دقة تشخيص المرض',
+                        value: diseaseConf,
+                        barColor: diseaseBarColor,
+                        sublabel: diseaseSublabel,
+                      ),
+                    ],
+
+                    // For specialist reports, show a verification badge instead
+                    if (isSpecialistReport) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: specialistColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.verified, color: specialistColor, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'هذا التقرير معتمد من خبير متخصص',
+                                style: TextStyle(color: specialistColor, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 16),
 
               // ── Diagnosis section ──────────────────────────────
-              _infoSection('التشخيص', report['diagnosis'] ?? 'لا يوجد بيانات', Icons.biotech_rounded),
+              _infoSection(
+                'التشخيص',
+                report['diagnosis'] ?? 'لا يوجد بيانات',
+                Icons.biotech_rounded,
+                isSpecialistReport ? specialistColor : null,
+              ),
               const SizedBox(height: 12),
-              _infoSection('العلاج الموصى به',
-                  report['treatment'] ?? 'لا يوجد علاج متاح حالياً', Icons.healing_rounded),
+              _infoSection(
+                'العلاج الموصى به',
+                report['treatment'] ?? 'لا يوجد علاج متاح حالياً',
+                Icons.healing_rounded,
+                isSpecialistReport ? specialistColor : null,
+              ),
               const SizedBox(height: 40),
             ],
           ),
@@ -573,31 +728,34 @@ class SharedReportDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value) {
+  Widget _detailRow(IconData icon, String label, String value, {Color? iconColor}) {
+    final color = iconColor ?? const Color(0xFF16A34A);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
-        Icon(icon, size: 20, color: const Color(0xFF16A34A)),
+        Icon(icon, size: 18, color: color),
         const SizedBox(width: 10),
-        Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+        Text('$label: ', style: TextStyle(color: Colors.grey, fontSize: 13)),
         Expanded(child: Text(value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2F3A33)))),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color))),
       ]),
     );
   }
 
-  Widget _infoSection(String title, String content, IconData icon) {
+  Widget _infoSection(String title, String content, IconData icon, [Color? customColor]) {
+    final color = customColor ?? const Color(0xFF16A34A);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0xFFE8F5E9))),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, color: const Color(0xFF16A34A), size: 18),
+          Icon(icon, color: color, size: 18),
           const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
         ]),
         const SizedBox(height: 10),
         Text(content, style: const TextStyle(color: Colors.black87, height: 1.6, fontSize: 14)),

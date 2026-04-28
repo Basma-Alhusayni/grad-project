@@ -93,7 +93,6 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
   }
 
   // --- End Chat & Report Logic ---
-  // --- End Chat & Report Logic ---
   Future<void> _showEndChatDialog() async {
     // Fetch all messages from the chat to find images
     final chatDoc = await _db.collection('chats').doc(widget.chatId).get();
@@ -204,10 +203,26 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
-    // 1. Mark Chat as Complete (Locks chat for user and triggers rating)
-    await _db.collection('chats').doc(widget.chatId).update({'completed': true});
+    // Create report object to save in chat
+    final reportData = {
+      'reportId': DateTime.now().millisecondsSinceEpoch.toString(),
+      'plantName': plantName,
+      'diagnosis': diagnosis,
+      'treatment': treatment,
+      'plantImage': imageUrl,
+      'date': '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+      'specialistId': uid,
+      'sharedToDashboard': false,
+      'status': diagnosis.contains('سليم') ? 'سليم' : 'مريض',  // ← ADD THIS
+    };
 
-    // 2. Save report to the new 'specialist_reports' collection
+    // 1. Mark Chat as Complete AND save report in chat
+    await _db.collection('chats').doc(widget.chatId).update({
+      'completed': true,
+      'report': reportData,  // ← This makes it visible to user
+    });
+
+    // 2. Save report to specialist_reports collection (specialist's profile)
     if (uid != null) {
       await _db.collection('specialist_reports').add({
         'specialistId': uid,

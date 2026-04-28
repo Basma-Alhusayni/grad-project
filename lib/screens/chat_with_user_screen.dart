@@ -48,6 +48,254 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     super.dispose();
   }
 
+// ── عرض تقرير الخبير مع زر المشاركة ─────────────────────────
+
+  Widget _buildReportSection(Map<String, dynamic> report) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF16A34A), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.assignment, color: Color(0xFF16A34A), size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'تقرير الحالة',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  report['sharedToDashboard'] == true ? Icons.public_off : Icons.share,
+                  color: report['sharedToDashboard'] == true ? Colors.orange : const Color(0xFF16A34A),
+                ),
+                onPressed: () => report['sharedToDashboard'] == true
+                    ? _unshareReportFromDashboard(report)
+                    : _shareReportToDashboard(report),
+                tooltip: report['sharedToDashboard'] == true ? 'إلغاء المشاركة' : 'مشاركة التقرير',
+              ),
+            ],
+          ),
+          const Divider(),
+          if (report['plantImage'] != null && report['plantImage'].isNotEmpty)
+            Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    report['plantImage'],
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          _buildReportDetailRow('🌿 اسم النبتة:', report['plantName'] ?? 'غير محدد'),
+          const SizedBox(height: 8),
+          _buildReportDetailRow('🩺 التشخيص:', report['diagnosis'] ?? 'غير محدد'),
+          const SizedBox(height: 8),
+          _buildReportDetailRow('💊 العلاج:', report['treatment'] ?? 'غير محدد'),
+          const SizedBox(height: 8),
+          _buildReportDetailRow('📅 التاريخ:', report['date'] ?? 'غير محدد'),
+          if (report['sharedToDashboard'] == true)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.public, size: 14, color: Colors.blue),
+                  SizedBox(width: 4),
+                  Text('تمت المشاركة في لوحة التحكم', style: TextStyle(fontSize: 11, color: Colors.blue)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
+
+// ── مشاركة تقارير الخبير ─────────────────────────────────────
+  Future<void> _shareReportToDashboard(Map<String, dynamic> report) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // Check if already shared
+    if (report['sharedToDashboard'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('هذا التقرير تمت مشاركته بالفعل')),
+      );
+      return;
+    }
+
+    try {
+      // Get user name
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
+
+      // Get current year for copyright
+      final currentYear = DateTime.now().year;
+
+      // Determine status based on diagnosis
+      final diagnosis = report['diagnosis'] ?? '';
+      final isHealthy = diagnosis.contains('سليم') ||
+          diagnosis.contains('healthy') ||
+          diagnosis.contains('طازج');
+      final finalStatus = report['status'] ?? (isHealthy ? 'سليم' : 'مريض');
+
+      // Prepare data for community feed
+      final sharedData = {
+        'plantName': report['plantName'],
+        'ImageUrl': report['plantImage'],
+        'diagnosis': report['diagnosis'],
+        'treatment': report['treatment'],
+        'status': finalStatus,
+        'date': report['date'],
+        'createdAt': FieldValue.serverTimestamp(),
+        'sharedBy': userName,
+        'userId': uid,
+        'chatId': widget.chatId,
+        'reportId': report['reportId'],
+        'specialistName': widget.expertName,
+        'isSpecialistReport': true,
+        'reportType': 'specialist',
+        'copyright': '© $currentYear BioShield - تقرير معتمد من الخبير ${widget.expertName}',
+      };
+
+      // 1. Add to community feed (for home screen)
+      final feedRef = await _db.collection('community_feed').add(sharedData);
+
+      // 2. ALSO add to shared_reports (for admin panel)
+      await _db.collection('shared_reports').add({
+        ...sharedData,
+        'feedDocId': feedRef.id,  // Link to community_feed document
+      });
+
+      // Mark report as shared in the chat document
+      await _db.collection('chats').doc(widget.chatId).update({
+        'report.sharedToDashboard': true,
+      });
+
+      setState(() {});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ تم مشاركة التقرير في لوحة التحكم'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('حدث خطأ: $e')),
+      );
+    }
+  }
+
+  // ── الغاء مشاركة تقارير الخبير ─────────────────────────────────────
+  Future<void> _unshareReportFromDashboard(Map<String, dynamic> report) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      // Find and delete from community_feed
+      final communityFeedQuery = await _db
+          .collection('community_feed')
+          .where('chatId', isEqualTo: widget.chatId)
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      for (var doc in communityFeedQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Also delete from shared_reports
+      final sharedReportsQuery = await _db
+          .collection('shared_reports')
+          .where('chatId', isEqualTo: widget.chatId)
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      for (var doc in sharedReportsQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Mark report as not shared in the chat document
+      await _db.collection('chats').doc(widget.chatId).update({
+        'report.sharedToDashboard': false,
+      });
+
+      setState(() {});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ تم إلغاء مشاركة التقرير'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('حدث خطأ: $e')),
+      );
+    }
+  }
+
+
+
   // ── مراقبة حالة الشات ─────────────────────────────────────
   void _listenToChat() {
     _db.collection('chats').doc(widget.chatId).snapshots().listen((snap) {
@@ -167,7 +415,6 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     _scrollToBottom();
   }
 
-  // ── ديالوج التقييم ─────────────────────────────────────────
   // ── ديالوج التقييم ─────────────────────────────────────────
   void _showRatingDialog() {
     int selectedRating = 0;
@@ -617,10 +864,11 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
 
         final data = snapshot.data?.data() as Map<String, dynamic>?;
         final rawMessages = data?['messages'] as List<dynamic>? ?? [];
+        final report = data?['report'] as Map<String, dynamic>?;
 
         _scrollToBottom();
 
-        if (rawMessages.isEmpty) {
+        if (rawMessages.isEmpty && report == null) {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -635,14 +883,18 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
           );
         }
 
-        return ListView.builder(
+        return ListView(
           controller: _scrollController,
           padding: const EdgeInsets.all(14),
-          itemCount: rawMessages.length,
-          itemBuilder: (context, index) {
-            final msg = Map<String, dynamic>.from(rawMessages[index]);
-            return _MessageBubble(msg: msg);
-          },
+          children: [
+            ...List.generate(rawMessages.length, (index) {
+              final msg = Map<String, dynamic>.from(rawMessages[index]);
+              return _MessageBubble(msg: msg);
+            }),
+            // Show report section if chat is completed and report exists
+            if (_isCompleted && report != null)
+              _buildReportSection(report),
+          ],
         );
       },
     );
