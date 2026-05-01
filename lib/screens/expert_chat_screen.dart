@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
+import 'splash_screen.dart';
+import 'specialist_list_screen.dart';
+import 'diagnosis_screen.dart';
+import 'user_reports_screen.dart';
+import 'user_profile_screen.dart';
+import 'dart:io';
 
 class ExpertChatScreen extends StatefulWidget {
   final String chatId;
@@ -17,6 +24,7 @@ class ExpertChatScreen extends StatefulWidget {
   @override
   State<ExpertChatScreen> createState() => _ExpertChatScreenState();
 }
+
 class _ExpertChatScreenState extends State<ExpertChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -27,6 +35,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
   final _treatmentController = TextEditingController();
 
   bool _isCompleted = false;
+  int _previousMessageCount = 0;
 
   @override
   void initState() {
@@ -67,6 +76,50 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
+  // ── Full image viewer ────────────────────────────────────────
+  void _showFullImage(String content) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black87,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              maxScale: 5.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: content.startsWith('http')
+                    ? Image.network(content, fit: BoxFit.contain)
+                    : File(content).existsSync()
+                    ? Image.file(File(content), fit: BoxFit.contain)
+                    : const SizedBox(),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child:
+                  const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -86,31 +139,30 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
       'lastMessage': text,
       'time': _now(),
       'updatedAt': DateTime.now().toIso8601String(),
-      'userUnread': FieldValue.increment(1), // ✅ Alerts the User
+      'userUnread': FieldValue.increment(1),
     });
 
     _scrollToBottom();
   }
 
-  // --- End Chat & Report Logic ---
   Future<void> _showEndChatDialog() async {
-    // Fetch all messages from the chat to find images
     final chatDoc = await _db.collection('chats').doc(widget.chatId).get();
     final messages = (chatDoc.data()?['messages'] as List<dynamic>?) ?? [];
 
-    // Extract only the images sent in the chat
     final List<String> chatImages = messages
         .where((m) => m['type'] == 'image')
         .map((m) => m['content'] as String)
         .toList();
 
-    // If there was a plantImage attached to the chat creation, add it too
     final initialImage = chatDoc.data()?['plantImage'] as String?;
-    if (initialImage != null && initialImage.isNotEmpty && !chatImages.contains(initialImage)) {
+    if (initialImage != null &&
+        initialImage.isNotEmpty &&
+        !chatImages.contains(initialImage)) {
       chatImages.insert(0, initialImage);
     }
 
-    String selectedImageUrl = chatImages.isNotEmpty ? chatImages.first : '';
+    String selectedImageUrl =
+    chatImages.isNotEmpty ? chatImages.first : '';
 
     if (!mounted) return;
 
@@ -121,7 +173,13 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
         textDirection: TextDirection.rtl,
         child: StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
-            title: const Text('إنهاء المحادثة وكتابة التقرير', style: TextStyle(color: Color(0xFF16A34A), fontSize: 16, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'إنهاء المحادثة وكتابة التقرير',
+              style: TextStyle(
+                  color: Color(0xFF16A34A),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -129,12 +187,13 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                 children: [
                   if (chatImages.isNotEmpty) ...[
                     const Text('اختر الصورة المرفقة بالتقرير:',
-                        style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-
-                    // 🔥 FIX: Wrap this Container with a width to stop the crash
                     SizedBox(
-                      width: 300, // Give it a fixed width so the Dialog knows how big to be
+                      width: 300,
                       height: 80,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
@@ -143,18 +202,24 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                           final imgUrl = chatImages[index];
                           final isSelected = selectedImageUrl == imgUrl;
                           return GestureDetector(
-                            onTap: () => setDialogState(() => selectedImageUrl = imgUrl),
+                            onTap: () => setDialogState(
+                                    () => selectedImageUrl = imgUrl),
                             child: Container(
                               margin: const EdgeInsets.only(left: 8),
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                    color: isSelected ? const Color(0xFF16A34A) : Colors.transparent,
+                                    color: isSelected
+                                        ? const Color(0xFF16A34A)
+                                        : Colors.transparent,
                                     width: 3),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: Image.network(imgUrl, width: 70, height: 70, fit: BoxFit.cover),
+                                child: Image.network(imgUrl,
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.cover),
                               ),
                             ),
                           );
@@ -163,23 +228,32 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  _reportField('اسم النبتة', 'مثال: نبات الطماطم', _plantNameController),
+                  _reportField('اسم النبتة', 'مثال: نبات الطماطم',
+                      _plantNameController),
                   const SizedBox(height: 12),
-                  _reportField('التشخيص / المرض', 'اكتب التشخيص هنا...', _diseaseController, maxLines: 2),
+                  _reportField('التشخيص / المرض', 'اكتب التشخيص هنا...',
+                      _diseaseController,
+                      maxLines: 2),
                   const SizedBox(height: 12),
-                  _reportField('العلاج المقترح', 'اكتب خطة العلاج...', _treatmentController, maxLines: 3),
+                  _reportField('العلاج المقترح', 'اكتب خطة العلاج...',
+                      _treatmentController,
+                      maxLines: 3),
                 ],
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16a34a)),
-                icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
-                label: const Text('حفظ وإنهاء', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16a34a)),
+                icon: const Icon(Icons.check_circle_outline,
+                    size: 18, color: Colors.white),
+                label: const Text('حفظ وإنهاء',
+                    style: TextStyle(color: Colors.white)),
                 onPressed: () async {
                   await _submitReport(selectedImageUrl);
                 },
@@ -197,32 +271,31 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     final treatment = _treatmentController.text.trim();
 
     if (plantName.isEmpty || diagnosis.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء تعبئة اسم النبتة والتشخيص')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('الرجاء تعبئة اسم النبتة والتشخيص')));
       return;
     }
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
-    // Create report object to save in chat
     final reportData = {
       'reportId': DateTime.now().millisecondsSinceEpoch.toString(),
       'plantName': plantName,
       'diagnosis': diagnosis,
       'treatment': treatment,
       'plantImage': imageUrl,
-      'date': '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+      'date':
+      '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
       'specialistId': uid,
       'sharedToDashboard': false,
-      'status': diagnosis.contains('سليم') ? 'سليم' : 'مريض',  // ← ADD THIS
+      'status': diagnosis.contains('سليم') ? 'سليم' : 'مريض',
     };
 
-    // 1. Mark Chat as Complete AND save report in chat
     await _db.collection('chats').doc(widget.chatId).update({
       'completed': true,
-      'report': reportData,  // ← This makes it visible to user
+      'report': reportData,
     });
 
-    // 2. Save report to specialist_reports collection (specialist's profile)
     if (uid != null) {
       await _db.collection('specialist_reports').add({
         'specialistId': uid,
@@ -232,28 +305,33 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
         'diagnosis': diagnosis,
         'treatment': treatment,
         'plantImage': imageUrl,
-        'date': '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+        'date':
+        '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Update the total cases handled by the expert in their profile
-      await _db.collection('specialists').doc(uid).update({
-        'totalCases': FieldValue.increment(1)
-      });
+      await _db.collection('specialists').doc(uid).update(
+          {'totalCases': FieldValue.increment(1)});
     }
 
     if (mounted) {
-      Navigator.pop(context); // Close dialog
-      Navigator.pop(context); // Leave chat screen
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنهاء المحادثة وحفظ التقرير بنجاح'), backgroundColor: Colors.green));
+      Navigator.pop(context);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('تم إنهاء المحادثة وحفظ التقرير بنجاح'),
+          backgroundColor: Colors.green));
     }
   }
 
-  Widget _reportField(String label, String hint, TextEditingController ctrl, {int maxLines = 1}) {
+  Widget _reportField(
+      String label, String hint, TextEditingController ctrl,
+      {int maxLines = 1}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         TextField(
           controller: ctrl,
@@ -262,8 +340,10 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(fontSize: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 10),
           ),
         ),
       ],
@@ -284,10 +364,14 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                 width: double.infinity,
                 color: Colors.grey[200],
                 padding: const EdgeInsets.all(8),
-                child: const Text('تم إنهاء هذه المحادثة', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                child: const Text('تم إنهاء هذه المحادثة',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey)),
               ),
             Expanded(child: _buildMessages()),
             if (!_isCompleted) _buildInputBar(),
+            if (_isCompleted)
+              const SafeArea(top: false, child: SizedBox(height: 8)),
           ],
         ),
       ),
@@ -301,7 +385,8 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_forward, color: Color(0xFF15803d)),
+            icon: const Icon(Icons.arrow_forward,
+                color: Color(0xFF15803d)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           CircleAvatar(
@@ -317,40 +402,52 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(widget.userName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    // 🔥 NEW: Real-time Online Stream using widget.userId
                     if (widget.userId.isNotEmpty)
                       StreamBuilder<DocumentSnapshot>(
-                        stream: _db.collection('users').doc(widget.userId).snapshots(),
+                        stream: _db
+                            .collection('users')
+                            .doc(widget.userId)
+                            .snapshots(),
                         builder: (context, snapshot) {
                           final isOnline = snapshot.data?.data() != null
-                              ? (snapshot.data!.data() as Map<String, dynamic>)['isOnline'] == true
+                              ? (snapshot.data!.data()
+                          as Map<String, dynamic>)[
+                          'isOnline'] ==
+                              true
                               : false;
 
                           if (isOnline) {
                             return const Row(
                               children: [
-                                Icon(Icons.circle, color: Color(0xFF16A34A), size: 8),
+                                Icon(Icons.circle,
+                                    color: Color(0xFF16A34A), size: 8),
                                 SizedBox(width: 4),
-                                Text('متصل الآن', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.bold)),
+                                Text('متصل الآن',
+                                    style: TextStyle(
+                                        color: Color(0xFF16A34A),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold)),
                                 SizedBox(width: 8),
                               ],
                             );
                           }
-                          return const SizedBox.shrink(); // Empty space if offline
+                          return const SizedBox.shrink();
                         },
                       ),
-
-                    // Chat Status
                     Text(
                       _isCompleted ? 'مكتملة' : 'محادثة جارية',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: _isCompleted ? Colors.grey : Colors.orange,
+                        color: _isCompleted
+                            ? Colors.grey
+                            : const Color(0xFF2D322C),
                       ),
                     ),
                   ],
@@ -358,7 +455,6 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
               ],
             ),
           ),
-          // --- THE 3 DOT MENU ---
           if (!_isCompleted)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Color(0xFF15803d)),
@@ -367,12 +463,14 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                   _showEndChatDialog();
                 }
               },
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              itemBuilder: (BuildContext context) =>
+              <PopupMenuEntry<String>>[
                 const PopupMenuItem<String>(
                   value: 'complete',
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
+                      Icon(Icons.check_circle,
+                          color: Color(0xFF16A34A), size: 18),
                       SizedBox(width: 8),
                       Text('إنهاء المحادثة'),
                     ],
@@ -385,22 +483,31 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
-  // _buildMessages() and _ExpertMessageBubble remain exactly the same...
   Widget _buildMessages() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.collection('chats').doc(widget.chatId).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data?.data() as Map<String, dynamic>?;
         final rawMessages = data?['messages'] as List<dynamic>? ?? [];
-        _scrollToBottom();
+
+        if (rawMessages.length > _previousMessageCount) {
+          _previousMessageCount = rawMessages.length;
+          _scrollToBottom();
+        }
+
         return ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           itemCount: rawMessages.length,
           itemBuilder: (context, index) {
             final msg = Map<String, dynamic>.from(rawMessages[index]);
-            return _ExpertMessageBubble(msg: msg);
+            return _ExpertMessageBubble(
+              msg: msg,
+              onImageTap: _showFullImage,
+            );
           },
         );
       },
@@ -422,17 +529,30 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                 onSubmitted: (_) => _sendMessage(),
                 decoration: InputDecoration(
                   hintText: 'اكتب رسالتك...',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFFbbf7d0))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFFbbf7d0))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFF4ade80), width: 1.5)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFbbf7d0))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFbbf7d0))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF4ade80), width: 1.5)),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: _sendMessage,
-              child: const CircleAvatar(radius: 22, backgroundColor: Color(0xFF16a34a), child: Icon(Icons.send, color: Colors.white, size: 20)),
+              child: const CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Color(0xFF16a34a),
+                  child: Icon(Icons.send, color: Colors.white, size: 20)),
             ),
           ],
         ),
@@ -443,35 +563,84 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
 
 class _ExpertMessageBubble extends StatelessWidget {
   final Map<String, dynamic> msg;
-  const _ExpertMessageBubble({required this.msg});
+  final void Function(String) onImageTap;
+
+  const _ExpertMessageBubble(
+      {required this.msg, required this.onImageTap});
+
   @override
   Widget build(BuildContext context) {
     final isExpert = msg['sender'] == 'expert';
-    final isImage = msg['type'] == 'image'; // Check if it's an image
+    final isImage = msg['type'] == 'image';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Align(
-        alignment: isExpert ? Alignment.centerLeft : Alignment.centerRight,
+        alignment:
+        isExpert ? Alignment.centerLeft : Alignment.centerRight,
         child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-          padding: isImage ? const EdgeInsets.all(4) : const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.72),
+          padding: isImage
+              ? const EdgeInsets.all(4)
+              : const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isExpert ? const Color(0xFF16a34a) : Colors.white,
+            color:
+            isExpert ? const Color(0xFF16a34a) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2))
+            ],
           ),
           child: isImage
-              ? ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(msg['content'], height: 200, width: 200, fit: BoxFit.cover),
+              ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  final content = msg['content'] ?? '';
+                  if (content.isNotEmpty) onImageTap(content);
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(msg['content'],
+                      height: 200,
+                      width: 200,
+                      fit: BoxFit.cover),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(
+                    top: 4, right: 4, left: 4),
+                child: Text(msg['time'] ?? '',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: isExpert
+                            ? Colors.green[100]
+                            : Colors.grey[400])),
+              ),
+            ],
           )
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(msg['content'] ?? '', style: TextStyle(fontSize: 14, color: isExpert ? Colors.white : Colors.grey[800])),
+              Text(msg['content'] ?? '',
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: isExpert
+                          ? Colors.white
+                          : Colors.grey[800])),
               const SizedBox(height: 2),
-              Text(msg['time'] ?? '', style: TextStyle(fontSize: 10, color: isExpert ? Colors.green[100] : Colors.grey[400])),
+              Text(msg['time'] ?? '',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: isExpert
+                          ? Colors.green[100]
+                          : Colors.grey[400])),
             ],
           ),
         ),

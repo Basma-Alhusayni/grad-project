@@ -255,136 +255,136 @@ class _UserAuthScreenState extends State<UserAuthScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0FDF4),
+      // KEY FIX: resizeToAvoidBottomInset keeps the layout stable when keyboard appears
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Directionality(
           textDirection: TextDirection.rtl,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF16A34A)),
+                      label: const Text('رجوع', style: TextStyle(color: Color(0xFF16A34A))),
+                    ),
                   ),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: TextButton.icon(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.arrow_back, color: Color(0xFF16A34A)),
-                            label: const Text('رجوع', style: TextStyle(color: Color(0xFF16A34A))),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
+                    child: const Icon(Icons.person, size: 64, color: Color(0xFF16A34A)),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, 4))]),
+                    child: Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(12)),
+                          child: TabBar(
+                            controller: _tab,
+                            indicator: BoxDecoration(color: const Color(0xFF16A34A), borderRadius: BorderRadius.circular(10)),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            labelColor: Colors.white,
+                            unselectedLabelColor: Colors.grey[600],
+                            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                            tabs: const [Tab(text: 'تسجيل الدخول'), Tab(text: 'إنشاء حساب')],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-                          child: const Icon(Icons.person, size: 64, color: Color(0xFF16A34A)),
-                        ),
-                        const SizedBox(height: 24),
-                        Container(
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, 4))]),
-                          child: Column(children: [
-                            Container(
-                              margin: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(12)),
-                              child: TabBar(
-                                controller: _tab,
-                                indicator: BoxDecoration(color: const Color(0xFF16A34A), borderRadius: BorderRadius.circular(10)),
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                labelColor: Colors.white,
-                                unselectedLabelColor: Colors.grey[600],
-                                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                                tabs: const [Tab(text: 'تسجيل الدخول'), Tab(text: 'إنشاء حساب')],
-                              ),
-                            ),
 
-                            if (_tab.index == 0) // --- LOGIN TAB ---
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                  _label('البريد الإلكتروني'),
-                                  const SizedBox(height: 6),
-                                  ValidatedField(hint: 'example@email.com', icon: Icons.email_outlined, controller: _loginEmail, errorText: _loginEmailError),
-                                  const SizedBox(height: 12),
-                                  _label('كلمة المرور'),
-                                  const SizedBox(height: 6),
-                                  PasswordField(
-                                    hint: '••••••••',
-                                    controller: _loginPass,
-                                    visible: _loginPassVisible,
-                                    errorText: _loginPassError,
-                                    onToggle: () => setState(() => _loginPassVisible = !_loginPassVisible),
-                                  ),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        if (_tab.index == 0) // --- LOGIN TAB ---
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _label('البريد الإلكتروني'),
+                                const SizedBox(height: 6),
+                                ValidatedField(hint: 'example@email.com', icon: Icons.email_outlined, controller: _loginEmail, errorText: _loginEmailError),
+                                const SizedBox(height: 12),
+                                _label('كلمة المرور'),
+                                const SizedBox(height: 6),
+                                PasswordField(
+                                  hint: '••••••••',
+                                  controller: _loginPass,
+                                  visible: _loginPassVisible,
+                                  errorText: _loginPassError,
+                                  onToggle: () => setState(() => _loginPassVisible = !_loginPassVisible),
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
                                     Row(children: [
                                       Checkbox(value: _rememberMe, onChanged: (v) => setState(() => _rememberMe = v!), activeColor: const Color(0xFF16A34A)),
                                       const Text('تذكرني', style: TextStyle(fontSize: 12)),
                                     ]),
                                     TextButton(onPressed: _forgotPassword, child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFF16A34A), fontSize: 12))),
-                                  ]),
+                                  ],
+                                ),
 
-                                  if (_error != null) _errorBox(_error!),
+                                if (_error != null) _errorBox(_error!),
 
-                                  const SizedBox(height: 10),
-                                  // ICON REMOVED HERE
-                                  GreenButton(label: 'تسجيل الدخول', onPressed: _login, isLoading: _loading),
-                                  const SizedBox(height: 8),
-                                ]),
-                              ),
+                                const SizedBox(height: 10),
+                                GreenButton(label: 'تسجيل الدخول', onPressed: _login, isLoading: _loading),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                          ),
 
-                            if (_tab.index == 1) // --- SIGNUP TAB ---
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                  _label('الاسم الكامل'),
-                                  const SizedBox(height: 6),
-                                  ValidatedField(hint: 'أدخل اسمك الكامل', icon: Icons.person_outline, controller: _signupName, errorText: _nameError),
-                                  const SizedBox(height: 12),
-                                  _label('اسم المستخدم'),
-                                  const SizedBox(height: 6),
-                                  ValidatedField(hint: 'أدخل اسم المستخدم', icon: Icons.alternate_email, controller: _signupUsername, errorText: _usernameError),
-                                  const SizedBox(height: 12),
-                                  _label('البريد الإلكتروني'),
-                                  const SizedBox(height: 6),
-                                  ValidatedField(hint: 'example@email.com', icon: Icons.email_outlined, controller: _signupEmail, errorText: _emailError, keyboardType: TextInputType.emailAddress),
-                                  const SizedBox(height: 12),
-                                  _label('كلمة المرور'),
-                                  const SizedBox(height: 6),
-                                  PasswordField(hint: '••••••••', controller: _signupPass, visible: _signupPassVisible, errorText: _passError, onToggle: () => setState(() => _signupPassVisible = !_signupPassVisible)),
-                                  const SizedBox(height: 12),
-                                  _label('تأكيد كلمة المرور'),
-                                  const SizedBox(height: 6),
-                                  PasswordField(hint: '••••••••', controller: _signupConfirm, visible: _signupConfirmVisible, errorText: _confirmError, onToggle: () => setState(() => _signupConfirmVisible = !_signupConfirmVisible)),
+                        if (_tab.index == 1) // --- SIGNUP TAB ---
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _label('الاسم الكامل'),
+                                const SizedBox(height: 6),
+                                ValidatedField(hint: 'أدخل اسمك الكامل', icon: Icons.person_outline, controller: _signupName, errorText: _nameError),
+                                const SizedBox(height: 12),
+                                _label('اسم المستخدم'),
+                                const SizedBox(height: 6),
+                                ValidatedField(hint: 'أدخل اسم المستخدم', icon: Icons.alternate_email, controller: _signupUsername, errorText: _usernameError),
+                                const SizedBox(height: 12),
+                                _label('البريد الإلكتروني'),
+                                const SizedBox(height: 6),
+                                ValidatedField(hint: 'example@email.com', icon: Icons.email_outlined, controller: _signupEmail, errorText: _emailError, keyboardType: TextInputType.emailAddress),
+                                const SizedBox(height: 12),
+                                _label('كلمة المرور'),
+                                const SizedBox(height: 6),
+                                PasswordField(hint: '••••••••', controller: _signupPass, visible: _signupPassVisible, errorText: _passError, onToggle: () => setState(() => _signupPassVisible = !_signupPassVisible)),
+                                const SizedBox(height: 12),
+                                _label('تأكيد كلمة المرور'),
+                                const SizedBox(height: 6),
+                                PasswordField(hint: '••••••••', controller: _signupConfirm, visible: _signupConfirmVisible, errorText: _confirmError, onToggle: () => setState(() => _signupConfirmVisible = !_signupConfirmVisible)),
 
-                                  if (_error != null) _errorBox(_error!),
+                                if (_error != null) _errorBox(_error!),
 
-                                  const SizedBox(height: 16),
-                                  // ICON REMOVED HERE
-                                  GreenButton(label: 'إنشاء حساب', onPressed: _signup, isLoading: _loading),
-                                  const SizedBox(height: 8),
-                                ]),
-                              ),
-                          ]),
-                        ),
-
-                        // --- SPACER PUSHES TEXT TO BOTTOM ---
-                        const Spacer(),
-
-                        const Text('جميع الحقوق محفوظة © 2026 BioShield', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        const SizedBox(height: 8),
-                      ]),
+                                const SizedBox(height: 16),
+                                GreenButton(label: 'إنشاء حساب', onPressed: _signup, isLoading: _loading),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ),
-              );
-            },
+
+                  const SizedBox(height: 24),
+                  const Text('جميع الحقوق محفوظة © 2026 BioShield', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ),
         ),
       ),

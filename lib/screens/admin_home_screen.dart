@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../services/auth_service.dart';
 import 'splash_screen.dart';
 import 'admin_shared_reports_screen.dart';
@@ -20,6 +22,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   String _filterStatus = 'active';
   String selectedStatus = 'pending';
   String _selectedEditStatus = 'pending';
+
+  // ── EmailJS credentials ─────────────────────────────────────────
+  static const String _emailJSServiceId = 'service_8howa9v';
+  static const String _emailJSPublicKey = '78Wkripf_iReiFIPK';
+  static const String _emailJSDeactivateTemplateId = 'template_cocv9le';
+  static const String _emailJSDeleteTemplateId = 'template_sb6f5vk';
+  static const String _adminContactEmail = 'bioshield.gp@gmail.com';
 
   @override
   void initState() {
@@ -53,6 +62,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _email = authEmail.isNotEmpty ? authEmail : firestoreEmail;
       _loading = false;
     });
+  }
+
+  // ── EmailJS helper ──────────────────────────────────────────────
+  Future<void> _sendEmailJS({
+    required String toEmail,
+    required String toName,
+    required String templateId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'service_id': _emailJSServiceId,
+          'template_id': templateId,
+          'user_id': _emailJSPublicKey,
+          'template_params': {
+            'to_email': toEmail,
+            'to_name': toName,
+            'admin_email': _adminContactEmail,
+          },
+        }),
+      );
+      debugPrint('✅ EmailJS status: ${response.statusCode}');
+      debugPrint('✅ EmailJS body: ${response.body}');
+    } catch (e) {
+      debugPrint('❌ EmailJS error: $e');
+    }
   }
 
   Future<void> _logout() async {
@@ -186,7 +223,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
           ],
         ),
-        // ── UPDATED BODY SWITCH ──────────────────────────────────
         body: _loading
             ? const Center(
             child: CircularProgressIndicator(color: Color(0xFF16A34A)))
@@ -199,9 +235,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             : _currentIndex == 3
             ? _buildEditRequestsTab()
             : _currentIndex == 4
-            ? const AdminSharedReportsScreen()   // ← NEW TAB
+            ? const AdminSharedReportsScreen()
             : _buildProfileTab(),
-        // ── UPDATED BOTTOM NAV (6 items) ────────────────────────
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
@@ -233,12 +268,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               activeIcon: Icon(Icons.edit_note),
               label: 'طلبات التعديل',
             ),
-            BottomNavigationBarItem(          // ← NEW
+            BottomNavigationBarItem(
               icon: Icon(Icons.public_outlined),
               activeIcon: Icon(Icons.public),
               label: 'المنشورات',
             ),
-            BottomNavigationBarItem(          // ← Profile shifted to index 5
+            BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'الملف الشخصي',
@@ -277,29 +312,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           stream: FirebaseFirestore.instance.collection('users').snapshots(),
           builder: (context, usersSnap) {
             if (!usersSnap.hasData) return const SizedBox();
-
             final users = usersSnap.data!.docs;
-
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('accounts')
                   .snapshots(),
               builder: (context, accSnap) {
                 if (!accSnap.hasData) return const SizedBox();
-
                 final accounts = accSnap.data!.docs;
-
                 int active = 0;
                 int disabled = 0;
-
                 for (var user in users) {
                   final userId = user.id;
-
                   final acc = accounts.where((a) => a['accountId'] == userId);
-
                   if (acc.isNotEmpty) {
                     final status = acc.first['status'];
-
                     if (status == 'active') {
                       active++;
                     } else {
@@ -307,18 +334,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     }
                   }
                 }
-
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _filterStatus = 'active';
-                            });
-                          },
+                          onTap: () => setState(() => _filterStatus = 'active'),
                           child: _statBox(
                             "$active",
                             "مستخدم نشط",
@@ -327,16 +349,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(width: 10),
-
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _filterStatus = 'disabled';
-                            });
-                          },
+                          onTap: () =>
+                              setState(() => _filterStatus = 'disabled'),
                           child: _statBox(
                             "$disabled",
                             "مستخدم معطل",
@@ -362,7 +379,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               if (!usersSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               return StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('accounts')
@@ -371,20 +387,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   if (!accSnap.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
                   final users = usersSnap.data!.docs;
                   final accounts = accSnap.data!.docs;
 
                   final combined = users.map((user) {
                     final data = user.data() as Map<String, dynamic>;
                     final uid = user.id;
-
                     final accList = accounts.where((a) => a.id == uid).toList();
-
                     final accData = accList.isNotEmpty
                         ? accList.first.data() as Map<String, dynamic>
                         : {};
-
                     return {
                       ...data,
                       'uid': uid,
@@ -396,17 +408,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   final filtered = combined.where((user) {
                     final name =
                     (user['username'] ?? '').toString().toLowerCase();
-
                     if (!name.contains(_searchQuery)) return false;
-
                     if (_filterStatus == 'active') {
                       return user['status'] == 'active';
                     }
-
                     if (_filterStatus == 'disabled') {
                       return user['status'] != 'active';
                     }
-
                     return true;
                   }).toList();
 
@@ -437,16 +445,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final user = filtered[index];
-
                       final status = user['status'];
                       final uid = user['uid'];
-
                       DateTime? createdAt =
                       (user['createdAt'] as Timestamp?)?.toDate();
-
                       String formattedDate = createdAt != null
-                          ? "${createdAt.day}-${createdAt.month}-${createdAt
-                          .year}"
+                          ? "${createdAt.day}-${createdAt.month}-${createdAt.year}"
                           : "";
 
                       return Container(
@@ -470,13 +474,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 10, vertical: 4),
@@ -484,19 +486,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                             color: status == 'active'
                                                 ? Colors.green
                                                 : Colors.grey,
-                                            borderRadius: BorderRadius.circular(
-                                                12),
+                                            borderRadius:
+                                            BorderRadius.circular(12),
                                           ),
                                           child: Text(
-                                            status == 'active' ? 'نشط' : 'معطل',
+                                            status == 'active'
+                                                ? 'نشط'
+                                                : 'معطل',
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 11),
                                           ),
                                         ),
-
                                         const SizedBox(width: 8),
-
                                         Text(
                                           user['username'] ?? '',
                                           style: const TextStyle(
@@ -505,20 +507,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                       ],
                                     ),
                                   ),
-
                                   const SizedBox(height: 6),
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       user['email'] ?? '',
-                                      style: const TextStyle(
-                                          color: Colors.grey),
+                                      style:
+                                      const TextStyle(color: Colors.grey),
                                     ),
                                   ),
-
                                   const SizedBox(height: 4),
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
@@ -530,20 +528,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 ],
                               ),
                             ),
-
                             PopupMenuButton<String>(
-                              icon: const Icon(
-                                  Icons.more_vert, color: Colors.grey),
+                              icon: const Icon(Icons.more_vert,
+                                  color: Colors.grey),
                               onSelected: (value) {
                                 if (value == 'view') {
                                   _showUserDetails(
                                       user, status, formattedDate, uid);
                                 } else if (value == 'toggle') {
-                                  _toggleStatus(uid, status);
+                                  _toggleStatus(
+                                    uid,
+                                    status,
+                                    userName: user['username'] ?? '',
+                                    userEmail: user['email'] ?? '',
+                                  );
+                                } else if (value == 'delete') {
+                                  _confirmDelete(
+                                    uid: uid,
+                                    name: user['username'] ?? '',
+                                    email: user['email'] ?? '',
+                                    collection: 'users',
+                                  );
                                 }
                               },
-                              itemBuilder: (context) =>
-                              [
+                              itemBuilder: (context) => [
                                 const PopupMenuItem(
                                   value: 'view',
                                   child: Row(
@@ -554,21 +562,33 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                     ],
                                   ),
                                 ),
-
                                 PopupMenuItem(
                                   value: 'toggle',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.block, size: 18),
-                                      SizedBox(width: 8),
+                                      const Icon(Icons.block, size: 18),
+                                      const SizedBox(width: 8),
                                       Text(status == 'active'
                                           ? 'تعطيل الحساب'
                                           : 'تفعيل الحساب'),
                                     ],
                                   ),
                                 ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline,
+                                          size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('حذف الحساب',
+                                          style:
+                                          TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
                               ],
-                            )
+                            ),
                           ],
                         ),
                       );
@@ -583,8 +603,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _statBox(String count, String label, MaterialColor color,
-      bool isSelected) {
+  Widget _statBox(
+      String count, String label, MaterialColor color, bool isSelected) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
@@ -630,7 +650,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         .where('userId', isEqualTo: userId)
         .count()
         .get();
-
     final reportsCount = reportsSnapshot.count;
 
     showModalBottomSheet(
@@ -641,7 +660,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       isScrollControlled: true,
       builder: (_) {
         return Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -649,39 +669,41 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const Center(
                 child: Text(
                   'معلومات المستخدم',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style:
+                  TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
               const SizedBox(height: 20),
-
               _detailRow('الاسم', data['username'] ?? ''),
               _detailRow('البريد الإلكتروني', data['email'] ?? ''),
               _detailRow('تاريخ الانضمام', createdAt),
               _detailRow('عدد التقارير', reportsCount.toString()),
-
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: status == 'active' ? Colors.green : Colors.grey,
+                        color: status == 'active'
+                            ? Colors.green
+                            : Colors.grey,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         status == 'active' ? 'نشط' : 'معطل',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12),
                       ),
                     ),
-                    const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
+                    const Text('حالة الحساب',
+                        style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -689,10 +711,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     backgroundColor: const Color(0xFFFFFFFF),
                     foregroundColor: Colors.grey,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('إغلاق',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -715,17 +739,158 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _toggleStatus(String uid, String status) async {
+  // ── Toggle status (with deactivation email) ─────────────────────
+  void _toggleStatus(
+      String uid,
+      String status, {
+        String userName = '',
+        String userEmail = '',
+      }) async {
     final newStatus = status == 'active' ? 'suspended' : 'active';
 
     await FirebaseFirestore.instance
         .collection('accounts')
         .doc(uid)
-        .update({
-      'status': newStatus,
-    });
+        .update({'status': newStatus});
+
+    // Send email only when deactivating
+    if (newStatus == 'suspended' && userEmail.isNotEmpty) {
+      await _sendEmailJS(
+        toEmail: userEmail,
+        toName: userName,
+        templateId: _emailJSDeactivateTemplateId,
+      );
+    }
 
     setState(() {});
+  }
+
+  // ── Delete account (with deletion email) ────────────────────────
+  void _confirmDelete({
+    required String uid,
+    required String name,
+    required String email,
+    required String collection, // 'users' or 'specialists'
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Colors.red, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'حذف حساب $name',
+                style: const TextStyle(
+                    color: Color(0xFF14532D),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+              ),
+            ),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'هل أنت متأكد من حذف هذا الحساب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+                style: TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.email_outlined,
+                      color: Colors.red, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتم إرسال إشعار إلى: $email',
+                      style:
+                      const TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child:
+              const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => const Center(
+                      child: CircularProgressIndicator(
+                          color: Color(0xFF16A34A)),
+                    ),
+                  );
+                }
+                try {
+                  // Send email BEFORE deleting so data is still available
+                  await _sendEmailJS(
+                    toEmail: email,
+                    toName: name,
+                    templateId: _emailJSDeleteTemplateId,
+                  );
+
+                  final batch = FirebaseFirestore.instance.batch();
+                  batch.delete(FirebaseFirestore.instance
+                      .collection(collection)
+                      .doc(uid));
+                  batch.delete(FirebaseFirestore.instance
+                      .collection('accounts')
+                      .doc(uid));
+                  await batch.commit();
+
+                  if (!mounted) return;
+                  Navigator.pop(context); // dismiss loading
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('🗑️ تم حذف حساب $name بنجاح'),
+                    backgroundColor: const Color(0xFF2D322C),
+                    duration: const Duration(seconds: 3),
+                  ));
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.pop(context); // dismiss loading
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('حدث خطأ: $e'),
+                    backgroundColor: Colors.red,
+                  ));
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.delete_outline,
+                  color: Colors.white, size: 16),
+              label: const Text('حذف نهائياً',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
 // ── Specialists management Tab ────────────────────────────────────────────
@@ -757,30 +922,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               .snapshots(),
           builder: (context, specSnap) {
             if (!specSnap.hasData) return const SizedBox();
-
             final specialists = specSnap.data!.docs;
-
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('accounts')
                   .snapshots(),
               builder: (context, accSnap) {
                 if (!accSnap.hasData) return const SizedBox();
-
                 final accounts = accSnap.data!.docs;
-
                 int active = 0;
                 int disabled = 0;
-
                 for (var spec in specialists) {
                   final accountId = spec['accountId'];
-
                   final accList =
                   accounts.where((a) => a['accountId'] == accountId);
-
                   if (accList.isNotEmpty) {
                     final status = accList.first['status'];
-
                     if (status == 'active') {
                       active++;
                     } else {
@@ -788,14 +945,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     }
                   }
                 }
-
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => setState(() => _filterStatus = 'active'),
+                          onTap: () =>
+                              setState(() => _filterStatus = 'active'),
                           child: _statBox(
                             "$active",
                             "خبير نشط",
@@ -836,7 +993,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               if (!specSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               return StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('accounts')
@@ -845,22 +1001,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   if (!accSnap.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
                   final specialists = specSnap.data!.docs;
                   final accounts = accSnap.data!.docs;
 
                   final combined = specialists.map((spec) {
                     final data = spec.data() as Map<String, dynamic>;
                     final accountId = data['accountId'];
-
                     final accList = accounts
                         .where((a) => a['accountId'] == accountId)
                         .toList();
-
                     final accData = accList.isNotEmpty
                         ? accList.first.data() as Map<String, dynamic>
                         : {};
-
                     return {
                       ...data,
                       'status': accData['status'] ?? 'active',
@@ -870,17 +1022,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   final filtered = combined.where((spec) {
                     final name =
                     (spec['fullName'] ?? '').toString().toLowerCase();
-
                     if (!name.contains(_searchQuery)) return false;
-
                     if (_filterStatus == 'active') {
                       return spec['status'] == 'active';
                     }
-
                     if (_filterStatus == 'disabled') {
                       return spec['status'] != 'active';
                     }
-
                     return true;
                   }).toList();
 
@@ -911,16 +1059,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final spec = filtered[index];
-
                       final status = spec['status'];
                       final accountId = spec['accountId'];
-
                       DateTime? createdAt =
                       (spec['createdAt'] as Timestamp?)?.toDate();
-
                       String formattedDate = createdAt != null
-                          ? "${createdAt.year}-${createdAt.month}-${createdAt
-                          .day}"
+                          ? "${createdAt.year}-${createdAt.month}-${createdAt.day}"
                           : "";
 
                       return Container(
@@ -944,13 +1088,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 10, vertical: 4),
@@ -958,19 +1100,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                             color: status == 'active'
                                                 ? Colors.green
                                                 : Colors.grey,
-                                            borderRadius: BorderRadius.circular(
-                                                12),
+                                            borderRadius:
+                                            BorderRadius.circular(12),
                                           ),
                                           child: Text(
-                                            status == 'active' ? 'نشط' : 'معطل',
+                                            status == 'active'
+                                                ? 'نشط'
+                                                : 'معطل',
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 11),
                                           ),
                                         ),
-
                                         const SizedBox(width: 8),
-
                                         Text(
                                           spec['fullName'] ?? '',
                                           style: const TextStyle(
@@ -979,20 +1121,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                       ],
                                     ),
                                   ),
-
                                   const SizedBox(height: 6),
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       spec['email'] ?? '',
-                                      style: const TextStyle(
-                                          color: Colors.grey),
+                                      style:
+                                      const TextStyle(color: Colors.grey),
                                     ),
                                   ),
-
                                   const SizedBox(height: 4),
-
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
@@ -1004,7 +1142,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 ],
                               ),
                             ),
-
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert),
                               onSelected: (value) {
@@ -1012,11 +1149,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   _showSpecialistDetails(
                                       spec, status, formattedDate);
                                 } else if (value == 'toggle') {
-                                  _toggleStatus(accountId, status);
+                                  _toggleStatus(
+                                    accountId,
+                                    status,
+                                    userName: spec['fullName'] ?? '',
+                                    userEmail: spec['email'] ?? '',
+                                  );
+                                } else if (value == 'delete') {
+                                  _confirmDelete(
+                                    uid: accountId,
+                                    name: spec['fullName'] ?? '',
+                                    email: spec['email'] ?? '',
+                                    collection: 'specialists',
+                                  );
                                 }
                               },
-                              itemBuilder: (context) =>
-                              [
+                              itemBuilder: (context) => [
                                 const PopupMenuItem(
                                   value: 'view',
                                   child: Row(
@@ -1031,11 +1179,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   value: 'toggle',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.block, size: 18),
-                                      SizedBox(width: 8),
+                                      const Icon(Icons.block, size: 18),
+                                      const SizedBox(width: 8),
                                       Text(status == 'active'
                                           ? 'تعطيل الحساب'
                                           : 'تفعيل الحساب'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline,
+                                          size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('حذف الحساب',
+                                          style:
+                                          TextStyle(color: Colors.red)),
                                     ],
                                   ),
                                 ),
@@ -1068,7 +1229,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       isScrollControlled: true,
       builder: (_) {
         return Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1076,22 +1238,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const Center(
                 child: Text(
                   'تفاصيل الخبير',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style:
+                  TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               _detailRow('الاسم', data['fullName'] ?? ''),
               _detailRow('البريد', data['email'] ?? ''),
               _detailRow('تاريخ الانضمام', createdAt),
-              _detailRow('عدد الحالات', data['reviewCount']?.toString() ?? '0'),
+              _detailRow(
+                  'عدد الحالات', data['reviewCount']?.toString() ?? '0'),
               _detailRow('التقييم', data['rating']?.toString() ?? '0.0'),
               _detailRow('الخبرة', data['experience'] ?? ''),
               _detailRow('الشهادات', data['certificates'] ?? ''),
-
               const SizedBox(height: 10),
-
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
@@ -1099,25 +1259,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: status == 'active' ? Colors.green : Colors.grey,
+                        color: status == 'active'
+                            ? Colors.green
+                            : Colors.grey,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         status == 'active' ? 'نشط' : 'معطل',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12),
                       ),
                     ),
-                    const Text('حالة الحساب', style: TextStyle(color: Colors.grey)),
+                    const Text('حالة الحساب',
+                        style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1126,14 +1286,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     foregroundColor: Colors.grey,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                        borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
                   ),
                   onPressed: () => Navigator.pop(context),
                   child: const Text(
                     'إغلاق',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
@@ -1152,7 +1312,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         final docs = snapshot.data?.docs ?? [];
-
         final pending = docs
             .where((d) => (d.data() as Map)['status'] == 'pending')
             .length;
@@ -1181,9 +1340,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: _requestsList(selectedStatus),
-            ),
+            Expanded(child: _requestsList(selectedStatus)),
           ],
         );
       },
@@ -1198,15 +1355,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       int count,
       ) {
     final isSelected = selectedStatus == status;
-
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          setState(() {
-            selectedStatus = status;
-          });
-        },
+        onTap: () => setState(() => selectedStatus = status),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
@@ -1223,9 +1375,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Icon(icon,
                   color: isSelected ? color.shade800 : color.shade600,
                   size: 26),
-
               const SizedBox(height: 6),
-
               Text(
                 '$count',
                 style: TextStyle(
@@ -1234,9 +1384,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   color: isSelected ? color.shade800 : color.shade700,
                 ),
               ),
-
               const SizedBox(height: 2),
-
               Text(
                 label,
                 textAlign: TextAlign.center,
@@ -1261,8 +1409,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-              child:
-              CircularProgressIndicator(color: Color(0xFF16A34A)));
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)));
         }
         final docs = snapshot.data?.docs ?? [];
         if (docs.isEmpty) {
@@ -1279,8 +1426,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       : status == 'approved'
                       ? 'لا توجد طلبات موافق عليها'
                       : 'لا توجد طلبات مرفوضة',
-                  style:
-                  const TextStyle(color: Colors.grey, fontSize: 15),
+                  style: const TextStyle(color: Colors.grey, fontSize: 15),
                 ),
               ],
             ),
@@ -1382,8 +1528,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             padding: const EdgeInsets.all(14),
             child: Column(
               children: [
-                _requestRow(Icons.workspace_premium_outlined,
-                    'الشهادات', data['certificates'] ?? '—'),
+                _requestRow(Icons.workspace_premium_outlined, 'الشهادات',
+                    data['certificates'] ?? '—'),
                 const SizedBox(height: 8),
                 _requestRow(Icons.history_edu_outlined, 'الخبرة',
                     data['experience'] ?? '—'),
@@ -1467,8 +1613,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () =>
-                          _approveRequest(data, docId),
+                      onPressed: () => _approveRequest(data, docId),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF16A34A),
                         shape: RoundedRectangleBorder(
@@ -1498,8 +1643,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           color: Color(0xFFCC0000), size: 16),
                       label: const Text('رفض',
                           style: TextStyle(
-                              color: Color(0xFFCC0000),
-                              fontSize: 13)),
+                              color: Color(0xFFCC0000), fontSize: 13)),
                     ),
                   ),
                 ],
@@ -1521,8 +1665,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: const TextStyle(
-                      fontSize: 11, color: Colors.grey)),
+                  style:
+                  const TextStyle(fontSize: 11, color: Colors.grey)),
               Text(value,
                   style: const TextStyle(
                       fontSize: 13, color: Colors.black87)),
@@ -1602,8 +1746,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(
-          child:
-          CircularProgressIndicator(color: Color(0xFF16A34A)),
+          child: CircularProgressIndicator(color: Color(0xFF16A34A)),
         ),
       );
     }
@@ -1777,12 +1920,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                            color: Colors.grey.shade300),
+                        side: BorderSide(color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
+                        padding:
+                        const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: const Text('إلغاء',
                           style:
@@ -1864,13 +2006,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               .snapshots(),
           builder: (context, snap) {
             final docs = snap.data?.docs ?? [];
-            final pending = docs.where((d) =>
-            (d.data() as Map)['status'] == 'pending').length;
-            final approved = docs.where((d) =>
-            (d.data() as Map)['status'] == 'approved').length;
-            final rejected = docs.where((d) =>
-            (d.data() as Map)['status'] == 'rejected').length;
-
+            final pending = docs
+                .where((d) => (d.data() as Map)['status'] == 'pending')
+                .length;
+            final approved = docs
+                .where((d) => (d.data() as Map)['status'] == 'approved')
+                .length;
+            final rejected = docs
+                .where((d) => (d.data() as Map)['status'] == 'rejected')
+                .length;
             return Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -1919,13 +2063,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? color.shade800 : color.shade700)),
+                    color:
+                    isSelected ? color.shade800 : color.shade700)),
             const SizedBox(height: 2),
             Text(label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 11,
-                    color: isSelected ? color.shade700 : color.shade600)),
+                    color:
+                    isSelected ? color.shade700 : color.shade600)),
           ]),
         ),
       ),
@@ -1942,7 +2088,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF16A34A)));
+              child:
+              CircularProgressIndicator(color: Color(0xFF16A34A)));
         }
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
@@ -1950,7 +2097,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
+                Icon(Icons.inbox_outlined,
+                    size: 64, color: Colors.grey[300]),
                 const SizedBox(height: 12),
                 Text(
                   _selectedEditStatus == 'pending'
@@ -1958,7 +2106,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       : _selectedEditStatus == 'approved'
                       ? 'لا توجد طلبات موافق عليها'
                       : 'لا توجد طلبات مرفوضة',
-                  style: const TextStyle(color: Colors.grey, fontSize: 15),
+                  style:
+                  const TextStyle(color: Colors.grey, fontSize: 15),
                 ),
               ],
             ),
@@ -2000,7 +2149,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             padding: const EdgeInsets.all(14),
             decoration: const BoxDecoration(
               color: Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+              BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(children: [
               CircleAvatar(
@@ -2023,14 +2173,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         color: Color(0xFF14532D))),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                  border:
+                  Border.all(color: statusColor.withOpacity(0.4)),
                 ),
                 child: Text(
-                  status == 'pending' ? 'معلق' : status == 'approved' ? 'موافق عليه' : 'مرفوض',
+                  status == 'pending'
+                      ? 'معلق'
+                      : status == 'approved'
+                      ? 'موافق عليه'
+                      : 'مرفوض',
                   style: TextStyle(fontSize: 11, color: statusColor),
                 ),
               ),
@@ -2041,14 +2197,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _editComparisonRow('الاسم الكامل', data['oldFullName'], data['newFullName']),
-                _editComparisonRow('الخبرة', data['oldExperience'], data['newExperience']),
-                _editComparisonRow('الشهادات', data['oldCertificates'], data['newCertificates']),
-                _editComparisonRow('البريد الإلكتروني', data['oldEmail'], data['newEmail']),
+                _editComparisonRow('الاسم الكامل', data['oldFullName'],
+                    data['newFullName']),
+                _editComparisonRow(
+                    'الخبرة', data['oldExperience'], data['newExperience']),
+                _editComparisonRow('الشهادات', data['oldCertificates'],
+                    data['newCertificates']),
+                _editComparisonRow('البريد الإلكتروني', data['oldEmail'],
+                    data['newEmail']),
                 if (oldImages.isNotEmpty || newImages.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Text('صور الشهادات',
-                      style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2057,38 +2220,60 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('قبل', style: TextStyle(fontSize: 11, color: Colors.red)),
+                            const Text('قبل',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.red)),
                             const SizedBox(height: 4),
                             oldImages.isEmpty
-                                ? const Text('—', style: TextStyle(color: Colors.grey))
+                                ? const Text('—',
+                                style: TextStyle(color: Colors.grey))
                                 : Wrap(
-                              spacing: 4, runSpacing: 4,
-                              children: oldImages.map((url) => ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.network(url, width: 60, height: 60, fit: BoxFit.cover),
-                              )).toList(),
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: oldImages
+                                  .map((url) => ClipRRect(
+                                borderRadius:
+                                BorderRadius.circular(6),
+                                child: Image.network(url,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover),
+                              ))
+                                  .toList(),
                             ),
                           ],
                         ),
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 6),
-                        child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
+                        child: Icon(Icons.arrow_forward,
+                            size: 14, color: Colors.grey),
                       ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('بعد', style: TextStyle(fontSize: 11, color: Color(0xFF16A34A))),
+                            const Text('بعد',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF16A34A))),
                             const SizedBox(height: 4),
                             newImages.isEmpty
-                                ? const Text('لم يتم تغييرها', style: TextStyle(color: Colors.grey))
+                                ? const Text('لم يتم تغييرها',
+                                style: TextStyle(color: Colors.grey))
                                 : Wrap(
-                              spacing: 4, runSpacing: 4,
-                              children: newImages.map((url) => ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.network(url, width: 60, height: 60, fit: BoxFit.cover),
-                              )).toList(),
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: newImages
+                                  .map((url) => ClipRRect(
+                                borderRadius:
+                                BorderRadius.circular(6),
+                                child: Image.network(url,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover),
+                              ))
+                                  .toList(),
                             ),
                           ],
                         ),
@@ -2096,7 +2281,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ],
                   ),
                 ],
-                if (status == 'rejected' && (data['rejectionReason'] ?? '').isNotEmpty) ...[
+                if (status == 'rejected' &&
+                    (data['rejectionReason'] ?? '').isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
@@ -2104,14 +2290,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                      border: Border.all(
+                          color: const Color(0xFFFCA5A5)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('سبب الرفض:', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+                        const Text('سبب الرفض:',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(data['rejectionReason'], style: const TextStyle(fontSize: 13, color: Colors.red)),
+                        Text(data['rejectionReason'],
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.red)),
                       ],
                     ),
                   ),
@@ -2125,27 +2318,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: Row(children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _approveEditRequest(data, docId),
+                    onPressed: () =>
+                        _approveEditRequest(data, docId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
-                    icon: const Icon(Icons.check, color: Colors.white, size: 16),
-                    label: const Text('قبول', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    icon: const Icon(Icons.check,
+                        color: Colors.white, size: 16),
+                    label: const Text('قبول',
+                        style: TextStyle(
+                            color: Colors.white, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showEditRejectDialog(data, docId),
+                    onPressed: () =>
+                        _showEditRejectDialog(data, docId),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFCC0000),
-                      side: const BorderSide(color: Color(0xFFCC0000)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: const BorderSide(
+                          color: Color(0xFFCC0000)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.close, color: Color(0xFFCC0000), size: 16),
-                    label: const Text('رفض', style: TextStyle(color: Color(0xFFCC0000), fontSize: 13)),
+                    icon: const Icon(Icons.close,
+                        color: Color(0xFFCC0000), size: 16),
+                    label: const Text('رفض',
+                        style: TextStyle(
+                            color: Color(0xFFCC0000), fontSize: 13)),
                   ),
                 ),
               ]),
@@ -2155,39 +2359,59 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _editComparisonRow(String label, String? oldVal, String? newVal) {
-    final changed = (oldVal ?? '') != (newVal ?? '') && (newVal ?? '').isNotEmpty;
+  Widget _editComparisonRow(
+      String label, String? oldVal, String? newVal) {
+    final changed =
+        (oldVal ?? '') != (newVal ?? '') && (newVal ?? '').isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Row(children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(6)),
-                child: Text(oldVal ?? '—', style: TextStyle(fontSize: 12, color: changed ? Colors.red : Colors.grey)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text(oldVal ?? '—',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: changed ? Colors.red : Colors.grey)),
               ),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
+              child: Icon(Icons.arrow_forward,
+                  size: 14, color: Colors.grey),
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: changed ? const Color(0xFFF0FDF4) : Colors.grey.shade50,
+                  color: changed
+                      ? const Color(0xFFF0FDF4)
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(newVal ?? '—',
                     style: TextStyle(
                         fontSize: 12,
-                        color: changed ? const Color(0xFF16A34A) : Colors.grey,
-                        fontWeight: changed ? FontWeight.bold : FontWeight.normal)),
+                        color: changed
+                            ? const Color(0xFF16A34A)
+                            : Colors.grey,
+                        fontWeight: changed
+                            ? FontWeight.bold
+                            : FontWeight.normal)),
               ),
             ),
           ]),
@@ -2196,23 +2420,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Approve edit request ──────────────────────────────────────────────
-  Future<void> _approveEditRequest(Map<String, dynamic> data, String docId) async {
+  Future<void> _approveEditRequest(
+      Map<String, dynamic> data, String docId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
           title: const Text('تأكيد القبول',
-              style: TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
-          content: Text('هل تريد قبول تعديلات ${data['specialistName'] ?? ''}؟ سيتم تحديث بياناته تلقائياً.'),
+              style: TextStyle(
+                  color: Color(0xFF14532D),
+                  fontWeight: FontWeight.bold)),
+          content: Text(
+              'هل تريد قبول تعديلات ${data['specialistName'] ?? ''}؟ سيتم تحديث بياناته تلقائياً.'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey))),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
-              child: const Text('قبول', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A)),
+              child: const Text('قبول',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -2224,42 +2457,70 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final specialistId = data['specialistId'] as String;
     final batch = FirebaseFirestore.instance.batch();
 
-    batch.update(FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId), {'status': 'approved'});
+    batch.update(
+        FirebaseFirestore.instance
+            .collection('Specialist_edit_request')
+            .doc(docId),
+        {'status': 'approved'});
 
     final updates = <String, dynamic>{};
-    if ((data['newFullName'] ?? '').isNotEmpty && data['newFullName'] != data['oldFullName']) updates['fullName'] = data['newFullName'];
-    if ((data['newExperience'] ?? '').isNotEmpty && data['newExperience'] != data['oldExperience']) updates['experience'] = data['newExperience'];
-    if ((data['newCertificates'] ?? '').isNotEmpty && data['newCertificates'] != data['oldCertificates']) updates['certificates'] = data['newCertificates'];
-    if ((data['newEmail'] ?? '').isNotEmpty && data['newEmail'] != data['oldEmail']) updates['email'] = data['newEmail'];
-    final newImages = List<String>.from(data['newCertificateImages'] ?? []);
+    if ((data['newFullName'] ?? '').isNotEmpty &&
+        data['newFullName'] != data['oldFullName'])
+      updates['fullName'] = data['newFullName'];
+    if ((data['newExperience'] ?? '').isNotEmpty &&
+        data['newExperience'] != data['oldExperience'])
+      updates['experience'] = data['newExperience'];
+    if ((data['newCertificates'] ?? '').isNotEmpty &&
+        data['newCertificates'] != data['oldCertificates'])
+      updates['certificates'] = data['newCertificates'];
+    if ((data['newEmail'] ?? '').isNotEmpty &&
+        data['newEmail'] != data['oldEmail'])
+      updates['email'] = data['newEmail'];
+    final newImages =
+    List<String>.from(data['newCertificateImages'] ?? []);
     if (newImages.isNotEmpty) updates['certificateImages'] = newImages;
 
     if (updates.isEmpty) {
-      await FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId).update({'status': 'approved'});
+      await FirebaseFirestore.instance
+          .collection('Specialist_edit_request')
+          .doc(docId)
+          .update({'status': 'approved'});
       return;
     }
 
-    batch.update(FirebaseFirestore.instance.collection('specialists').doc(specialistId), updates);
+    batch.update(
+        FirebaseFirestore.instance
+            .collection('specialists')
+            .doc(specialistId),
+        updates);
 
     final accountUpdates = <String, dynamic>{};
-    if ((data['newEmail'] ?? '').isNotEmpty && data['newEmail'] != data['oldEmail']) accountUpdates['email'] = data['newEmail'];
-    if ((data['newFullName'] ?? '').isNotEmpty && data['newFullName'] != data['oldFullName']) accountUpdates['username'] = data['newFullName'];
+    if ((data['newEmail'] ?? '').isNotEmpty &&
+        data['newEmail'] != data['oldEmail'])
+      accountUpdates['email'] = data['newEmail'];
+    if ((data['newFullName'] ?? '').isNotEmpty &&
+        data['newFullName'] != data['oldFullName'])
+      accountUpdates['username'] = data['newFullName'];
     if (accountUpdates.isNotEmpty) {
-      batch.update(FirebaseFirestore.instance.collection('accounts').doc(specialistId), accountUpdates);
+      batch.update(
+          FirebaseFirestore.instance
+              .collection('accounts')
+              .doc(specialistId),
+          accountUpdates);
     }
 
     await batch.commit();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('✅ تم قبول تعديلات ${data['specialistName'] ?? ''} وتحديث بياناته'),
+        content: Text(
+            '✅ تم قبول تعديلات ${data['specialistName'] ?? ''} وتحديث بياناته'),
         backgroundColor: const Color(0xFF16A34A),
         duration: const Duration(seconds: 3),
       ));
     }
   }
 
-// ── Reject edit request ──────────────────────────────────────────────
   void _showEditRejectDialog(Map<String, dynamic> data, String docId) {
     final reasonController = TextEditingController();
     String? reasonError;
@@ -2270,54 +2531,84 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialog) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
             title: Row(children: [
-              const Icon(Icons.cancel_outlined, color: Color(0xFFCC0000), size: 22),
+              const Icon(Icons.cancel_outlined,
+                  color: Color(0xFFCC0000), size: 22),
               const SizedBox(width: 8),
-              Expanded(child: Text('رفض تعديل ${data['specialistName'] ?? ''}',
-                  style: const TextStyle(color: Color(0xFF14532D), fontWeight: FontWeight.bold, fontSize: 16))),
+              Expanded(
+                  child: Text(
+                      'رفض تعديل ${data['specialistName'] ?? ''}',
+                      style: const TextStyle(
+                          color: Color(0xFF14532D),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16))),
             ]),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('سبب الرفض *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+                const Text('سبب الرفض *',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151))),
                 const SizedBox(height: 6),
                 TextField(
                   controller: reasonController,
                   maxLines: 4,
                   textDirection: TextDirection.rtl,
-                  onChanged: (v) => setDialog(() { reasonError = v.trim().isEmpty ? 'سبب الرفض مطلوب' : null; }),
+                  onChanged: (v) => setDialog(() {
+                    reasonError =
+                    v.trim().isEmpty ? 'سبب الرفض مطلوب' : null;
+                  }),
                   decoration: InputDecoration(
                     hintText: 'أدخل سبب الرفض...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     errorText: reasonError,
                   ),
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: Colors.grey))),
               ElevatedButton.icon(
                 onPressed: () async {
                   final reason = reasonController.text.trim();
-                  if (reason.isEmpty) { setDialog(() => reasonError = 'سبب الرفض مطلوب'); return; }
+                  if (reason.isEmpty) {
+                    setDialog(
+                            () => reasonError = 'سبب الرفض مطلوب');
+                    return;
+                  }
                   Navigator.pop(ctx);
-                  await FirebaseFirestore.instance.collection('Specialist_edit_request').doc(docId).update({
+                  await FirebaseFirestore.instance
+                      .collection('Specialist_edit_request')
+                      .doc(docId)
+                      .update({
                     'status': 'rejected',
                     'rejectionReason': reason,
                     'rejectedAt': FieldValue.serverTimestamp(),
                   });
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('❌ تم رفض تعديلات ${data['specialistName'] ?? ''}'),
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(
+                      content: Text(
+                          '❌ تم رفض تعديلات ${data['specialistName'] ?? ''}'),
                       backgroundColor: Colors.orange,
                     ));
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFCC0000)),
-                icon: const Icon(Icons.close, color: Colors.white, size: 16),
-                label: const Text('رفض', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFCC0000)),
+                icon: const Icon(Icons.close,
+                    color: Colors.white, size: 16),
+                label: const Text('رفض',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2338,76 +2629,131 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: Column(
               children: [
                 Container(
-                  width: 72, height: 72,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     color: const Color(0xFFDCFCE7),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF16A34A), width: 2),
+                    border: Border.all(
+                        color: const Color(0xFF16A34A), width: 2),
                   ),
-                  child: const Icon(Icons.shield, color: Color(0xFF16A34A), size: 38),
+                  child: const Icon(Icons.shield,
+                      color: Color(0xFF16A34A), size: 38),
                 ),
                 const SizedBox(height: 10),
-                Text(_name.isNotEmpty ? _name : 'مدير النظام',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+                Text(
+                    _name.isNotEmpty ? _name : 'مدير النظام',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF14532D))),
                 const SizedBox(height: 4),
-                const Text('مدير النظام', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const Text('مدير النظام',
+                    style:
+                    TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8E8E8))),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border:
+                Border.all(color: const Color(0xFFE8E8E8))),
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('المعلومات الشخصية', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      const Text('المعلومات الشخصية',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87)),
                       GestureDetector(
                         onTap: _showEditDialog,
                         child: const Row(children: [
-                          Icon(Icons.edit_outlined, color: Color(0xFF16A34A), size: 17),
+                          Icon(Icons.edit_outlined,
+                              color: Color(0xFF16A34A), size: 17),
                           SizedBox(width: 4),
-                          Text('تعديل', style: TextStyle(fontSize: 13, color: Color(0xFF16A34A))),
+                          Text('تعديل',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF16A34A))),
                         ]),
                       ),
                     ],
                   ),
                 ),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                _buildInfoRow(label: 'الاسم', value: _name.isNotEmpty ? _name : 'مدير النظام', icon: Icons.person_outline, iconColor: const Color(0xFF16A34A)),
-                const Divider(height: 1, color: Color(0xFFEEEEEE), indent: 16, endIndent: 16),
-                _buildInfoRow(label: 'البريد الإلكتروني', value: _email.isNotEmpty ? _email : 'admin@bioshield.com', icon: Icons.email_outlined, iconColor: const Color(0xFF16A34A)),
-                const Divider(height: 1, color: Color(0xFFEEEEEE), indent: 16, endIndent: 16),
-                _buildInfoRow(label: 'الصلاحيات', value: 'صلاحيات: كاملة', icon: Icons.settings_outlined, iconColor: const Color(0xFF16A34A)),
+                const Divider(
+                    height: 1, color: Color(0xFFEEEEEE)),
+                _buildInfoRow(
+                    label: 'الاسم',
+                    value:
+                    _name.isNotEmpty ? _name : 'مدير النظام',
+                    icon: Icons.person_outline,
+                    iconColor: const Color(0xFF16A34A)),
+                const Divider(
+                    height: 1,
+                    color: Color(0xFFEEEEEE),
+                    indent: 16,
+                    endIndent: 16),
+                _buildInfoRow(
+                    label: 'البريد الإلكتروني',
+                    value: _email.isNotEmpty
+                        ? _email
+                        : 'admin@bioshield.com',
+                    icon: Icons.email_outlined,
+                    iconColor: const Color(0xFF16A34A)),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE8E8E8))),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border:
+                Border.all(color: const Color(0xFFE8E8E8))),
             child: Column(
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Align(alignment: Alignment.centerRight, child: Text('الأمان', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text('الأمان',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87))),
                 ),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                const Divider(
+                    height: 1, color: Color(0xFFEEEEEE)),
                 ListTile(
-                  leading: const Icon(Icons.lock_outline, color: Color(0xFF16A34A)),
-                  title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 14)),
-                  trailing: const Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey),
+                  leading: const Icon(Icons.lock_outline,
+                      color: Color(0xFF16A34A)),
+                  title: const Text('تغيير كلمة المرور',
+                      style: TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      size: 14, color: Colors.grey),
                   onTap: _showChangePasswordDialog,
                 ),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                const Divider(
+                    height: 1, color: Color(0xFFEEEEEE)),
                 ListTile(
-                  leading: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
-                  title: const Text('تغيير البريد الإلكتروني', style: TextStyle(fontSize: 14)),
-                  trailing: const Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey),
+                  leading: const Icon(Icons.email_outlined,
+                      color: Color(0xFF16A34A)),
+                  title: const Text('تغيير البريد الإلكتروني',
+                      style: TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      size: 14, color: Colors.grey),
                   onTap: _showChangeEmailDialog,
                 ),
               ],
@@ -2417,16 +2763,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
-              width: double.infinity, height: 48,
+              width: double.infinity,
+              height: 48,
               child: ElevatedButton.icon(
                 onPressed: _logout,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFCC0000),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
-                icon: const Icon(Icons.logout, color: Colors.white, size: 20),
-                label: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.logout,
+                    color: Colors.white, size: 20),
+                label: const Text('تسجيل الخروج',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -2444,44 +2797,87 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('تغيير كلمة المرور', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text('تغيير كلمة المرور',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF14532D))),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني', style: TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.right),
+                const Text(
+                    'سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
+                    style:
+                    TextStyle(fontSize: 13, color: Colors.grey),
+                    textAlign: TextAlign.right),
                 const SizedBox(height: 12),
                 Container(
-                  width: double.infinity, padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF86EFAC))),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                      Border.all(color: const Color(0xFF86EFAC))),
                   child: Row(children: [
-                    const Icon(Icons.email_outlined, color: Color(0xFF16A34A), size: 18),
+                    const Icon(Icons.email_outlined,
+                        color: Color(0xFF16A34A), size: 18),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(_email, style: const TextStyle(fontSize: 14, color: Color(0xFF166534), fontWeight: FontWeight.w500), textDirection: TextDirection.ltr)),
+                    Expanded(
+                        child: Text(_email,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF166534),
+                                fontWeight: FontWeight.w500),
+                            textDirection: TextDirection.ltr)),
                   ]),
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: Colors.grey))),
               ElevatedButton(
-                onPressed: sending ? null : () async {
+                onPressed: sending
+                    ? null
+                    : () async {
                   setDialogState(() => sending = true);
                   try {
-                    await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
+                    await FirebaseAuth.instance
+                        .sendPasswordResetEmail(email: _email);
                     if (!mounted) return;
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ تم إرسال رابط إعادة التعيين إلى بريدك'), backgroundColor: Color(0xFF16A34A)));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(const SnackBar(
+                        content: Text(
+                            '✅ تم إرسال رابط إعادة التعيين إلى بريدك'),
+                        backgroundColor:
+                        Color(0xFF16A34A)));
                   } catch (e) {
                     setDialogState(() => sending = false);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(
+                        content: Text('حدث خطأ: $e'),
+                        backgroundColor: Colors.red));
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8))),
                 child: sending
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('إرسال', style: TextStyle(color: Colors.white)),
+                    ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                    : const Text('إرسال',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2501,10 +2897,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
             title: const Text(
               'تغيير البريد الإلكتروني',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D)),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF14532D)),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2522,61 +2922,71 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   onChanged: (v) => setDialogState(() {
                     emailError = v.trim().isEmpty
                         ? 'البريد الإلكتروني مطلوب'
-                        : !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                        : !RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                        .hasMatch(v.trim())
                         ? 'صيغة البريد غير صحيحة'
                         : null;
                   }),
                   decoration: InputDecoration(
                     labelText: 'البريد الإلكتروني الجديد',
-                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    labelStyle:
+                    const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.email_outlined,
+                        color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF16A34A), width: 2),
                     ),
                     errorText: emailError,
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Current email display
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
+                    border:
+                    Border.all(color: const Color(0xFF86EFAC)),
                   ),
                   child: Row(children: [
-                    const Icon(Icons.email_outlined, color: Color(0xFF16A34A), size: 18),
+                    const Icon(Icons.email_outlined,
+                        color: Color(0xFF16A34A), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'الحالي: $_email',
                         style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF166534), fontWeight: FontWeight.w500),
+                            fontSize: 13,
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w500),
                         textDirection: TextDirection.ltr,
                       ),
                     ),
                   ]),
                 ),
                 const SizedBox(height: 10),
-                // Warning banner
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF7ED),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(
+                        color: const Color(0xFFFDE68A)),
                   ),
                   child: const Row(children: [
-                    Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                    Icon(Icons.info_outline,
+                        color: Colors.orange, size: 16),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'ستحتاج لإعادة تسجيل الدخول بعد تغيير البريد',
-                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange),
                       ),
                     ),
                   ]),
@@ -2586,36 +2996,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
                 onPressed: saving
                     ? null
                     : () async {
-                  final newEmail = emailController.text.trim();
+                  final newEmail =
+                  emailController.text.trim();
                   if (newEmail.isEmpty ||
-                      !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(newEmail)) {
-                    setDialogState(() => emailError = 'أدخل بريداً صحيحاً');
+                      !RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                          .hasMatch(newEmail)) {
+                    setDialogState(() =>
+                    emailError = 'أدخل بريداً صحيحاً');
                     return;
                   }
                   if (newEmail == _email) {
-                    setDialogState(() => emailError = 'هذا هو بريدك الحالي');
+                    setDialogState(() =>
+                    emailError = 'هذا هو بريدك الحالي');
                     return;
                   }
                   setDialogState(() => saving = true);
                   try {
-                    final user = FirebaseAuth.instance.currentUser!;
+                    final user =
+                    FirebaseAuth.instance.currentUser!;
                     final uid = user.uid;
-
-                    // 1. Send verification link to new email
-                    //    Firebase will only update Auth after the user
-                    //    clicks the link, so Firestore is updated via
-                    //    _fetchAdminData() on next login — but we also
-                    //    pre-write it so the UI reflects intent.
-                    await user.verifyBeforeUpdateEmail(newEmail);
-
-                    // 2. Pre-update Firestore with new email
-                    //    (will be confirmed once user verifies)
+                    await user
+                        .verifyBeforeUpdateEmail(newEmail);
                     await FirebaseFirestore.instance
                         .collection('admins')
                         .doc(uid)
@@ -2624,10 +3032,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         .collection('accounts')
                         .doc(uid)
                         .update({'email': newEmail});
-
                     if (!mounted) return;
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
                       const SnackBar(
                         content: Text(
                           '✅ تم إرسال رابط التحقق إلى بريدك الجديد. تحقق منه لإتمام التغيير.',
@@ -2641,23 +3049,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     setDialogState(() => saving = false);
                     String msg = 'حدث خطأ';
                     if (e.code == 'requires-recent-login') {
-                      msg = 'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
-                    } else if (e.code == 'email-already-in-use') {
+                      msg =
+                      'يرجى تسجيل الخروج والدخول مجدداً ثم المحاولة';
+                    } else if (e.code ==
+                        'email-already-in-use') {
                       msg = 'هذا البريد مستخدم بالفعل';
                     }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(msg), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(
+                        content: Text(msg),
+                        backgroundColor: Colors.red));
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: saving
                     ? const SizedBox(
-                    width: 18, height: 18,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
                     : const Text('إرسال رابط التحقق',
                     style: TextStyle(color: Colors.white)),
               ),
@@ -2678,8 +3092,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         builder: (ctx, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('تعديل المعلومات الشخصية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14532D))),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text('تعديل المعلومات الشخصية',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF14532D))),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2691,10 +3110,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: 'الاسم',
-                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2)),
+                    labelStyle:
+                    const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF16A34A), width: 2)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2704,40 +3129,86 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: 'البريد الإلكتروني',
-                    labelStyle: const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2)),
+                    labelStyle:
+                    const TextStyle(color: Color(0xFF16A34A)),
+                    prefixIcon: const Icon(Icons.email_outlined,
+                        color: Color(0xFF16A34A)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF16A34A), width: 2)),
                   ),
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: Colors.grey))),
               ElevatedButton(
-                onPressed: saving ? null : () async {
+                onPressed: saving
+                    ? null
+                    : () async {
                   setDialogState(() => saving = true);
                   try {
-                    final uid = FirebaseAuth.instance.currentUser?.uid;
-                    final newName = nameController.text.trim();
-                    final newEmail = emailController.text.trim();
+                    final uid = FirebaseAuth
+                        .instance.currentUser?.uid;
+                    final newName =
+                    nameController.text.trim();
+                    final newEmail =
+                    emailController.text.trim();
                     if (uid != null) {
-                      await FirebaseFirestore.instance.collection('admins').doc(uid).update({'username': newName, 'email': newEmail});
-                      await FirebaseFirestore.instance.collection('accounts').doc(uid).update({'username': newName, 'email': newEmail});
-                      if (newEmail != _email) await FirebaseAuth.instance.currentUser?.verifyBeforeUpdateEmail(newEmail);
+                      await FirebaseFirestore.instance
+                          .collection('admins')
+                          .doc(uid)
+                          .update({
+                        'username': newName,
+                        'email': newEmail
+                      });
+                      await FirebaseFirestore.instance
+                          .collection('accounts')
+                          .doc(uid)
+                          .update({
+                        'username': newName,
+                        'email': newEmail
+                      });
+                      if (newEmail != _email)
+                        await FirebaseAuth.instance
+                            .currentUser
+                            ?.verifyBeforeUpdateEmail(
+                            newEmail);
                     }
                     if (!mounted) return;
-                    setState(() { _name = newName; _email = newEmail; });
+                    setState(() {
+                      _name = newName;
+                      _email = newEmail;
+                    });
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ التعديلات بنجاح ✓'), backgroundColor: Color(0xFF16A34A)));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(const SnackBar(
+                        content: Text(
+                            'تم حفظ التعديلات بنجاح ✓'),
+                        backgroundColor:
+                        Color(0xFF16A34A)));
                   } catch (e) {
                     setDialogState(() => saving = false);
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8))),
                 child: saving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('حفظ', style: TextStyle(color: Colors.white)),
+                    ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                    : const Text('حفظ',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2746,19 +3217,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildInfoRow({required String label, required String value, required IconData icon, required Color iconColor}) {
+  Widget _buildInfoRow({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              const SizedBox(height: 3),
-              Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87)),
-            ],
-          )),
+          Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.grey)),
+                  const SizedBox(height: 3),
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black87)),
+                ],
+              )),
           Icon(icon, color: iconColor, size: 22),
         ],
       ),

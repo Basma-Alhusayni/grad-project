@@ -652,20 +652,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          // ── Custom Header ──
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'الملف الشخصي',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: _green900,
-                              ),
-                            ),
-                          ),
 
-                          const SizedBox(height: 16),
 
                           // ── بطاقة معلومات المستخدم ──
                           Container(
@@ -748,7 +735,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                       color: _green600,
                                     ),
                                     label: const Text(
-                                      'تعديل',
+                                      'تعديل الاسم',
                                       style: TextStyle(
                                         color: _green600,
                                         fontSize: 12,
@@ -839,7 +826,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           ),
                           // ── زر تسجيل الخروج ──
                           Padding(
-                            padding: const EdgeInsets.only(top: 24),
+                            padding: const EdgeInsets.only(top: 8),
                             child: SizedBox(
                               width: double.infinity,
                               height: 55,

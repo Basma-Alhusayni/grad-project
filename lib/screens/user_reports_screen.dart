@@ -98,12 +98,10 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             'status':              data['status'] ?? '',
             'date':                data['date'] ?? '',
             'confidence':          data['confidence'] ?? 0,
-            // ─── two separate confidence fields ───
             'plantNameConfidence': data['plantNameConfidence'] ?? data['confidence'] ?? 0,
             'diseaseConfidence':   data['diseaseConfidence'] ?? data['confidence'] ?? 0,
             'plantNetLabel':       data['plantNetLabel'] ?? '',
             'modelDiseaseLabel':   data['modelDiseaseLabel'] ?? '',
-            // ──────────────────────────────────────
             'treatment':           data['treatment'] ?? '',
             'plantType':           data['plantType'] ?? '',
             'icon':                _iconForPlant(data['plantType'] ?? ''),
@@ -112,6 +110,8 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             'imageUrl':            data['imageUrl'] ?? '',
             'userName':            data['userName'] ?? '',
             'userId':              data['userId'] ?? '',
+            // ← NEW: read the adminBlocked flag
+            'adminBlocked':        data['adminBlocked'] ?? false,
           };
         }).toList();
 
@@ -212,6 +212,7 @@ class _ReportCard extends StatelessWidget {
     final sc = isHealthy ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
     final sb = isHealthy ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
     final isShared = (report['feedDocId'] as String).isNotEmpty;
+    final isBlocked = report['adminBlocked'] == true;
     final imageUrl = report['imageUrl'] ?? '';
 
     return GestureDetector(
@@ -244,6 +245,8 @@ class _ReportCard extends StatelessWidget {
             Row(children: [
               Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)),
               if (isShared) ...[const SizedBox(width: 8), _SharedBadge()],
+              // ← NEW: show a small blocked badge in the list card
+              if (isBlocked) ...[const SizedBox(width: 8), _BlockedBadge()],
             ]),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -274,6 +277,25 @@ class _SharedBadge extends StatelessWidget {
   }
 }
 
+// ← NEW: small badge shown in the list card when a report is admin-blocked
+class _BlockedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Row(children: [
+        Icon(Icons.block, color: Color(0xFFDC2626), size: 10),
+        SizedBox(width: 3),
+        Text('مقيّد', style: TextStyle(color: Color(0xFFDC2626), fontSize: 10, fontWeight: FontWeight.bold)),
+      ]),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  REPORT DETAIL PAGE
 // ═══════════════════════════════════════════════════════════════
@@ -298,6 +320,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   Color get _sc => _isHealthy ? _green600 : const Color(0xFFDC2626);
   Color get _sb => _isHealthy ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
 
+  // ← NEW: convenience getter
+  bool get _isAdminBlocked => widget.report['adminBlocked'] == true;
+
   @override
   void initState() {
     super.initState();
@@ -305,7 +330,51 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     _isShared = _feedDocId != null && _feedDocId!.isNotEmpty;
   }
 
+  // ─── Share / Unshare ────────────────────────────────────────
   Future<void> _shareToggle() async {
+    // ── NEW: Guard — admin has blocked this report ─────────────
+    if (_isAdminBlocked) {
+      showDialog(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(children: const [
+              Icon(Icons.shield_outlined, color: Color(0xFFDC2626), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'تعذّر المشاركة',
+                style: TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ]),
+            content: const Text(
+              'عذراً، لاحظ المشرف مشكلة في هذا التقرير لذلك لا يمكن مشاركته مع المجتمع.',
+              style: TextStyle(fontSize: 14, height: 1.6),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _green600,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('حسناً', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+      return; // stop here — do not proceed with sharing
+    }
+
     if (_sharingLoading) return;
     setState(() => _sharingLoading = true);
     try {
@@ -313,79 +382,84 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       if (user == null) return;
 
       if (_isShared && _feedDocId != null) {
-        // ── UNSHARE: delete from both community_feed and shared_reports ──
-        await FirebaseFirestore.instance.collection('community_feed').doc(_feedDocId).delete();
+        // ── UNSHARE: delete only from community_feed ──
+        await FirebaseFirestore.instance
+            .collection('community_feed')
+            .doc(_feedDocId)
+            .delete();
 
-        // Also delete from shared_reports if it exists there
-        final sharedQuery = await FirebaseFirestore.instance
-            .collection('shared_reports')
-            .where('feedDocId', isEqualTo: _feedDocId)
-            .get();
-        for (final doc in sharedQuery.docs) {
-          await doc.reference.delete();
-        }
+        await FirebaseFirestore.instance
+            .collection('reports')
+            .doc(widget.report['id'])
+            .update({'feedDocId': '', 'isSharedToCommunity': false});
 
-        await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
-          'feedDocId': '',
-          'isSharedToCommunity': false,
+        setState(() {
+          _isShared = false;
+          _feedDocId = null;
         });
-        setState(() { _isShared = false; _feedDocId = null; });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ تم إلغاء المشاركة', textDirection: TextDirection.rtl)));
-
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('✅ تم إلغاء المشاركة',
+                  textDirection: TextDirection.rtl)));
+        }
       } else {
-        // ── SHARE ──
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
+        // ── SHARE: write only to community_feed ──
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final userName = userDoc.data()?['fullName'] ??
+            userDoc.data()?['username'] ??
+            'مستخدم';
 
-        // Shared payload includes both confidence values
         final sharedData = {
-          'plantName':           widget.report['plantName'],
-          'ImageUrl':            widget.report['imageUrl'],
-          'diagnosis':           widget.report['disease'],
-          'details':             widget.report['details'],
-          'treatment':           widget.report['treatment'],
-          'isHealthy':           _isHealthy,
-          'confidence':          widget.report['confidence'],
-          // ─── NEW: two percentages ───────────────────────────
-          'plantNameConfidence': widget.report['plantNameConfidence'] ?? widget.report['confidence'],
-          'diseaseConfidence':   widget.report['diseaseConfidence'] ?? widget.report['confidence'],
-          'plantNetLabel':       widget.report['plantNetLabel'] ?? '',
-          'modelDiseaseLabel':   widget.report['modelDiseaseLabel'] ?? '',
-          // ────────────────────────────────────────────────────
-          'status':              widget.report['status'],
-          'date':                widget.report['date'],
-          'createdAt':           FieldValue.serverTimestamp(),
-          'sharedBy':            userName,     // ← person's real name
-          'userId':              user.uid,
-          'reportId':            widget.report['id'],
+          'plantName': widget.report['plantName'],
+          'ImageUrl': widget.report['imageUrl'],
+          'diagnosis': widget.report['disease'],
+          'details': widget.report['details'],
+          'treatment': widget.report['treatment'],
+          'isHealthy': _isHealthy,
+          'confidence': widget.report['confidence'],
+          'plantNameConfidence': widget.report['plantNameConfidence'] ??
+              widget.report['confidence'],
+          'diseaseConfidence': widget.report['diseaseConfidence'] ??
+              widget.report['confidence'],
+          'plantNetLabel': widget.report['plantNetLabel'] ?? '',
+          'modelDiseaseLabel': widget.report['modelDiseaseLabel'] ?? '',
+          'status': widget.report['status'],
+          'date': widget.report['date'],
+          'createdAt': FieldValue.serverTimestamp(),
+          'sharedBy': userName,
+          'userId': user.uid,
+          'reportId': widget.report['id'],
         };
 
-        // Write to community_feed (for the home feed)
-        final ref = await FirebaseFirestore.instance.collection('community_feed').add(sharedData);
+        final ref = await FirebaseFirestore.instance
+            .collection('community_feed')
+            .add(sharedData);
 
-        // Write to shared_reports (for admin management)
-        await FirebaseFirestore.instance.collection('shared_reports').add({
-          ...sharedData,
-          'feedDocId': ref.id,
+        await FirebaseFirestore.instance
+            .collection('reports')
+            .doc(widget.report['id'])
+            .update({'feedDocId': ref.id, 'isSharedToCommunity': true});
+
+        setState(() {
+          _isShared = true;
+          _feedDocId = ref.id;
         });
-
-        // Update the report document
-        await FirebaseFirestore.instance.collection('reports').doc(widget.report['id']).update({
-          'feedDocId': ref.id,
-          'isSharedToCommunity': true,
-        });
-
-        setState(() { _isShared = true; _feedDocId = ref.id; });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ تمت المشاركة مع المجتمع!', textDirection: TextDirection.rtl),
-                  backgroundColor: _green600));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('✅ تمت المشاركة مع المجتمع!',
+                  textDirection: TextDirection.rtl),
+              backgroundColor: _green600));
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl),
+            backgroundColor: Colors.red));
+      }
     } finally {
       if (mounted) setState(() => _sharingLoading = false);
     }
@@ -406,7 +480,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         if (resp.statusCode == 200) reportImage = pw.MemoryImage(resp.bodyBytes);
       }
 
-      // Values are already stored with the minimum-25 rule applied at save time
       final int plantNameConf  = ((widget.report['plantNameConfidence'] ?? widget.report['confidence'] ?? 0) as num).toInt();
       final int diseaseConf    = ((widget.report['diseaseConfidence']   ?? widget.report['confidence'] ?? 0) as num).toInt();
       final String plantLabelPdf   = (widget.report['plantNetLabel']     ?? '').toString();
@@ -431,7 +504,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             _pdfRow('الحالة الصحية:', widget.report['status']),
             _pdfRow('تاريخ الفحص:', widget.report['date']),
             pw.SizedBox(height: 10),
-            // ─── Plant name confidence block ───────────────────
             _pdfConfidenceBlock(
               arabicFont: arabicFont,
               label: 'دقة تحديد الاسم العلمي للنبات:',
@@ -440,7 +512,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               barColor: PdfColors.green700,
             ),
             pw.SizedBox(height: 10),
-            // ─── Disease confidence block ──────────────────────
             _pdfConfidenceBlock(
               arabicFont: arabicFont,
               label: 'دقة تشخيص المرض:',
@@ -482,7 +553,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             pw.Text(value, style: const pw.TextStyle(fontSize: 12)),
           ]));
 
-  // ── PDF confidence bar block (label + bar + sublabel) ─────────
   pw.Widget _pdfConfidenceBlock({
     required pw.Font arabicFont,
     required String label,
@@ -491,19 +561,16 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     required PdfColor barColor,
   }) {
     final fraction = (percent / 100).clamp(0.0, 1.0);
-    // A4 usable width ≈ 515 pt (595 − 40 margins each side)
     const double totalWidth = 515.0;
     final double filledWidth = totalWidth * fraction;
 
     return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-      // Header row: label + percent
       pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
         pw.Text(label, style: pw.TextStyle(font: arabicFont, fontSize: 11, color: PdfColors.grey700)),
         pw.Text('$percent%', style: pw.TextStyle(font: arabicFont, fontSize: 11,
             fontWeight: pw.FontWeight.bold, color: barColor)),
       ]),
       pw.SizedBox(height: 4),
-      // Progress bar — track
       pw.Stack(children: [
         pw.Container(
           height: 8,
@@ -513,7 +580,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
           ),
         ),
-        // Filled portion — only render when non-zero to avoid zero-width artefact
         if (filledWidth > 0)
           pw.Container(
             height: 8,
@@ -525,7 +591,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           ),
       ]),
       pw.SizedBox(height: 3),
-      // Sublabel
       pw.Text(sublabel, style: pw.TextStyle(font: arabicFont, fontSize: 10,
           fontStyle: pw.FontStyle.italic, color: barColor)),
     ]);
@@ -626,6 +691,33 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     child: Text(widget.report['status'], style: TextStyle(color: _sc, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 16),
 
+                // ── Admin blocked notice ──────────────────────
+                if (_isAdminBlocked) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: const Row(children: [
+                      Icon(Icons.shield_outlined, color: Color(0xFFDC2626), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'لاحظ المشرف مشكلة في هذا التقرير — لا يمكن مشاركته.',
+                          style: TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // ─── Two confidence bars ──────────────────────
                 _ConfidenceRow(
                   label: '🌿 دقة تحديد اسم النبات',
@@ -642,7 +734,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       ? (_isHealthy ? 'النبات سليم' : 'تم رصد علامات مرضية: $diseaseLabel')
                       : '—',
                 ),
-                // ─────────────────────────────────────────────
 
                 const SizedBox(height: 12),
                 Text('📅 ${widget.report['date']}',
@@ -681,8 +772,18 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             Row(children: [
               Expanded(child: _ActionBtn(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.blue, onTap: _exportPDF)),
               const SizedBox(width: 10),
+
+              // ── NEW: share button — locked when admin-blocked ──
               Expanded(
-                child: _sharingLoading
+                child: _isAdminBlocked
+                // Blocked: grey button that opens the explanation dialog
+                    ? _ActionBtn(
+                  icon: Icons.block,
+                  label: 'مشاركة مقيّدة',
+                  color: Colors.grey,
+                  onTap: _shareToggle, // dialog fires inside _shareToggle
+                )
+                    : _sharingLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _ActionBtn(
                   icon: _isShared ? Icons.cancel : Icons.share,
@@ -746,7 +847,6 @@ class _ConfidenceRow extends StatelessWidget {
     ]);
   }
 }
-
 
 // ─── Shared helpers ───────────────────────────────────────────
 class _StatCard extends StatelessWidget {

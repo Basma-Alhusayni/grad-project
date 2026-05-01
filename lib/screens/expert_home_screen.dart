@@ -1263,6 +1263,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 12),
 
         // ── زر حذف الحساب ——
         Padding(
@@ -1291,7 +1292,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
 
         // ── زر تسجيل الخروج
         Padding(
@@ -2183,7 +2184,15 @@ class _ChatsPage extends StatefulWidget {
 }
 
 class _ChatsPageState extends State<_ChatsPage> {
-  String _chatFilter = 'pending'; // 'pending' = active, 'completed' = finished
+  String _chatFilter = 'all';
+  String _searchText = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2193,7 +2202,6 @@ class _ChatsPageState extends State<_ChatsPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: StreamBuilder<QuerySnapshot>(
-        // ✅ Only fetch chats assigned to this specific expert
         stream: db
             .collection('chats')
             .where('specialistId', isEqualTo: uid)
@@ -2207,66 +2215,115 @@ class _ChatsPageState extends State<_ChatsPage> {
 
           final allChats = snapshot.data?.docs ?? [];
 
-          // Calculate counts for filters
           final activeCount = allChats
-              .where(
-                (d) => (d.data() as Map<String, dynamic>)['completed'] != true,
-              )
+              .where((d) =>
+          (d.data() as Map<String, dynamic>)['completed'] != true)
               .length;
           final completedCount = allChats
-              .where(
-                (d) => (d.data() as Map<String, dynamic>)['completed'] == true,
-              )
+              .where((d) =>
+          (d.data() as Map<String, dynamic>)['completed'] == true)
               .length;
+          final totalCount = allChats.length;
 
-          // Apply filters
           List<QueryDocumentSnapshot> filtered = allChats.where((d) {
             final data = d.data() as Map<String, dynamic>;
-            if (_chatFilter == 'pending') return data['completed'] != true;
-            if (_chatFilter == 'completed') return data['completed'] == true;
-            return true;
+
+            final matchSearch = (data['userName'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(_searchText.toLowerCase());
+
+            bool matchFilter = true;
+            if (_chatFilter == 'pending') {
+              matchFilter = data['completed'] != true;
+            } else if (_chatFilter == 'completed') {
+              matchFilter = data['completed'] == true;
+            }
+
+            return matchSearch && matchFilter;
           }).toList();
-          // 🔥 SAFELY PARSED SORTING BLOCK:
+
           filtered.sort((a, b) {
             final dataA = a.data() as Map<String, dynamic>;
             final dataB = b.data() as Map<String, dynamic>;
 
-            // Helper function to safely convert any time format to DateTime
             DateTime parseTime(dynamic timeVal) {
-              if (timeVal is Timestamp) {
-                return timeVal.toDate();
-              } else if (timeVal is String && timeVal.isNotEmpty) {
+              if (timeVal is Timestamp) return timeVal.toDate();
+              if (timeVal is String && timeVal.isNotEmpty) {
                 return DateTime.tryParse(timeVal) ?? DateTime(2000);
               }
-              return DateTime(2000); // Fallback
+              return DateTime(2000);
             }
 
             final timeA = parseTime(dataA['updatedAt'] ?? dataA['createdAt']);
             final timeB = parseTime(dataB['updatedAt'] ?? dataB['createdAt']);
-
             return timeB.compareTo(timeA);
           });
+
           return CustomScrollView(
             slivers: [
-              // ── Filters ──────────────────────────────
+              // ── Search + Filter ───────────────────────────────
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-                  child: Row(
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(
                     children: [
-                      _filterChip(
-                        'محادثات جارية ($activeCount)',
-                        _chatFilter == 'pending',
-                        () => setState(() => _chatFilter = 'pending'),
-                        activeColor: Colors.orange,
+                      // ── Search ──────────────────────────────
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          textDirection: TextDirection.rtl,
+                          onChanged: (v) =>
+                              setState(() => _searchText = v.trim()),
+                          decoration: InputDecoration(
+                            hintText: 'ابحث عن اسم المستخدم...',
+                            hintStyle: const TextStyle(
+                                color: Colors.grey, fontSize: 13),
+                            prefixIcon: _searchText.isNotEmpty
+                                ? IconButton(
+                                icon: const Icon(Icons.clear,
+                                    color: Colors.grey),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchText = '');
+                                })
+                                : const Icon(Icons.search,
+                                color: Colors.grey),
+                            border: InputBorder.none,
+                            contentPadding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _filterChip(
-                        'مكتملة ($completedCount)',
-                        _chatFilter == 'completed',
-                        () => setState(() => _chatFilter = 'completed'),
-                        activeColor: const Color(0xFF16A34A),
+                      const SizedBox(height: 10),
+                      // ── Filter chips ─────────────────────────
+                      Row(
+                        children: [
+                          _availChip(
+                            'الكل ($totalCount)',
+                            _chatFilter == 'all',
+                                () => setState(() => _chatFilter = 'all'),
+                          ),
+                          const SizedBox(width: 8),
+                          _availChip(
+                            'جارية ($activeCount)',
+                            _chatFilter == 'pending',
+                                () => setState(() => _chatFilter = 'pending'),
+                          ),
+                          const SizedBox(width: 8),
+                          _availChip(
+                            'مكتملة ($completedCount)',
+                            _chatFilter == 'completed',
+                                () => setState(() => _chatFilter = 'completed'),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -2280,16 +2337,12 @@ class _ChatsPageState extends State<_ChatsPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 60,
-                            color: Colors.grey[300],
-                          ),
+                          Icon(Icons.chat_bubble_outline,
+                              size: 60, color: Colors.grey[300]),
                           const SizedBox(height: 12),
-                          const Text(
-                            'لا توجد دردشات حالياً',
-                            style: TextStyle(color: Colors.grey, fontSize: 15),
-                          ),
+                          const Text('لا توجد دردشات حالياً',
+                              style:
+                              TextStyle(color: Colors.grey, fontSize: 15)),
                         ],
                       ),
                     ),
@@ -2299,156 +2352,156 @@ class _ChatsPageState extends State<_ChatsPage> {
                 SliverPadding(
                   padding: const EdgeInsets.all(16),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final data =
-                          filtered[index].data() as Map<String, dynamic>;
-                      final chatId = filtered[index].id;
-                      final userName = data['userName'] ?? 'مستخدم';
-                      final userId = data['userId'] ?? ''; // 🔥 GRABBING THE ID
-                      final lastMessage = data['lastMessage'] ?? '';
-                      final time = data['time'] ?? '';
-                      final unread = data['expertUnread'] ?? 0;
-                      final isCompleted = data['completed'] == true;
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        final data =
+                        filtered[index].data() as Map<String, dynamic>;
+                        final chatId = filtered[index].id;
+                        final userName = data['userName'] ?? 'مستخدم';
+                        final userId = data['userId'] ?? '';
+                        final lastMessage = data['lastMessage'] ?? '';
+                        final time = data['time'] ?? '';
+                        final unread = data['expertUnread'] ?? 0;
+                        final isCompleted = data['completed'] == true;
 
-                      return GestureDetector(
-                        onTap: () {
-                          FirebaseFirestore.instance
-                              .collection('chats')
-                              .doc(chatId)
-                              .update({'expertUnread': 0});
+                        return GestureDetector(
+                          onTap: () {
+                            FirebaseFirestore.instance
+                                .collection('chats')
+                                .doc(chatId)
+                                .update({'expertUnread': 0});
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ExpertChatScreen(
-                                chatId: chatId,
-                                userName: userName,
-                                userId:
-                                    userId, // 🔥 THIS IS REQUIRED NOW (Remove isOnline if it's here!)
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ExpertChatScreen(
+                                  chatId: chatId,
+                                  userName: userName,
+                                  userId: userId,
+                                ),
                               ),
+                            );
+                          },
+                          onLongPress: () => _confirmDeleteChat(chatId, userName),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border:
+                              Border.all(color: const Color(0xFFE1F1E4)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE1F1E4)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: const Color(0xFFDDF7DD),
-                                child: Text(
-                                  userName.isNotEmpty ? userName[0] : 'م',
-                                  style: const TextStyle(
-                                    color: Color(0xFF2E7D32),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            userName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                              color: Color(0xFF2F3A33),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isCompleted
-                                                ? const Color(0xFF16A34A)
-                                                : Colors.orange,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            isCompleted ? 'مكتملة' : 'جارية',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            lastMessage,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey[600],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Text(
-                                          time,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey[400],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (unread > 0) ...[
-                                const SizedBox(width: 10),
+                            child: Row(
+                              children: [
                                 CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor: const Color(0xFF16A34A),
+                                  radius: 24,
+                                  backgroundColor: const Color(0xFFDDF7DD),
                                   child: Text(
-                                    '$unread',
+                                    userName.isNotEmpty ? userName[0] : 'م',
                                     style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
+                                      color: Color(0xFF2E7D32),
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              userName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                                color: Color(0xFF2F3A33),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: isCompleted
+                                                  ? const Color(0xFF16A34A)
+                                                  : Colors.orange,
+                                              borderRadius:
+                                              BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              isCompleted ? 'مكتملة' : 'جارية',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              lastMessage,
+                                              style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey[600]),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Text(
+                                            time,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[400]),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (unread > 0) ...[
+                                  const SizedBox(width: 10),
+                                  CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: const Color(0xFF16A34A),
+                                    child: Text(
+                                      '$unread',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                      );
-                    }, childCount: filtered.length),
+                        );
+                      },
+                      childCount: filtered.length,
+                    ),
                   ),
                 ),
             ],
@@ -2457,30 +2510,91 @@ class _ChatsPageState extends State<_ChatsPage> {
       ),
     );
   }
+  Future<void> _confirmDeleteChat(String chatId, String userName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('حذف المحادثة',
+              style: TextStyle(
+                  color: Color(0xFF14532D), fontWeight: FontWeight.bold)),
+          content: Text('هل تريد حذف محادثة $userName؟ سيتم أيضاً حذف أي تقارير مشتركة مرتبطة بها.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, elevation: 0),
+              child: const Text('حذف',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
 
-  Widget _filterChip(
-    String label,
-    bool isSelected,
-    VoidCallback onTap, {
-    Color activeColor = const Color(0xFF16A34A),
-  }) {
+    if (confirm != true) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+
+      // 1. حذف التقرير من مجتمع المشاركات (Community Feed) إن وُجد
+      final feedSnap = await db.collection('community_feed').where('chatId', isEqualTo: chatId).get();
+      for (var doc in feedSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      // 2. حذف التقرير من سجل تقارير الخبير (Specialist Reports)
+      final reportSnap = await db.collection('specialist_reports').where('chatId', isEqualTo: chatId).get();
+      for (var doc in reportSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      // 3. أخيراً، حذف المحادثة نفسها
+      await db.collection('chats').doc(chatId).delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🗑️ تم حذف المحادثة والتقارير المرتبطة بها'),
+            backgroundColor: Color(0xFF2D322C),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Widget _availChip(String label, bool isActive, VoidCallback onTap) {
+    const activeColor = Color(0xFF16A34A);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.1) : Colors.white,
+          color: isActive ? activeColor : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? activeColor : Colors.grey[300]!,
-          ),
+              color: isActive ? activeColor : const Color(0xFFE5E7EB)),
         ),
         child: Text(
           label,
           style: TextStyle(
+            color: isActive ? Colors.white : Colors.grey[700],
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? activeColor : Colors.grey[600],
           ),
         ),
       ),
