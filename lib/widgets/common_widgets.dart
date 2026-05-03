@@ -17,6 +17,7 @@ class PlantTypeSelectorWidget extends StatelessWidget {
     {'id': 'palm',              'label': 'النخيل',       'icon': '🌴'},
   ];
 
+  // Builds a card with a row of plant type buttons for the user to select from
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -35,7 +36,6 @@ class PlantTypeSelectorWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // 5 items — wrap into two rows: 3 on top, 2 on bottom
             Row(
               children: plantTypes.map((type) => Expanded(
                 child: _TypeButton(
@@ -45,8 +45,6 @@ class PlantTypeSelectorWidget extends StatelessWidget {
                 ),
               )).toList(),
             ),
-
-
           ],
         ),
       ),
@@ -65,9 +63,9 @@ class _TypeButton extends StatelessWidget {
     required this.onTap,
   });
 
+  // Builds one plant type button that animates its border and background when selected
   @override
   Widget build(BuildContext context) {
-    // Special pink accent for "أخرى"
     final isOther     = type['id'] == 'other';
     final activeColor = isOther ? Colors.pink : AppTheme.primaryGreen;
     final activeBg    = isOther ? const Color(0xFFFFF0F9) : AppTheme.bgGreen;
@@ -134,6 +132,7 @@ class InfoCard extends StatelessWidget {
     this.icon,
   });
 
+  // Builds a colored card showing a title with an optional icon and a block of text content
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -173,12 +172,14 @@ class ConfidenceBadge extends StatelessWidget {
   final double confidence;
   const ConfidenceBadge({super.key, required this.confidence});
 
+  // Returns green, orange, or red based on how high the confidence score is
   Color get _color {
     if (confidence >= 70) return AppTheme.primaryGreen;
     if (confidence >= 50) return AppTheme.orange;
     return AppTheme.red;
   }
 
+  // Builds a small pill badge showing the diagnosis confidence percentage with a matching color
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -216,6 +217,7 @@ class GradientButton extends StatelessWidget {
     this.isOutlined = false,
   });
 
+  // Builds a full-width green gradient button with an icon — shows a spinner when loading, or an outlined style if isOutlined is true
   @override
   Widget build(BuildContext context) {
     if (isOutlined) {

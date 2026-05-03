@@ -10,7 +10,7 @@ class EmailService {
   static const String _apiUrl =
       'https://api.emailjs.com/api/v1.0/email/send';
 
-  /// Sends the approval email containing the temporary password.
+  // Sends an approval email to a newly accepted specialist with their temporary password
   static Future<EmailResult> sendApprovalEmail({
     required String toEmail,
     required String toName,
@@ -27,7 +27,8 @@ class EmailService {
     );
   }
 
-  /// Sends the rejection email with the admin-supplied reason.
+
+  // Sends a rejection email to a specialist applicant with the reason for rejection
   static Future<EmailResult> sendRejectionEmail({
     required String toEmail,
     required String toName,
@@ -44,14 +45,13 @@ class EmailService {
     );
   }
 
+  // Builds the EmailJS request and sends it — returns success or a failure message
   static Future<EmailResult> _send({
     required String templateId,
     required Map<String, String> templateParams,
   }) async {
-    // Skip real HTTP call if credentials are still placeholders
     if (_serviceId.startsWith('YOUR_') ||
         _publicKey.startsWith('YOUR_')) {
-      // ignore: avoid_print
       print('[EmailService] ⚠️ Credentials not set — '
           'would have emailed: ${templateParams['to_email']}');
       return EmailResult.success();
@@ -89,7 +89,10 @@ class EmailResult {
 
   EmailResult._({required this.success, this.error});
 
+  // Creates a successful email result
   factory EmailResult.success() => EmailResult._(success: true);
+
+  // Creates a failed email result with an error message
   factory EmailResult.failure(String error) =>
       EmailResult._(success: false, error: error);
 }

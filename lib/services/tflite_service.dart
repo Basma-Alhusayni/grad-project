@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -74,7 +73,6 @@ class TFLiteService {
     'healthy',
   ];
 
-  // ── UPDATED: new mint model classes ─────────────────────────────────────────
   static const List<String> mintLabels = ['Dried', 'Fresh', 'Spoiled', 'Sunlight'];
 
   static const Map<String, Map<String, String>> diseaseTranslations = {
@@ -126,14 +124,13 @@ class TFLiteService {
     'Rachis_Blight':                  {'ar': 'لفحة العرجون',                        'type': 'فطري',     'en': 'Rachis Blight'},
     'Parlatoria_Blanchardi':          {'ar': 'حشرة البارلاتوريا (الدرع الأبيض)',    'type': 'حشري',     'en': 'Parlatoria Blanchardi'},
     'healthy':                        {'ar': 'نبات سليم',                           'type': 'سليم',     'en': 'Healthy'},
-    // ── UPDATED: new mint model translations (replaced 'unhealthy') ────────────
     'Dried':    {'ar': 'نعناع مجفف / جاف',      'type': 'فسيولوجي', 'en': 'Dried'},
     'Fresh':    {'ar': 'نعناع طازج وسليم',       'type': 'سليم',     'en': 'Fresh'},
     'Spoiled':  {'ar': 'نعناع فاسد / تالف',      'type': 'فطري',     'en': 'Spoiled'},
     'Sunlight': {'ar': 'حرق شمسي / إجهاد ضوئي', 'type': 'فسيولوجي', 'en': 'Sunlight Stress'},
   };
 
-  // ── Initialisation ───────────────────────────────────────────────────────────
+  // Loads all four TFLite models and the PlantNet labels file — skips if already initialized
   Future<void> initialize() async {
     if (_isInitialized) return;
     try {
@@ -152,6 +149,7 @@ class TFLiteService {
     }
   }
 
+  // Tries to load a TFLite model from assets and logs its input/output shape — returns null if it fails
   Future<Interpreter?> _safeLoad(String asset) async {
     try {
       final interp   = await Interpreter.fromAsset(asset);
@@ -165,7 +163,7 @@ class TFLiteService {
     }
   }
 
-  // ── Plant identification (PlantNet) ──────────────────────────────────────────
+  // Runs the PlantNet model on the image and returns the top plant name and confidence score
   Future<Map<String, dynamic>> identifyPlant(Uint8List imageBytes) async {
     await initialize();
     if (_plantNetInterpreter == null || _plantNetLabels.isEmpty) {
@@ -197,7 +195,7 @@ class TFLiteService {
     }
   }
 
-  // ── Disease diagnosis ────────────────────────────────────────────────────────
+  // Selects the right disease model based on plant type, runs it on the image, and returns the top disease label and confidence
   Future<Map<String, dynamic>> diagnosePlant(
       Uint8List imageBytes,
       PlantType plantType,
@@ -231,9 +229,6 @@ class TFLiteService {
       final inputShape = interpreter.getInputTensor(0).shape;
       debugPrint('📐 Model input shape: $inputShape');
 
-      // ── Smart preprocessing based on input shape ──────────────────────────
-      // [1, N] → flat grayscale (e.g. mint_model with 784 = 28x28)
-      // [1, H, W, 3] → image tensor
       late dynamic input;
       if (inputShape.length == 2) {
         final flatSize = inputShape[1];
@@ -273,7 +268,6 @@ class TFLiteService {
         debugPrint('  Top${i + 1}: [$idx] $lbl (${(indexed[i].value * 100).toStringAsFixed(1)}%)');
       }
 
-      // Skip Background_without_leaves — pick the next best prediction
       const backgroundLabel = 'Background_without_leaves';
       MapEntry<int, double> chosen = indexed[0];
       for (final entry in indexed) {
@@ -294,7 +288,6 @@ class TFLiteService {
 
       final translation = diseaseTranslations[label];
 
-      // ── UPDATED: isHealthy logic covers new mint classes ──────────────────
       final isHealthy = label == 'Fresh' ||
           (label.contains('healthy') && !label.contains('Background'));
 
@@ -314,6 +307,7 @@ class TFLiteService {
     }
   }
 
+  // Returns a default failed disease result when the model is unavailable or throws an error
   Map<String, dynamic> _failedDisease() => {
     'label':       'unknown',
     'labelAr':     'تعذّر التشخيص',
@@ -323,9 +317,7 @@ class TFLiteService {
     'labelEn':     'Unknown',
   };
 
-  // ── Preprocessing ────────────────────────────────────────────────────────────
-
-  /// ImageNet normalisation — for PlantNet
+  // Resizes the image to the target size and normalizes pixel values using ImageNet mean and std
   List<List<List<List<double>>>> _preprocessImageNet(
       Uint8List bytes, int w, int h) {
     final image   = img.decodeImage(bytes)!;
@@ -345,7 +337,7 @@ class TFLiteService {
             })));
   }
 
-  /// Raw 0-255 — for plantvillage.tflite which has built-in Rescaling(1./255)
+  // Resizes the image and returns raw RGB values in the range 0–255
   List<List<List<List<double>>>> _preprocessRaw(
       Uint8List bytes, int w, int h) {
     final image   = img.decodeImage(bytes)!;
@@ -358,7 +350,7 @@ class TFLiteService {
             })));
   }
 
-  /// /255 normalisation — for palm model
+  // Resizes the image and normalizes pixel values to the range 0.0–1.0
   List<List<List<List<double>>>> _preprocessSimple(
       Uint8List bytes, int w, int h) {
     final image   = img.decodeImage(bytes)!;
@@ -371,7 +363,7 @@ class TFLiteService {
             })));
   }
 
-  /// Flat grayscale — for models with input shape [1, N] e.g. [1, 784]
+  // Resizes the image, converts it to grayscale, and returns a flat 1D normalized array
   List<List<double>> _preprocessFlat(Uint8List bytes, int side) {
     final image   = img.decodeImage(bytes)!;
     final resized = img.copyResize(image, width: side, height: side);
@@ -386,7 +378,7 @@ class TFLiteService {
     return [flat];
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // Converts raw model output scores into probabilities that sum to 1
   List<double> _softmax(List<double> scores) {
     if (scores.isEmpty) return [];
     final maxVal = scores.reduce(math.max);
@@ -395,6 +387,7 @@ class TFLiteService {
     return sum == 0 ? exps : exps.map((e) => e / sum).toList();
   }
 
+  // Returns the index of the highest value in a list
   int _argmax(List<double> list) {
     if (list.isEmpty) return 0;
     int maxIdx = 0;
@@ -404,6 +397,7 @@ class TFLiteService {
     return maxIdx;
   }
 
+  // Closes all four TFLite interpreters to free memory
   void dispose() {
     _plantNetInterpreter?.close();
     _fruitVegInterpreter?.close();

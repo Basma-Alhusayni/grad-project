@@ -25,6 +25,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   String? _emailError;
   String? _passError;
 
+  // Start listening to email and password fields as the user types
   @override
   void initState() {
     super.initState();
@@ -32,6 +33,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     _loginPass.addListener(_validatePassword);
   }
 
+  // Clean up controllers and listeners when the screen is removed
   @override
   void dispose() {
     _loginEmail.removeListener(_validateEmail);
@@ -41,6 +43,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     super.dispose();
   }
 
+  // Checks if the email format is valid while the user types
   void _validateEmail() {
     final v = _loginEmail.text.trim();
     final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
@@ -55,6 +58,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
   }
 
+  // Checks that the password is at least 6 characters
   void _validatePassword() {
     final v = _loginPass.text;
     setState(() {
@@ -66,6 +70,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
   }
 
+  // Validates fields then tries to log in as admin, saves remember-me preference on success
   Future<void> _login() async {
     if (_loginEmail.text.trim().isEmpty || _loginPass.text.isEmpty) {
       setState(() => _error = 'يرجى ملء جميع الحقول');
@@ -101,6 +106,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     }
   }
 
+  // Shows a dialog where admin can enter their email to receive a password reset link
   void _forgotPassword() {
     final ctrl = TextEditingController();
     showDialog(
@@ -156,6 +162,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     );
   }
 
+  // A red box that displays an error message to the user
   Widget _errorBox(String message) {
     return Container(
       width: double.infinity,
@@ -181,6 +188,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     );
   }
 
+  // A small right-aligned label shown above each input field
   Widget _label(String text) => Align(
     alignment: Alignment.centerRight,
     child: Text(
@@ -193,6 +201,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     ),
   );
 
+  // Builds the full login screen with logo, input fields, remember-me checkbox, and login button
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -316,7 +325,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             ),
                           ),
 
-                          // --- ADDED SPACER HERE ---
                           const Spacer(),
 
                           const Text(
@@ -324,7 +332,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                               style: TextStyle(color: Colors.grey, fontSize: 12)
                           ),
                           const SizedBox(height: 8),
-                          // Match the login screen padding
                         ],
                       ),
                     ),

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// A text field that shows an inline error below it.
-/// Border turns red when [errorText] is non-null.
 class ValidatedField extends StatelessWidget {
   final String hint;
   final IconData icon;
@@ -20,6 +18,7 @@ class ValidatedField extends StatelessWidget {
     this.enabled = true,
   });
 
+  // Builds a right-aligned text input field that turns red and shows an error message when errorText is set
   @override
   Widget build(BuildContext context) {
     final hasError = errorText != null;
@@ -76,8 +75,6 @@ class ValidatedField extends StatelessWidget {
   }
 }
 
-/// A password field with a visibility toggle eye icon
-/// and an optional inline error message.
 class PasswordField extends StatelessWidget {
   final String hint;
   final TextEditingController controller;
@@ -96,6 +93,7 @@ class PasswordField extends StatelessWidget {
     this.enabled = true,
   });
 
+  // Builds a password input field with a show/hide toggle that turns red and shows an error message when errorText is set
   @override
   Widget build(BuildContext context) {
     final hasError = errorText != null;

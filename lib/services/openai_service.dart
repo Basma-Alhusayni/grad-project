@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 
 class OpenAIService {
 
-  //هنا تحطوا المفتاح 🔴🔴🔴
+  // OpenAI API key
   static const String _apiKey = '';
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
   static const String _model   = 'gpt-4o-mini';
@@ -16,7 +15,7 @@ class OpenAIService {
   static OpenAIService get instance => _instance ??= OpenAIService._();
   OpenAIService._();
 
-  // ── Plant identification + category routing ──────────────────────────────────
+  // Sends the plant image to OpenAI and returns the plant name, Arabic name, confidence, and category
   Future<Map<String, dynamic>> identifyPlantWithCategory(Uint8List imageBytes) async {
     const prompt =
         'Look at this plant image carefully. '
@@ -84,7 +83,7 @@ class OpenAIService {
     };
   }
 
-  // ── Full vision diagnosis ────────────────────────────────────────────────────
+  // Sends the plant image to OpenAI for a full disease diagnosis and returns diagnosis, treatment, and details in Arabic
   Future<Map<String, String>> diagnoseFromImage(Uint8List imageBytes) async {
     const prompt =
         'You are an expert plant pathologist. Carefully examine this plant image and provide a comprehensive diagnosis. '
@@ -161,7 +160,7 @@ class OpenAIService {
     return _visionFallback();
   }
 
-  // ── Text enrichment ──────────────────────────────────────────────────────────
+  // Sends a text-only request to OpenAI to get detailed Arabic care or treatment info based on plant and disease name
   Future<Map<String, String>> getPlantDiagnosisDetails({
     required String plantName,
     required String diseaseName,
@@ -225,12 +224,13 @@ class OpenAIService {
     return _textFallback(isHealthy, diseaseName);
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // Returns a fake 408 response when the request exceeds the timeout limit
   http.Response _timeoutResponse() {
     debugPrint('⏰ Request timed out after ${_timeout.inSeconds}s');
     return http.Response('{"timeout":true}', 408);
   }
 
+  // Resizes and compresses the image to 256px and 70% quality before sending to OpenAI
   Uint8List _compressImage(Uint8List bytes) {
     try {
       final decoded = img.decodeImage(bytes);
@@ -249,6 +249,7 @@ class OpenAIService {
     }
   }
 
+  // Parses the JSON object out of the OpenAI response text, stripping any markdown formatting
   Map<String, dynamic>? _extractJson(String responseBody) {
     try {
       final data = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -268,12 +269,14 @@ class OpenAIService {
     }
   }
 
+  // Safely converts a value to double, returning a fallback if conversion fails
   double _toDouble(dynamic val, double fallback) {
     if (val == null) return fallback;
     if (val is num) return val.toDouble();
     return double.tryParse(val.toString()) ?? fallback;
   }
 
+  // Returns a default failed result when the vision diagnosis request fails
   Map<String, String> _visionFallback() => {
     'plantName': 'Plant', 'plantNameAr': 'نبات', 'isHealthy': 'false',
     'diagnosis': 'تعذّر الاتصال', 'diseaseType': 'غير محدد',
@@ -281,6 +284,7 @@ class OpenAIService {
     'prevention': '', 'confidence': '0',
   };
 
+  // Returns simple Arabic care or treatment text when the text diagnosis request fails
   Map<String, String> _textFallback(bool isHealthy, String diseaseName) => {
     'diagnosis':  isHealthy ? 'النبات سليم' : 'مصاب بـ $diseaseName',
     'details':    '',

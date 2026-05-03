@@ -18,6 +18,7 @@ class DiagnosisResult {
   final String imagePath;
   final DateTime timestamp;
 
+  // Holds all the data from a completed plant diagnosis including plant name, disease info, confidence scores, and status
   DiagnosisResult({
     required this.plantName,
     required this.plantNameAr,
@@ -40,9 +41,10 @@ class DiagnosisResult {
   });
 }
 
+// Represents the possible outcomes of a diagnosis — healthy, diseased, failed, or still analyzing
 enum DiagnosisStatus { healthy, diseased, failed, analyzing }
 
-// Used internally by the service for model routing — not shown to the user
+// Represents the three supported plant categories, each with an id, Arabic label, and emoji icon
 enum PlantType {
   vegetablesFruits('vegetables-fruits', 'خضار وفواكه', '🥬'),
   mint('mint', 'النعناع', '🌿'),

@@ -36,12 +36,14 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
   String _specialistId = '';
   int _previousMessageCount = 0;
 
+  // Set up the chat listener when the screen opens
   @override
   void initState() {
     super.initState();
     _listenToChat();
   }
 
+  // Clean up the message input and scroll controllers
   @override
   void dispose() {
     _messageController.dispose();
@@ -49,6 +51,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     super.dispose();
   }
 
+  // Listens to chat changes in real time — updates approval status, completion, and triggers the rating dialog if needed
   void _listenToChat() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -86,6 +89,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     });
   }
 
+  // Smoothly scrolls the message list to the latest message
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -98,12 +102,13 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     });
   }
 
+  // Returns the current time as a formatted string like "09:05"
   String _now() {
     final t = TimeOfDay.now();
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  // ── Full image viewer ────────────────────────────────────────
+  // Opens a full-screen zoomable view of an image (from URL or local file)
   void _showFullImage(String content) {
     showDialog(
       context: context,
@@ -146,6 +151,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // Sends the typed text message to Firestore and scrolls to the bottom
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -171,6 +177,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     _scrollToBottom();
   }
 
+  // Lets user pick an image from gallery, uploads it to Cloudinary, then sends it as a message
   Future<void> _sendImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
@@ -215,7 +222,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     _scrollToBottom();
   }
 
-  // ── Admin-blocked dialog ─────────────────────────────────────
+  // Shows a dialog telling the user this report was blocked by the admin and cannot be shared
   void _showAdminBlockedDialog() {
     showDialog(
       context: context,
@@ -257,9 +264,8 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
-  // ── عرض تقرير الخبير مع زر المشاركة ─────────────────────────
+  // Builds the case report card shown at the bottom of the chat after the specialist closes the case
   Widget _buildReportSection(Map<String, dynamic> report) {
-    // ← NEW: read the adminBlocked flag from the report sub-map
     final bool isAdminBlocked = report['adminBlocked'] == true;
 
     return Container(
@@ -307,9 +313,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
                   ),
                 ),
               ),
-              // ── Share / blocked icon button ──────────────────
               if (isAdminBlocked)
-              // Blocked: grey lock icon — tapping shows dialog
                 IconButton(
                   icon: const Icon(Icons.block, color: Colors.grey),
                   onPressed: _showAdminBlockedDialog,
@@ -335,7 +339,6 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
             ],
           ),
 
-          // ── NEW: admin-blocked notice banner ─────────────────
           if (isAdminBlocked) ...[
             const SizedBox(height: 10),
             Container(
@@ -410,6 +413,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // A single row showing a label and its value inside the report card
   Widget _buildReportDetailRow(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +429,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
-  // ── مشاركة تقارير الخبير ─────────────────────────────────────
+// Shares the specialist report to the community feed and marks it as shared in Firestore
   Future<void> _shareReportToDashboard(Map<String, dynamic> report) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -489,7 +493,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     }
   }
 
-  // ── الغاء مشاركة تقارير الخبير ───────────────────────────────
+// Removes the report from the community feed and marks it as unshared
   Future<void> _unshareReportFromDashboard(Map<String, dynamic> report) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -523,7 +527,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     }
   }
 
-  // ── ديالوج التقييم ─────────────────────────────────────────
+  // Shows a dialog with 5 stars and an optional comment so the user can rate the specialist
   void _showRatingDialog() {
     int selectedRating = 0;
     final commentController = TextEditingController();
@@ -664,7 +668,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
-  // ── إرسال التقييم ──────────────────────────────────────────
+  // Saves the rating and comment, recalculates the specialist's average rating, and marks the chat as rated
   Future<void> _submitRating(int rating, String comment) async {
     if (_specialistId.isEmpty) return;
 
@@ -734,6 +738,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     }
   }
 
+  // Builds the full chat screen: header, banners, message list, and input bar
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -753,6 +758,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // A banner shown when the specialist hasn't approved the chat yet
   Widget _buildPendingBanner() {
     return Container(
       width: double.infinity,
@@ -773,6 +779,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // A banner shown when the case is closed — includes the rate button if the user hasn't rated yet
   Widget _buildCompletedBanner() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.collection('chats').doc(widget.chatId).snapshots(),
@@ -852,6 +859,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // Builds the top bar with the expert's name, online status, rating, and case status badge
   Widget _buildHeader() {
     return Container(
       color: Colors.white,
@@ -959,6 +967,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // Listens to messages in real time and builds the scrollable message list, including the report card if the case is closed
   Widget _buildMessages() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.collection('chats').doc(widget.chatId).snapshots(),
@@ -1010,6 +1019,7 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
     );
   }
 
+  // Builds the bottom input bar with image picker and send button — hidden when the case is closed
   Widget _buildInputBar() {
     if (_isCompleted) return const SafeArea(top: false, child: SizedBox(height: 8));
     return Container(
@@ -1061,7 +1071,6 @@ class _ChatWithUserScreenState extends State<ChatWithUserScreen> {
   }
 }
 
-// ─── فقاعة الرسالة ───────────────────────────────────────────
 class _MessageBubble extends StatelessWidget {
   final Map<String, dynamic> msg;
   final void Function(String) onImageTap;

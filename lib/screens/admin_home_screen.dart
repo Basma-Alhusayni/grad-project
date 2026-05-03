@@ -23,19 +23,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   String selectedStatus = 'pending';
   String _selectedEditStatus = 'pending';
 
-  // ── EmailJS credentials ─────────────────────────────────────────
   static const String _emailJSServiceId = 'service_8howa9v';
   static const String _emailJSPublicKey = '78Wkripf_iReiFIPK';
   static const String _emailJSDeactivateTemplateId = 'template_cocv9le';
   static const String _emailJSDeleteTemplateId = 'template_sb6f5vk';
   static const String _adminContactEmail = 'bioshield.gp@gmail.com';
 
+  // Load admin name and email when screen first opens
   @override
   void initState() {
     super.initState();
     _fetchAdminData();
   }
 
+  // Gets admin info from Firestore and syncs email if it changed in Firebase Auth
   Future<void> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -64,7 +65,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     });
   }
 
-  // ── EmailJS helper ──────────────────────────────────────────────
+  // Sends an email using the EmailJS service (no backend needed)
   Future<void> _sendEmailJS({
     required String toEmail,
     required String toName,
@@ -94,6 +95,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
+  // Signs the admin out and goes back to the splash screen
   Future<void> _logout() async {
     await AuthService().signOut();
     if (!mounted) return;
@@ -104,6 +106,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Shows a zoomable full-screen preview of a document image
   void _showFullImage(String url) {
     showDialog(
       context: context,
@@ -286,7 +289,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Users management Tab ────────────────────────────────────────────
+  // Builds the users tab with search, active/disabled counters, and a list of users
   Widget _buildUsersTab() {
     return Column(
       children: [
@@ -672,6 +675,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // A small card showing a count and label, highlights when selected
   Widget _statBox(
       String count, String label, MaterialColor color, bool isSelected) {
     return AnimatedContainer(
@@ -708,6 +712,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Shows a bottom sheet with full info about a user, including how many reports they submitted
   void _showUserDetails(
       Map<String, dynamic> data,
       String status,
@@ -795,6 +800,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // A single row showing a label and its value side by side
   Widget _detailRow(String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -808,7 +814,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ── Toggle status (with deactivation email) ─────────────────────
+  // Suspends an active account (with deadline + email) or re-activates a suspended one
   void _toggleStatus(
       String uid,
       String status, {
@@ -816,7 +822,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         String userEmail = '',
       }) async {
     if (status == 'active') {
-      // ── DEACTIVATING: show date picker dialog ──────────────
       DateTime selectedDeadline =
       DateTime.now().add(const Duration(days: 14));
 
@@ -952,7 +957,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final deadlineStr =
           '${selectedDeadline.day}/${selectedDeadline.month}/${selectedDeadline.year}';
 
-      // Update Firestore
       await FirebaseFirestore.instance
           .collection('accounts')
           .doc(uid)
@@ -962,7 +966,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         'reactivateDeadline': Timestamp.fromDate(selectedDeadline),
       });
 
-      // Send suspension email with deadline date
       if (userEmail.isNotEmpty) {
         await _sendEmailJS(
           toEmail: userEmail,
@@ -982,7 +985,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         setState(() {});
       }
     } else {
-      // ── RE-ENABLING ─────────────────────────────────────────
       await FirebaseFirestore.instance
           .collection('accounts')
           .doc(uid)
@@ -1003,12 +1005,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
-  // ── Delete account (with deletion email) ────────────────────────
+  // Shows a confirmation dialog then deletes the account from Firestore and sends a notification email
   void _confirmDelete({
     required String uid,
     required String name,
     required String email,
-    required String collection, // 'users' or 'specialists'
+    required String collection,
   }) {
     showDialog(
       context: context,
@@ -1082,7 +1084,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   );
                 }
                 try {
-                  // Send email BEFORE deleting so data is still available
                   await _sendEmailJS(
                     toEmail: email,
                     toName: name,
@@ -1099,7 +1100,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   await batch.commit();
 
                   if (!mounted) return;
-                  Navigator.pop(context); // dismiss loading
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('🗑️ تم حذف حساب $name بنجاح'),
                     backgroundColor: const Color(0xFF2D322C),
@@ -1107,7 +1108,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ));
                 } catch (e) {
                   if (!mounted) return;
-                  Navigator.pop(context); // dismiss loading
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('حدث خطأ: $e'),
                     backgroundColor: Colors.red,
@@ -1131,7 +1132,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Specialists management Tab ────────────────────────────────────────────
+  // Same as users tab but for specialists
   Widget _buildSpecialistsTab() {
     return Column(
       children: [
@@ -1522,6 +1523,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Shows a bottom sheet with full details about a specialist
   void _showSpecialistDetails(
       Map<String, dynamic> data,
       String status,
@@ -1610,7 +1612,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Requests Tab ────────────────────────────────────────────
+  // Builds the join requests tab with pending/approved/rejected filter cards
   Widget _buildRequestsTab() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1653,6 +1655,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // A selectable card showing count of requests for one status (pending, approved, rejected)
   Widget _filterCard(
       String status,
       String label,
@@ -1706,6 +1709,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Fetches and lists specialist join requests filtered by status
   Widget _requestsList(String status) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1751,6 +1755,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Builds one request card showing applicant info, certificates, images, and accept/reject buttons
   Widget _buildRequestCard(
       Map<String, dynamic> data, String docId, String status) {
     final statusColor = status == 'pending'
@@ -1960,6 +1965,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // A small row with an icon, a label, and a value — used inside request cards
   Widget _requestRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1983,6 +1989,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Confirms with admin then calls AuthService to approve the specialist request and send a password setup email
   Future<void> _approveRequest(
       Map<String, dynamic> data, String docId) async {
     final confirm = await showDialog<bool>(
@@ -2081,6 +2088,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
+  // Shows a dialog asking for a rejection reason, then rejects the request and notifies the applicant
   void _showRejectDialog(Map<String, dynamic> data, String docId) {
     final reasonController = TextEditingController();
     String? reasonError;
@@ -2302,7 +2310,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Edit requests Tab ────────────────────────────────────────────
+  // Builds the profile edit requests tab for specialists
   Widget _buildEditRequestsTab() {
     return Column(
       children: [
@@ -2342,6 +2350,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Same as _filterCard but controls the edit requests tab filter
   Widget _editFilterCard(String status, String label, MaterialColor color,
       IconData icon, int count) {
     final isSelected = _selectedEditStatus == status;
@@ -2384,6 +2393,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Fetches and lists specialist edit requests filtered by selected status
   Widget _editRequestsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -2431,6 +2441,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Shows old vs new values for each field the specialist wants to change, with approve/reject buttons
   Widget _editRequestCard(Map<String, dynamic> data, String docId) {
     final status = data['status'] as String;
     final statusColor = status == 'pending'
@@ -2665,6 +2676,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Shows one field comparison: old value on the left, new value on the right, highlights if changed
   Widget _editComparisonRow(
       String label, String? oldVal, String? newVal) {
     final changed =
@@ -2726,6 +2738,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Confirms then applies the specialist's requested changes to their Firestore documents
   Future<void> _approveEditRequest(
       Map<String, dynamic> data, String docId) async {
     final confirm = await showDialog<bool>(
@@ -2827,6 +2840,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
+  // Asks admin for a reason then marks the edit request as rejected in Firestore
   void _showEditRejectDialog(Map<String, dynamic> data, String docId) {
     final reasonController = TextEditingController();
     String? reasonError;
@@ -2923,7 +2937,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-// ── Profile Tab ──────────────────────────────────────────────
+  // Builds the admin's own profile page with personal info and security options
   Widget _buildProfileTab() {
     return SingleChildScrollView(
       child: Column(
@@ -3095,6 +3109,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Sends a password reset email to the admin's current email address
   void _showChangePasswordDialog() {
     bool sending = false;
     showDialog(
@@ -3192,6 +3207,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Lets admin enter a new email and sends a verification link to it
   void _showChangeEmailDialog() {
     final emailController = TextEditingController();
     String? emailError;
@@ -3388,6 +3404,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // Dialog to edit the admin's display name and email directly
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
     final emailController = TextEditingController(text: _email);
@@ -3523,6 +3540,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  // A row with an icon, a label, and the current value — used in the profile info card
   Widget _buildInfoRow({
     required String label,
     required String value,

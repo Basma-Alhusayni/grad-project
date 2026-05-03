@@ -9,10 +9,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/services.dart';
-
 import '../theme/app_theme.dart';
 import '../models/diagnosis_result.dart';
-import '../widgets/common_widgets.dart';
 import 'expert_selection_screen.dart';
 
 class DiagnosisResultScreen extends StatefulWidget {
@@ -33,6 +31,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       cache: false
   );
 
+  // Show the failure dialog after the screen loads if the diagnosis failed
   @override
   void initState() {
     super.initState();
@@ -43,6 +42,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Shows a dialog when diagnosis fails — lets user contact an expert or try again
   void _showCustomFailureDialog() {
     showDialog(
       context: context,
@@ -124,6 +124,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     );
   }
 
+  // Uploads the diagnosed plant image to Cloudinary and returns the remote URL
   Future<String?> _uploadImage() async {
     try {
       if (!await File(widget.result.imagePath).exists()) return null;
@@ -136,6 +137,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Saves the diagnosis result as a report in Firestore under the user's profile
   Future<void> _saveToProfile() async {
     if (_isAlreadySaved) return;
 
@@ -144,15 +146,12 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Fetch user's full name to store alongside the report
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'مستخدم';
 
       final remoteUrl = await _uploadImage();
       if (remoteUrl == null) throw Exception("فشل رفع الصورة للسحابة");
 
-      // Apply the same minimum-25 display rule before saving.
-      // Use round() to match toStringAsFixed(0) which rounds, not truncates.
       int display(double raw) => (raw > 0 && raw < 25) ? 25 : raw.round();
 
       await FirebaseFirestore.instance.collection('reports').add({
@@ -196,6 +195,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Generates a PDF report with the plant image and diagnosis details, then shares it
   Future<void> _exportPDF() async {
     try {
       final pdf = pw.Document();
@@ -210,7 +210,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
 
       final bool isHealthy = widget.result.status == DiagnosisStatus.healthy;
 
-      // Use round() to match toStringAsFixed(0) rounding shown on screen
       int display(double raw) => (raw > 0 && raw < 25) ? 25 : raw.round();
 
       final int plantConf   = display(widget.result.plantNetConfidence);
@@ -218,7 +217,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
       final String plantLbl   = widget.result.plantNetLabel;
       final String diseaseLbl = widget.result.modelDiseaseLabel;
 
-      // Mirror the same isDiseased logic used in _StatusHeader
       bool isDiseased(String label) {
         final l = label.toLowerCase();
         return l.isNotEmpty &&
@@ -266,7 +264,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                   _pdfResultRow('اسم النبات:', widget.result.plantNameAr),
                   _pdfResultRow('الحالة الصحية:', isHealthy ? 'سليم' : 'مريض'),
                   pw.SizedBox(height: 12),
-                  // ─── Plant name confidence bar ─────────────────
                   _pdfConfidenceBlock(
                     arabicFont: arabicFont,
                     label: 'دقة تحديد الاسم العلمي للنبات:',
@@ -275,7 +272,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                     barColor: PdfColors.green700,
                   ),
                   pw.SizedBox(height: 10),
-                  // ─── Disease confidence bar ────────────────────
                   _pdfConfidenceBlock(
                     arabicFont: arabicFont,
                     label: 'دقة تشخيص المرض:',
@@ -321,6 +317,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // A single label-value row used inside the PDF layout
   pw.Widget _pdfResultRow(String label, String value) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
@@ -334,7 +331,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     );
   }
 
-  // ── PDF confidence bar: header + coloured bar + italic sublabel ─
+  // A confidence bar block used inside the PDF showing percentage and a progress bar
   pw.Widget _pdfConfidenceBlock({
     required pw.Font arabicFont,
     required String label,
@@ -343,12 +340,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     required PdfColor barColor,
   }) {
     final double fraction = (percent / 100).clamp(0.0, 1.0);
-    // A4 usable width ≈ 515 pt (595 − 40 pt margin each side)
     const double totalWidth = 515.0;
     final double filledWidth = totalWidth * fraction;
 
     return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-      // Label row + percent
       pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
         pw.Text(label,
             style: pw.TextStyle(font: arabicFont, fontSize: 11, color: PdfColors.grey700)),
@@ -358,7 +353,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
                 fontWeight: pw.FontWeight.bold, color: barColor)),
       ]),
       pw.SizedBox(height: 4),
-      // Track + filled bar
       pw.Stack(children: [
         pw.Container(
           height: 8,
@@ -377,7 +371,6 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
           ),
       ]),
       pw.SizedBox(height: 3),
-      // Sublabel in italic
       pw.Text(sublabel,
           style: pw.TextStyle(
               font: arabicFont, fontSize: 10,
@@ -385,6 +378,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     ]);
   }
 
+  // Returns the right color based on whether the plant is healthy, diseased, or failed
   Color get _statusColor {
     switch (widget.result.status) {
       case DiagnosisStatus.healthy:  return AppTheme.primaryGreen;
@@ -394,6 +388,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Returns the background color matching the diagnosis status
   Color get _statusBgColor {
     switch (widget.result.status) {
       case DiagnosisStatus.healthy:  return AppTheme.bgGreen;
@@ -403,10 +398,12 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Returns an emoji icon matching the diagnosis status
   String get _statusIcon =>
       widget.result.status == DiagnosisStatus.healthy ? '✅' :
       widget.result.status == DiagnosisStatus.diseased ? '🔴' : '❌';
 
+  // Returns a short Arabic description of the diagnosis status
   String get _statusText {
     switch (widget.result.status) {
       case DiagnosisStatus.healthy:  return 'النبات سليم وبصحة جيدة';
@@ -416,6 +413,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     }
   }
 
+  // Builds the full results screen: plant image, status header, info cards, save and export buttons
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -561,6 +559,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     );
   }
 
+  // A green full-width button used for the main action
   Widget _buildMainButton({required String label, required IconData icon, required VoidCallback onTap}) {
     return SizedBox(
       width: double.infinity,
@@ -578,6 +577,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     );
   }
 
+  // A greyed-out button shown when the report has already been saved
   Widget _buildDisabledButton({required String label, required IconData icon}) {
     return SizedBox(
       width: double.infinity,
@@ -595,6 +595,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
     );
   }
 
+  // An outlined button used for secondary actions like exporting PDF
   Widget _buildSecondaryButton({required String label, required IconData icon, required VoidCallback onTap}) {
     return SizedBox(
       width: double.infinity,
@@ -612,11 +613,11 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen> {
   }
 }
 
-// ─── HELPER UI CLASSES ────────────────────────────────────────
 class _FullWidthImage extends StatelessWidget {
   final String imagePath;
   const _FullWidthImage({required this.imagePath});
 
+  // Shows the plant photo at full width at the top of the screen
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -650,6 +651,7 @@ class _FullWidthInfoCard extends StatelessWidget {
     required this.icon,
   });
 
+  // A colored card showing a titled section with icon and text content
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -683,7 +685,6 @@ class _FullWidthInfoCard extends StatelessWidget {
   }
 }
 
-// ─── Status Header with TFLite-only confidence bars ───────────
 class _StatusHeader extends StatelessWidget {
   final String statusText, statusIcon;
   final Color statusColor, statusBgColor;
@@ -707,8 +708,10 @@ class _StatusHeader extends StatelessWidget {
     required this.openAIDiseaseLabel,
   });
 
+  // Bumps very low confidence values up to 25% so the bar is always visible
   double _display(double raw) => (raw > 0 && raw < 25) ? 25.0 : raw;
 
+  // Returns true if the disease model label is not a healthy or fresh label
   bool get _tfliteIsDiseased {
     final label = modelDiseaseLabel.toLowerCase();
     if (label.isEmpty) return false;
@@ -718,6 +721,7 @@ class _StatusHeader extends StatelessWidget {
         !label.contains('طازج');
   }
 
+  // Builds the status card showing the result icon, status text, and two confidence bars
   @override
   Widget build(BuildContext context) {
     final isFailed = statusColor == AppTheme.orange;
@@ -800,6 +804,7 @@ class _ConfidenceBar extends StatelessWidget {
     required this.sublabel,
   });
 
+  // Builds a labeled progress bar showing a confidence percentage for plant name or disease
   @override
   Widget build(BuildContext context) {
     final fraction = (value / 100).clamp(0.0, 1.0);

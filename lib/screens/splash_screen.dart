@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // مكتبة حفظ الحالة
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'user_home_screen.dart';
 import 'expert_home_screen.dart';
@@ -16,42 +16,38 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+
+  // Start the auth check as soon as the splash screen opens
   @override
   void initState() {
     super.initState();
     _checkAuth();
   }
 
+  // Waits 2 seconds then checks if the user is logged in, verifies their role, and navigates to the right screen
   Future<void> _checkAuth() async {
-    // انتظار لمدة ثانيتين لإظهار الشعار
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    // جلب تفضيلات المستخدم (خيار تذكرني)
     final prefs = await SharedPreferences.getInstance();
     final bool rememberMe = prefs.getBool('remember_me') ?? false;
     final user = FirebaseAuth.instance.currentUser;
 
-    // --- منطق تذكرني ---
-    // إذا كان هناك مستخدم مسجل ولكن لم يضغط على "تذكرني"، يتم تسجيل الخروج
     if (user != null && !rememberMe) {
       await FirebaseAuth.instance.signOut();
       _go(const LoginScreen());
       return;
     }
 
-    // إذا لم يكن هناك مستخدم مسجل أصلاً
     if (user == null) {
       _go(const LoginScreen());
       return;
     }
 
     try {
-      // تحديث بيانات المستخدم من الخادم للتأكد من حالة التحقق من البريد
       await user.reload();
       final refreshedUser = FirebaseAuth.instance.currentUser!;
 
-      // جلب بيانات الحساب من Firestore لمعرفة الدور (Role)
       final doc = await FirebaseFirestore.instance
           .collection('accounts')
           .doc(refreshedUser.uid)
@@ -69,19 +65,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (!mounted) return;
 
-      // 1. الخبير في أول تسجيل دخول (يجب تغيير كلمة المرور)
       if (role == 'specialist' && isFirstLogin) {
         _go(const FirstLoginScreen());
         return;
       }
 
-      // 2. المستخدم أو المسؤول لم يوثق البريد الإلكتروني بعد
       if ((role == 'user' || role == 'admin') && !refreshedUser.emailVerified) {
         _go(EmailVerificationScreen(email: refreshedUser.email ?? ''));
         return;
       }
 
-      // 3. التوجيه بناءً على الدور
       switch (role) {
         case 'admin':
           _go(const AdminHomeScreen());
@@ -93,11 +86,11 @@ class _SplashScreenState extends State<SplashScreen> {
           _go(const UserHomeScreen());
       }
     } catch (e) {
-      // في حال حدوث خطأ غير متوقع، نعود لصفحة تسجيل الدخول كإجراء احترازي
       _go(const LoginScreen());
     }
   }
 
+  // Replaces the current screen with the given screen
   void _go(Widget screen) {
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -106,6 +99,7 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
+  // Builds the splash screen with the app logo, name, and a loading spinner
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -114,7 +108,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // الشعار (Logo) بنفس تصميمك الأصلي
             Container(
               width: 130,
               height: 130,
@@ -143,7 +136,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            // اسم التطبيق
             const Text(
               'BioShield',
               style: TextStyle(
@@ -152,7 +144,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   color: Color(0xFF14532D)),
             ),
             const SizedBox(height: 48),
-            // مؤشر التحميل
             const CircularProgressIndicator(
                 color: Color(0xFF16A34A)),
           ],

@@ -8,7 +8,6 @@ import 'diagnosis_screen.dart';
 import 'user_reports_screen.dart';
 import 'user_profile_screen.dart';
 
-// ─── MAIN HOME SCREEN ───────────────────────────────────────
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
 
@@ -20,6 +19,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   int _currentIndex = 0;
   late List<Widget> _pages;
 
+  // Set up the page list and mark the user as online when the screen opens
   @override
   void initState() {
     super.initState();
@@ -33,6 +33,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     _setOnlineStatus();
   }
 
+  // Marks the current user as online in Firestore
   Future<void> _setOnlineStatus() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
@@ -46,6 +47,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     }
   }
 
+  // Builds the main home screen with app bar, logout button, page switcher, and custom bottom nav
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -109,6 +111,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     );
   }
 
+  // Builds the custom bottom navigation bar with a raised circle button for the diagnosis tab
   Widget _buildBottomNav() {
     return SafeArea(
       bottom: true,
@@ -167,6 +170,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     );
   }
 
+  // Builds one bottom nav button — shows a raised circle for the diagnosis tab, plain icon for others
   Widget _navItem(
     int index,
     IconData icon,
@@ -233,7 +237,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 }
 
-// ─── COMMUNITY FEED DASHBOARD ───────────────────────────────
 class _ReportsDashboard extends StatefulWidget {
   const _ReportsDashboard();
 
@@ -245,6 +248,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
   final TextEditingController _searchController = TextEditingController();
   final ValueNotifier<String> _notifier = ValueNotifier<String>('');
 
+  // Clean up the search controller and value notifier
   @override
   void dispose() {
     _searchController.dispose();
@@ -252,6 +256,7 @@ class _ReportsDashboardState extends State<_ReportsDashboard> {
     super.dispose();
   }
 
+  // Builds the dashboard with a welcome banner, search bar, and a live grid of shared community reports
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -404,6 +409,7 @@ class _ReportCard extends StatelessWidget {
 
   const _ReportCard({required this.report});
 
+  // Returns true if the disease label is not a healthy or fresh label
   bool _isDiseased(String label) {
     final l = label.toLowerCase();
     return l.isNotEmpty &&
@@ -413,13 +419,13 @@ class _ReportCard extends StatelessWidget {
         !l.contains('طازج');
   }
 
+  // Builds one report card in the grid showing plant image, status badge, name, and confidence bars
   @override
   Widget build(BuildContext context) {
     final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
     final imageUrl = report['ImageUrl'] ?? report['imageUrl'] ?? '';
     final isSpecialistReport = report['reportType'] == 'specialist';
 
-    // Only get confidence data for AI reports
     final int plantConf = isSpecialistReport
         ? 0
         : ((report['plantNameConfidence'] ?? report['confidence'] ?? 0) as num)
@@ -438,7 +444,6 @@ class _ReportCard extends StatelessWidget {
         ? Colors.red
         : const Color(0xFF16A34A);
 
-    // Specialist report colors
     final specialistColor = const Color(0xFF8B5CF6);
 
     return GestureDetector(
@@ -462,7 +467,6 @@ class _ReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image with status badge ──────────────────────────
             Expanded(
               child: Stack(
                 children: [
@@ -480,7 +484,6 @@ class _ReportCard extends StatelessWidget {
                           )
                         : _imgPlaceholder(),
                   ),
-                  // Specialist badge (only for specialist reports)
                   if (isSpecialistReport)
                     Positioned(
                       top: 6,
@@ -510,7 +513,6 @@ class _ReportCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Status badge
                   Positioned(
                     top: 6,
                     right: 6,
@@ -536,13 +538,11 @@ class _ReportCard extends StatelessWidget {
               ),
             ),
 
-            // ── Info section ─────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Plant name with verified icon for specialist
                   Row(
                     children: [
                       Expanded(
@@ -561,7 +561,6 @@ class _ReportCard extends StatelessWidget {
                     ],
                   ),
 
-                  // Shared by (different text for specialist)
                   if (isSpecialistReport)
                     Text(
                       'بواسطة الخبير: ${report['specialistName'] ?? 'خبير'}',
@@ -577,7 +576,6 @@ class _ReportCard extends StatelessWidget {
 
                   const SizedBox(height: 6),
 
-                  // Show different content based on report type
                   if (isSpecialistReport) ...[
                     Text(
                       report['diagnosis'] ?? '',
@@ -604,7 +602,6 @@ class _ReportCard extends StatelessWidget {
                       ],
                     ),
                   ] else ...[
-                    // AI Report shows confidence bars (only if data exists)
                     if (plantConf > 0)
                       _MiniConfidenceBar(
                         icon: '🌿',
@@ -624,7 +621,6 @@ class _ReportCard extends StatelessWidget {
                             : '—',
                         color: diseaseColor,
                       ),
-                    // If no confidence data, show diagnosis
                     if (plantConf == 0 && diseaseConf == 0)
                       Text(
                         report['diagnosis'] ?? '',
@@ -655,13 +651,13 @@ class _ReportCard extends StatelessWidget {
     );
   }
 
+  // A grey placeholder shown when the report has no image
   Widget _imgPlaceholder() => Container(
     color: Colors.grey[100],
     child: const Center(child: Icon(Icons.eco_outlined, color: Colors.grey)),
   );
 }
 
-// ─── Compact confidence bar for the grid card ─────────────────
 class _MiniConfidenceBar extends StatelessWidget {
   final String icon;
   final String sublabel;
@@ -675,13 +671,13 @@ class _MiniConfidenceBar extends StatelessWidget {
     required this.color,
   });
 
+  // Builds a small inline progress bar showing a confidence percentage with a label
   @override
   Widget build(BuildContext context) {
     final fraction = (percent / 100).clamp(0.0, 1.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Icon + percent on one row
         Row(
           children: [
             Text(icon, style: const TextStyle(fontSize: 11)),
@@ -711,7 +707,6 @@ class _MiniConfidenceBar extends StatelessWidget {
             ),
           ],
         ),
-        // Sublabel
         Padding(
           padding: const EdgeInsets.only(right: 16),
           child: Text(
@@ -730,15 +725,12 @@ class _MiniConfidenceBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  SHARED REPORT DETAIL PAGE  — with conditional confidence bars
-// ═══════════════════════════════════════════════════════════════
 class SharedReportDetailPage extends StatelessWidget {
   final Map<String, dynamic> report;
 
   const SharedReportDetailPage({super.key, required this.report});
 
-  // ── Determine if diseased based on modelDiseaseLabel ──────────
+  // Returns true if the disease label is not a healthy or fresh label
   bool _isDiseaseLabel(String label) {
     if (label.isEmpty) return false;
     final l = label.toLowerCase();
@@ -748,6 +740,7 @@ class SharedReportDetailPage extends StatelessWidget {
         !l.contains('طازج');
   }
 
+  // Builds the full detail page for a shared report with image, plant info, confidence bars, diagnosis, and treatment
   @override
   Widget build(BuildContext context) {
     final isHealthy = report['status'] == 'سليم' || report['isHealthy'] == true;
@@ -755,10 +748,8 @@ class SharedReportDetailPage extends StatelessWidget {
     final Color pc = isHealthy ? const Color(0xFF16A34A) : Colors.red;
     final isSpecialistReport = report['reportType'] == 'specialist';
 
-    // Specialist report colors
     final specialistColor = const Color(0xFF8B5CF6);
 
-    // ── Confidence data (only for AI reports) ───────────────────
     final int plantNameConf = isSpecialistReport
         ? 0
         : ((report['plantNameConfidence'] as num?)?.toInt() ??
@@ -818,7 +809,6 @@ class SharedReportDetailPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Plant image ────────────────────────────────────
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: imageUrl.isNotEmpty
@@ -833,7 +823,6 @@ class SharedReportDetailPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ── Main info card ─────────────────────────────────
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -890,7 +879,6 @@ class SharedReportDetailPage extends StatelessWidget {
                     ),
                     const Divider(height: 30),
 
-                    // For specialist reports: Show BOTH sharer (user) AND specialist
                     if (isSpecialistReport) ...[
                       _detailRow(
                         Icons.person_outline,
@@ -922,7 +910,6 @@ class SharedReportDetailPage extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // ── ONLY SHOW CONFIDENCE BARS FOR AI REPORTS ──
                     if (!isSpecialistReport && plantNameConf > 0) ...[
                       _ConfidenceBar(
                         label: '🌿 دقة تحديد اسم النبات',
@@ -941,7 +928,6 @@ class SharedReportDetailPage extends StatelessWidget {
                       ),
                     ],
 
-                    // For specialist reports, show a verification badge instead
                     if (isSpecialistReport) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -975,7 +961,6 @@ class SharedReportDetailPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // ── Diagnosis section ──────────────────────────────
               _infoSection(
                 'التشخيص',
                 report['diagnosis'] ?? 'لا يوجد بيانات',
@@ -997,6 +982,7 @@ class SharedReportDetailPage extends StatelessWidget {
     );
   }
 
+  // A single row showing an icon, a label, and a value — used inside the detail card
   Widget _detailRow(
     IconData icon,
     String label,
@@ -1026,6 +1012,7 @@ class SharedReportDetailPage extends StatelessWidget {
     );
   }
 
+  // A white card section showing a title with an icon and a block of text — used for diagnosis and treatment
   Widget _infoSection(
     String title,
     String content,
@@ -1067,6 +1054,7 @@ class SharedReportDetailPage extends StatelessWidget {
     );
   }
 
+  // A grey box shown when the report detail page has no image
   Widget _placeholder() => Container(
     height: 200,
     color: Colors.grey[200],
@@ -1078,11 +1066,10 @@ class SharedReportDetailPage extends StatelessWidget {
   );
 }
 
-// ─── Confidence bar widget (mirrors diagnosis_result_screen) ──
 class _ConfidenceBar extends StatelessWidget {
   final String label;
   final String sublabel;
-  final int value; // 0–100
+  final int value;
   final Color barColor;
 
   const _ConfidenceBar({
@@ -1092,6 +1079,7 @@ class _ConfidenceBar extends StatelessWidget {
     required this.sublabel,
   });
 
+  // Builds a labeled progress bar showing a confidence percentage for plant name or disease detection
   @override
   Widget build(BuildContext context) {
     final fraction = (value / 100).clamp(0.0, 1.0);
@@ -1121,7 +1109,6 @@ class _ConfidenceBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        // Bar
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Stack(
@@ -1148,7 +1135,6 @@ class _ConfidenceBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 5),
-        // Sublabel
         Text(
           sublabel,
           style: TextStyle(

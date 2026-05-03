@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/auth_service.dart';
-import 'splash_screen.dart';
-import 'specialist_list_screen.dart';
-import 'diagnosis_screen.dart';
-import 'user_reports_screen.dart';
-import 'user_profile_screen.dart';
 import 'dart:io';
 
 class ExpertChatScreen extends StatefulWidget {
@@ -37,6 +31,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
   bool _isCompleted = false;
   int _previousMessageCount = 0;
 
+  // Listen to the chat document to track whether the case has been completed
   @override
   void initState() {
     super.initState();
@@ -49,6 +44,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     });
   }
 
+  // Clean up all text controllers and the scroll controller
   @override
   void dispose() {
     _messageController.dispose();
@@ -59,6 +55,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     super.dispose();
   }
 
+  // Smoothly scrolls the message list down to the latest message
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -71,12 +68,13 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     });
   }
 
+  // Returns the current time as a formatted string like "09:05"
   String _now() {
     final t = TimeOfDay.now();
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  // ── Full image viewer ────────────────────────────────────────
+  // Opens a full-screen zoomable view of a message image
   void _showFullImage(String content) {
     showDialog(
       context: context,
@@ -120,6 +118,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Sends the typed text message to Firestore and scrolls to the bottom
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -145,6 +144,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     _scrollToBottom();
   }
 
+  // Loads chat images and shows a dialog where the expert fills in the case report before closing
   Future<void> _showEndChatDialog() async {
     final chatDoc = await _db.collection('chats').doc(widget.chatId).get();
     final messages = (chatDoc.data()?['messages'] as List<dynamic>?) ?? [];
@@ -265,6 +265,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Saves the report to Firestore, marks the chat as completed, and updates the specialist's case count
   Future<void> _submitReport(String imageUrl) async {
     final plantName = _plantNameController.text.trim();
     final diagnosis = _diseaseController.text.trim();
@@ -323,6 +324,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     }
   }
 
+  // A labeled text input field used inside the end-chat report dialog
   Widget _reportField(
       String label, String hint, TextEditingController ctrl,
       {int maxLines = 1}) {
@@ -350,6 +352,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Builds the expert chat screen: header, completed banner if closed, message list, and input bar
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -378,6 +381,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Builds the top bar with the user's name, online status, case status, and end-chat menu
   Widget _buildHeader() {
     return Container(
       color: Colors.white,
@@ -483,6 +487,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Listens to messages in real time and builds the scrollable message list
   Widget _buildMessages() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _db.collection('chats').doc(widget.chatId).snapshots(),
@@ -514,6 +519,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
+  // Builds the bottom text input bar with a send button — hidden when the case is completed
   Widget _buildInputBar() {
     return Container(
       color: Colors.white,
@@ -568,6 +574,7 @@ class _ExpertMessageBubble extends StatelessWidget {
   const _ExpertMessageBubble(
       {required this.msg, required this.onImageTap});
 
+  // Builds one chat bubble — aligned left for expert, right for user — supports text and image messages
   @override
   Widget build(BuildContext context) {
     final isExpert = msg['sender'] == 'expert';

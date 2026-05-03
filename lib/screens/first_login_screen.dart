@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'expert_home_screen.dart';
 
-/// Shown when an expert logs in for the first time using their
-/// temporary password. They must set a new password before
-/// the app lets them through.
 class FirstLoginScreen extends StatefulWidget {
   const FirstLoginScreen({super.key});
 
@@ -27,6 +24,7 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
   static const _green900 = Color(0xFF14532D);
   static const _green50 = Color(0xFFF0FDF4);
 
+  // Attach live validators to both password fields when the screen opens
   @override
   void initState() {
     super.initState();
@@ -34,6 +32,7 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
     _confirmController.addListener(_validateConfirm);
   }
 
+  // Remove listeners and clean up both controllers
   @override
   void dispose() {
     _newPassController.removeListener(_validateNewPass);
@@ -43,7 +42,7 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
     super.dispose();
   }
 
-  // ── Real-time validators ─────────────────────────────────
+  // Checks that the new password is at least 6 characters, and re-validates the confirm field if filled
   void _validateNewPass() {
     final v = _newPassController.text;
     setState(() {
@@ -58,6 +57,7 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
     if (_confirmController.text.isNotEmpty) _validateConfirm();
   }
 
+  // Checks that the confirm password matches the new password
   void _validateConfirm() {
     final v = _confirmController.text;
     setState(() {
@@ -71,15 +71,15 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
     });
   }
 
+  // Returns true only if both fields pass validation and the passwords match
   bool get _formValid =>
       _newPassError == null &&
           _confirmError == null &&
           _newPassController.text.length >= 6 &&
           _confirmController.text == _newPassController.text;
 
-  // ── Submit ───────────────────────────────────────────────
+  // Validates both fields then calls AuthService to save the new password and navigate to the home screen
   Future<void> _submit() async {
-    // Trigger validators
     setState(() {
       if (_newPassController.text.isEmpty) {
         _newPassError = 'كلمة المرور الجديدة مطلوبة';
@@ -105,7 +105,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
         backgroundColor: Colors.red,
       ));
     } else {
-      // Password changed — go to home
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const ExpertHomeScreen()),
@@ -114,6 +113,7 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
     }
   }
 
+  // Builds the first login screen with a welcome message, password rules hint, and two password fields
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,7 +126,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 32),
-                // Icon
                 Container(
                   width: 90,
                   height: 90,
@@ -156,7 +155,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Card
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -172,7 +170,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // Requirements hint
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -197,7 +194,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // New password
                       const Align(
                         alignment: Alignment.centerRight,
                         child: Text('كلمة المرور الجديدة',
@@ -217,7 +213,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Confirm
                       const Align(
                         alignment: Alignment.centerRight,
                         child: Text('تأكيد كلمة المرور',
@@ -237,7 +232,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Submit button
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -281,7 +275,6 @@ class _FirstLoginScreenState extends State<FirstLoginScreen> {
   }
 }
 
-// ── Password field with visibility toggle ────────────────────
 class _PasswordField extends StatelessWidget {
   final String hint;
   final TextEditingController controller;
@@ -297,6 +290,7 @@ class _PasswordField extends StatelessWidget {
     this.errorText,
   });
 
+  // Builds a password input field with a show/hide toggle and an inline error message
   @override
   Widget build(BuildContext context) {
     return Column(

@@ -20,28 +20,27 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   int _currentIndex = 0;
   int _profileTabIndex = 0;
 
-  // ── الحقول الفعلية الموجودة في Firestore ──
   String _fullName = '';
   String _email = '';
   String _experience = '';
   String _certificates = '';
   double _rating = 0.0;
   int _reviewCount = 0;
-  List<Map<String, dynamic>> _reports = []; // 🔥 ADD THIS LINE
+  List<Map<String, dynamic>> _reports = [];
   List<String> _certificateImages = [];
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true;
 
+  // Load specialist data and set the specialist as online when the screen opens
   @override
   void initState() {
     super.initState();
     _fetchData();
 
-    // 🔥 NEW: Mark expert online immediately when app opens!
     _setOnlineStatus();
   }
 
-  // 🔥 NEW: The function that updates Firestore
+  // Marks the specialist as online in Firestore
   Future<void> _setOnlineStatus() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
@@ -56,6 +55,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
+  // Loads the specialist's profile, certificate images, reviews, and reports from Firestore
   Future<void> _fetchData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
@@ -63,7 +63,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       return;
     }
     try {
-      // ── جلب بيانات specialists ──
       final doc = await FirebaseFirestore.instance
           .collection('specialists')
           .doc(uid)
@@ -71,7 +70,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
       final d = doc.data() ?? {};
 
-      // ── جلب صور الشهادات من specialists أولاً ──
       List<String> certImages = [];
       if (d['certificateImages'] is List) {
         certImages = (d['certificateImages'] as List)
@@ -79,7 +77,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             .toList();
       }
 
-      // ── إذا ما فيه صور في specialists نجيبها من specialist_requests ──
       if (certImages.isEmpty) {
         try {
           final reqSnap = await FirebaseFirestore.instance
@@ -99,7 +96,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         } catch (_) {}
       }
 
-      // ── جلب التقييمات ──
       List<Map<String, dynamic>> reviews = [];
       try {
         final reviewsSnap = await FirebaseFirestore.instance
@@ -111,7 +107,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         reviews = reviewsSnap.docs.map((e) => e.data()).toList();
       } catch (_) {}
 
-      // 🔥 NEW: جلب التقارير من الكوليكشن الجديد
       List<Map<String, dynamic>> reports = [];
       try {
         final reportsSnap = await FirebaseFirestore.instance
@@ -124,11 +119,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         debugPrint('Error fetching reports: $e');
       }
 
-      // ── جلب الإيميل من Auth ──
       await FirebaseAuth.instance.currentUser?.reload();
       final authEmail = FirebaseAuth.instance.currentUser?.email ?? '';
 
-      // sync email from Auth to Firestore if different
       final firestoreEmail = d['email'] ?? '';
       if (authEmail.isNotEmpty && authEmail != firestoreEmail) {
         await FirebaseFirestore.instance
@@ -161,8 +154,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
+  // Sets the specialist as offline, signs them out, and goes back to the splash screen
   Future<void> _logout() async {
-    // 🔥 NEW: Set expert to offline before logging out
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       await FirebaseFirestore.instance
@@ -180,7 +173,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── عرض صورة الشهادة كاملة ──────────────────────────────────
+  // Opens a zoomable full-screen preview of a certificate image
   void _showFullImage(String url) {
     showDialog(
       context: context,
@@ -285,6 +278,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Builds the main expert screen with app bar, bottom nav, and the selected tab body
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -333,6 +327,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Returns the correct screen based on the selected bottom nav tab
   Widget _buildBody() {
     switch (_currentIndex) {
       case 0:
@@ -346,6 +341,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
+  // Builds the bottom navigation bar with chats, schedule, and profile tabs
   Widget _buildBottomNav() {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
@@ -358,7 +354,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       selectedFontSize: 12,
       unselectedFontSize: 12,
       items: const [
-        // REMOVED REQUESTS TAB
         BottomNavigationBarItem(
           icon: Icon(Icons.chat_bubble_outline),
           activeIcon: Icon(Icons.chat_bubble),
@@ -378,11 +373,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تاب الملف الشخصي ─────────────────────────────────────────
+  // Listens to the specialist's Firestore document and builds the profile page with live data
   Widget _buildProfileTab() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    // 🔥 NEW: Listen to the Specialist document in real-time
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('specialists')
@@ -394,7 +388,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         final d = specSnapshot.data!.data() as Map<String, dynamic>? ?? {};
 
-        // Update local variables so the rest of your UI works
         _rating = (d['rating'] ?? 0.0).toDouble();
         _reviewCount = (d['reviewCount'] ?? 0).toInt();
         _fullName = d['fullName'] ?? '';
@@ -408,7 +401,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                   ? _buildInfoContent()
                   : _profileTabIndex == 1
                   ? _buildReportsContent()
-                  : _buildReviewsStream(uid), // ✅ Use a Stream for reviews too
+                  : _buildReviewsStream(uid),
               const SizedBox(height: 24),
             ],
           ),
@@ -417,7 +410,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // 🔥 NEW: Method to listen to reviews in real-time
+  // Listens to the specialist's reviews in real time and displays them as a list
   Widget _buildReviewsStream(String uid) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -454,6 +447,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Builds the green gradient header showing the specialist's name, star rating, and edit button
   Widget _buildProfileHeader() {
     return Container(
       width: double.infinity,
@@ -516,7 +510,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${_rating.toStringAsFixed(1)} ($_reviewCount تقييم)',
+                      '${_rating.toStringAsFixed(1)} ($_reviewCount تقييمات)',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -537,6 +531,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Builds the three-tab bar for switching between info, reports, and reviews
   Widget _buildTabBar() {
     const tabs = ['المعلومات', 'التقارير', 'التقييمات'];
     return Container(
@@ -576,7 +571,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── ارسال طلب تعديل للبيانات ────────────────────────────────────────────
+  // Opens a bottom sheet where the specialist can submit a request to edit their profile info
   void _showEditRequestSheet() {
     final nameController = TextEditingController(text: _fullName);
     final certificatesController = TextEditingController(text: _certificates);
@@ -587,7 +582,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      // backgroundColor: Colors.white, // Optional: ensures background is solid
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -599,14 +593,12 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
               16,
               20,
               16,
-              // This handles the keyboard popping up
               MediaQuery.of(ctx).viewInsets.bottom + 16,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- Header ---
                 const Center(
                   child: Text(
                     'طلب تعديل المعلومات',
@@ -622,18 +614,27 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- Scrollable Fields ---
                 Flexible(
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _editField('الاسم الكامل', nameController),
-                        _editField('الخبرة', experienceController, maxLines: 3),
+                        _editField(
+                          'الاسم الكامل',
+                          nameController,
+                          hintText: 'مثال: محمد علي العمري',
+                        ),
+                        _editField(
+                          'الخبرة',
+                          experienceController,
+                          maxLines: 3,
+                          hintText: 'مثال: 10 سنوات في مجال علم النبات والتشخيص الزراعي',
+                        ),
                         _editField(
                           'الشهادات',
                           certificatesController,
                           maxLines: 3,
+                          hintText: 'مثال: بكالوريوس علوم زراعية، جامعة الملك سعود',
                         ),
                         const SizedBox(height: 12),
 
@@ -646,11 +647,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                           onTap: () async {
                             final picked = await ImagePicker().pickMultiImage();
                             if (picked.isNotEmpty) {
-                              setSheet(
-                                () => newImages = picked
-                                    .map((e) => File(e.path))
-                                    .toList(),
-                              );
+                              setSheet(() {
+                                newImages.addAll(picked.map((e) => File(e.path)));
+                              });
                             }
                           },
                           child: Container(
@@ -663,21 +662,33 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(
-                                  Icons.upload_file,
-                                  color: Colors.grey,
-                                ),
+                                const Icon(Icons.add_photo_alternate_outlined, color: Colors.grey),
                                 const SizedBox(width: 8),
                                 Text(
-                                  newImages.isNotEmpty
-                                      ? 'تم اختيار ${newImages.length} صورة ✓'
-                                      : 'اضغط لاختيار صور الشهادات',
+                                  newImages.isEmpty
+                                      ? 'اضغط لإضافة صور الشهادات'
+                                      : 'إضافة المزيد من الصور',
                                   style: TextStyle(
-                                    color: newImages.isNotEmpty
-                                        ? const Color(0xFF16A34A)
-                                        : Colors.grey,
+                                    color: newImages.isNotEmpty ? const Color(0xFF16A34A) : Colors.grey,
                                   ),
                                 ),
+                                const Spacer(),
+                                if (newImages.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '${newImages.length} صورة',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF16A34A),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -685,33 +696,51 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
                         if (newImages.isNotEmpty) ...[
                           const SizedBox(height: 10),
-                          SizedBox(
-                            height: 80,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: newImages.length,
-                              itemBuilder: (_, i) => Padding(
-                                padding: const EdgeInsets.only(left: 8),
-                                child: ClipRRect(
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 1,
+                            ),
+                            itemCount: newImages.length,
+                            itemBuilder: (_, i) => Stack(
+                              children: [
+                                ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.file(
                                     newImages[i],
-                                    width: 80,
-                                    height: 80,
+                                    width: double.infinity,
+                                    height: double.infinity,
                                     fit: BoxFit.cover,
                                   ),
                                 ),
-                              ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: () => setSheet(() => newImages.removeAt(i)),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(3),
+                                      child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                        const SizedBox(height: 20),
-                      ],
+                      ]
                     ),
                   ),
                 ),
 
-                // --- Action Button with SafeArea ---
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
@@ -787,11 +816,13 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // A labeled text input field used inside the edit request sheet
   Widget _editField(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-  }) {
+      String label,
+      TextEditingController controller, {
+        int maxLines = 1,
+        String? hintText,
+      }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -804,6 +835,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             maxLines: maxLines,
             textDirection: TextDirection.rtl,
             decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+              hintTextDirection: TextDirection.rtl,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: Colors.grey.shade300),
@@ -823,6 +857,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Uploads new certificate images and submits the edit request to Firestore for admin review
   Future<void> _submitEditRequest({
     required String newFullName,
     required String newExperience,
@@ -831,7 +866,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   }) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    // تحميل صور الشهادات الجديدة
     List<String> newImageUrls = [];
     for (int i = 0; i < newImages.length; i++) {
       String? url = await ImageUploadService.uploadImage(newImages[i]);
@@ -846,12 +880,10 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       'status': 'pending',
       'submittedAt': FieldValue.serverTimestamp(),
       'rejectionReason': '',
-      // القيم الجديدة
       'newFullName': newFullName,
       'newExperience': newExperience,
       'newCertificates': newCertificates,
       'newCertificateImages': newImageUrls,
-      // القيم القديمة للمقارنة
       'oldFullName': _fullName,
       'oldExperience': _experience,
       'oldCertificates': _certificates,
@@ -859,8 +891,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     });
   }
 
+  // Confirms with the specialist, re-authenticates, then deletes all their data and account
   Future<void> _deleteAccount() async {
-    // Step 1 — Confirm dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -939,7 +971,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
     if (confirm != true) return;
 
-    // Step 2 — Password re-authentication dialog
     final passwordController = TextEditingController();
     bool obscure = true;
 
@@ -1024,7 +1055,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
     if (password == null || password.isEmpty) return;
 
-    // Step 3 — Show loading
     if (mounted) {
       showDialog(
         context: context,
@@ -1039,37 +1069,28 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       final user = FirebaseAuth.instance.currentUser!;
       final uid = user.uid;
 
-      // Step 4 — Re-authenticate
       final credential = EmailAuthProvider.credential(
         email: _email,
         password: password,
       );
       await user.reauthenticateWithCredential(credential);
 
-      // Step 5 — Delete all Firestore data in parallel
       await Future.wait([
-        // Specialist profile
         FirebaseFirestore.instance.collection('specialists').doc(uid).delete(),
 
-        // Account doc
         FirebaseFirestore.instance.collection('accounts').doc(uid).delete(),
 
-        // Specialist reports
         _deleteCollection('specialist_reports', 'specialistId', uid),
 
-        // Edit requests
         _deleteCollection('Specialist_edit_request', 'specialistId', uid),
       ]);
 
-      // Reviews sub-collection must be deleted separately
       await _deleteSubCollection('specialists', uid, 'reviews');
 
-      // Step 6 — Delete Firebase Auth account
       await user.delete();
 
-      // Step 7 — Navigate to splash
       if (mounted) {
-        Navigator.pop(context); // close loading
+        Navigator.pop(context);
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const SplashScreen()),
@@ -1077,7 +1098,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) Navigator.pop(context); // close loading
+      if (mounted) Navigator.pop(context);
       String msg = 'حدث خطأ أثناء الحذف';
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
         msg = 'كلمة المرور غير صحيحة';
@@ -1094,7 +1115,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // close loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl),
@@ -1105,7 +1126,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
-  // ── Helper: delete all docs in a collection matching a field ──
+  // Deletes all documents in a collection where a specific field matches the specialist's uid
   Future<void> _deleteCollection(
     String collection,
     String field,
@@ -1120,7 +1141,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
-  // ── Helper: delete a Firestore sub-collection ─────────────────
+  // Deletes all documents inside a sub-collection under a specific parent document
   Future<void> _deleteSubCollection(
     String parent,
     String docId,
@@ -1136,7 +1157,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     }
   }
 
-  // ── Helper: bullet point row in confirm dialog ────────────────
+  // A small row with a red icon used to list what will be deleted in the delete account dialog
   Widget _deleteItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1150,13 +1171,12 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تاب المعلومات ────────────────────────────────────────────
+  // Builds the info tab showing personal info, professional info, certificate images, security options, and logout
   Widget _buildInfoContent() {
     return Column(
       children: [
         const SizedBox(height: 12),
 
-        // ── بطاقة المعلومات الشخصية
         _sectionCard(
           title: 'المعلومات الشخصية',
           children: [
@@ -1176,7 +1196,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         const SizedBox(height: 12),
 
-        // ── بطاقة المعلومات المهنية
         _sectionCard(
           title: 'المعلومات المهنية',
           children: [
@@ -1194,7 +1213,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           ],
         ),
 
-        // ── صور الشهادات
         if (_certificateImages.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildCertificateImages(),
@@ -1202,7 +1220,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         const SizedBox(height: 16),
 
-        // ── قسم الأمان ──
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
@@ -1265,7 +1282,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
         ),
         const SizedBox(height: 12),
 
-        // ── زر حذف الحساب ——
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SizedBox(
@@ -1294,7 +1311,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
 
         const SizedBox(height: 12),
 
-        // ── زر تسجيل الخروج
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SizedBox(
@@ -1327,7 +1344,8 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تغيير كلمة المرور (خبير) ──────────────────────────────
+
+// Sends a password reset email to the specialist's current email address
   void _showChangePasswordDialog() {
     bool sending = false;
 
@@ -1454,7 +1472,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تغيير البريد الالكتروني ──────────────────────────────────────
+// Lets the specialist enter a new email and sends a verification link to it
   void _showChangeEmailDialog() {
     final emailController = TextEditingController();
     String? emailError;
@@ -1564,7 +1582,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                         try {
                           final user = FirebaseAuth.instance.currentUser!;
 
-                          // إرسال رابط تحقق للبريد الجديد فقط
+
                           await user.verifyBeforeUpdateEmail(newEmail);
 
                           if (!mounted) return;
@@ -1622,7 +1640,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── بطاقة صور الشهادات ──────────────────────────────────────
+// Builds a grid of the specialist's certificate images with a zoom-on-tap feature
   Widget _buildCertificateImages() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1746,7 +1764,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                             ),
                           ),
                         ),
-                        // شريط سفلي مع رقم الشهادة وأيقونة تكبير
+
                         Positioned(
                           bottom: 0,
                           left: 0,
@@ -1801,6 +1819,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // A white card with a title and a list of rows — used to group related info fields
   Widget _sectionCard({required String title, required List<Widget> children}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1830,6 +1849,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // A thin horizontal line used between rows inside a section card
   Widget _divider() => const Divider(
     height: 1,
     color: Color(0xFFEEEEEE),
@@ -1837,6 +1857,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     endIndent: 16,
   );
 
+  // A single row showing a label, a value, and an icon — used inside section cards
   Widget _buildInfoRow({
     required String label,
     required String value,
@@ -1868,19 +1889,19 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // ── تاب التقارير ─────────────────────────────────────────────
+// Listens to the specialist's reports in real time and displays them as a list
   Widget _buildReportsContent() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return StreamBuilder<QuerySnapshot>(
-      // Listen to the reports collection specifically for this expert
+
       stream: FirebaseFirestore.instance
           .collection('specialist_reports')
           .where('specialistId', isEqualTo: uid)
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
-        // 1. Check for Errors (e.g., Missing Index or Permissions)
+
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(32.0),
@@ -1900,7 +1921,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           );
         }
 
-        // 2. Show Loading State
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.all(50.0),
@@ -1910,7 +1931,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           );
         }
 
-        // 3. Handle Empty List
+
         final reports = snapshot.data?.docs ?? [];
         if (reports.isEmpty) {
           return const Padding(
@@ -1934,7 +1955,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           );
         }
 
-        // 4. Build the List of Reports
+
         return Column(
           children: [
             const SizedBox(height: 12),
@@ -1949,7 +1970,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // --- Report Card UI ---
+// Builds one report card showing plant name, image, diagnosis, and suggested treatment
   Widget _reportCard(Map<String, dynamic> r) {
     final hasImage = (r['plantImage'] ?? '').toString().isNotEmpty;
 
@@ -1971,7 +1992,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Icon + Plant Name + Date
+
           Row(
             children: [
               Container(
@@ -2014,7 +2035,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Plant Image (if selected by expert)
           if (hasImage) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -2029,11 +2049,9 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Diagnosis Content
           _detailSection('التشخيص:', r['diagnosis'] ?? 'لا يوجد تشخيص'),
           const SizedBox(height: 10),
 
-          // Treatment Content
           _detailSection(
             'العلاج المقترح:',
             r['treatment'] ?? 'لا يوجد علاج مقترح',
@@ -2044,7 +2062,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
-  // Helper widget for diagnosis/treatment boxes
+  // A colored box showing a label and text content — used for diagnosis and treatment inside report cards
   Widget _detailSection(String label, String value, {bool isOrange = false}) {
     return Container(
       width: double.infinity,
@@ -2082,8 +2100,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
       ),
     );
   }
-
-  // ── تاب التقييمات ────────────────────────────────────────────
+// Builds the reviews list from the locally loaded reviews data
   Widget _buildReviewsContent() {
     if (_reviews.isEmpty) {
       return const Padding(
@@ -2104,6 +2121,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
     );
   }
 
+  // Builds one review card showing the user's name, star rating, and optional comment
   Widget _reviewCard(Map<String, dynamic> r) {
     final rating = (r['rating'] ?? 5).toInt();
     return Container(
@@ -2175,7 +2193,6 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   }
 }
 
-// ─── صفحة المحادثات ───────────────────────────────────────────
 class _ChatsPage extends StatefulWidget {
   const _ChatsPage();
 
@@ -2188,12 +2205,14 @@ class _ChatsPageState extends State<_ChatsPage> {
   String _searchText = '';
   final TextEditingController _searchController = TextEditingController();
 
+  // Clean up the search controller when the chats page is removed
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  // Builds the chats page with search bar, filter chips, and a sorted list of all chats
   @override
   Widget build(BuildContext context) {
     final db = FirebaseFirestore.instance;
@@ -2262,14 +2281,12 @@ class _ChatsPageState extends State<_ChatsPage> {
 
           return CustomScrollView(
             slivers: [
-              // ── Search + Filter ───────────────────────────────
               SliverToBoxAdapter(
                 child: Container(
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Column(
                     children: [
-                      // ── Search ──────────────────────────────
                       Container(
                         decoration: BoxDecoration(
                           color: const Color(0xFFF0FDF4),
@@ -2301,7 +2318,6 @@ class _ChatsPageState extends State<_ChatsPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      // ── Filter chips ─────────────────────────
                       Row(
                         children: [
                           _availChip(
@@ -2510,6 +2526,8 @@ class _ChatsPageState extends State<_ChatsPage> {
       ),
     );
   }
+
+  // Confirms with the specialist then deletes the chat and all its linked reports and feed posts
   Future<void> _confirmDeleteChat(String chatId, String userName) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -2543,19 +2561,16 @@ class _ChatsPageState extends State<_ChatsPage> {
     try {
       final db = FirebaseFirestore.instance;
 
-      // 1. حذف التقرير من مجتمع المشاركات (Community Feed) إن وُجد
       final feedSnap = await db.collection('community_feed').where('chatId', isEqualTo: chatId).get();
       for (var doc in feedSnap.docs) {
         await doc.reference.delete();
       }
 
-      // 2. حذف التقرير من سجل تقارير الخبير (Specialist Reports)
       final reportSnap = await db.collection('specialist_reports').where('chatId', isEqualTo: chatId).get();
       for (var doc in reportSnap.docs) {
         await doc.reference.delete();
       }
 
-      // 3. أخيراً، حذف المحادثة نفسها
       await db.collection('chats').doc(chatId).delete();
 
       if (mounted) {
@@ -2576,6 +2591,7 @@ class _ChatsPageState extends State<_ChatsPage> {
     }
   }
 
+  // A filter chip that highlights when active — used to filter chats by all, active, or completed
   Widget _availChip(String label, bool isActive, VoidCallback onTap) {
     const activeColor = Color(0xFF16A34A);
     return GestureDetector(

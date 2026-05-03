@@ -22,12 +22,10 @@ class _UserAuthScreenState extends State<UserAuthScreen>
   String? _error;
   bool _rememberMe = false;
 
-  // Login controllers
   final _loginEmail = TextEditingController();
   final _loginPass = TextEditingController();
   bool _loginPassVisible = false;
 
-  // Signup controllers
   final _signupName = TextEditingController();
   final _signupUsername = TextEditingController();
   final _signupEmail = TextEditingController();
@@ -36,17 +34,16 @@ class _UserAuthScreenState extends State<UserAuthScreen>
   bool _signupPassVisible = false;
   bool _signupConfirmVisible = false;
 
-  // Real-time errors for Login
   String? _loginEmailError;
   String? _loginPassError;
 
-  // Real-time errors for Signup
   String? _nameError;
   String? _usernameError;
   String? _emailError;
   String? _passError;
   String? _confirmError;
 
+  // Set up the tab controller and attach live validators to all input fields
   @override
   void initState() {
     super.initState();
@@ -57,11 +54,9 @@ class _UserAuthScreenState extends State<UserAuthScreen>
       }
     });
 
-    // Login listeners (Real-time)
     _loginEmail.addListener(_validateLoginEmail);
     _loginPass.addListener(_validateLoginPass);
 
-    // Signup listeners
     _signupName.addListener(_validateName);
     _signupUsername.addListener(_validateUsername);
     _signupEmail.addListener(_validateEmail);
@@ -69,6 +64,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     _signupConfirm.addListener(_validateConfirm);
   }
 
+  // Clean up the tab controller and all text controllers
   @override
   void dispose() {
     _tab.dispose();
@@ -82,7 +78,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     super.dispose();
   }
 
-  // --- Login Validators (Real-time) ---
+  // Checks if the login email format is valid while the user types
   void _validateLoginEmail() {
     final v = _loginEmail.text.trim();
     final reg = RegExp(r'^[^@]+@[^@]+\.[^@]+');
@@ -93,6 +89,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     });
   }
 
+  // Checks that the login password is at least 6 characters
   void _validateLoginPass() {
     final v = _loginPass.text;
     setState(() {
@@ -101,27 +98,35 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     });
   }
 
-  // --- Signup Validators ---
+  // Checks that the full name field is not empty
   void _validateName() => setState(() => _nameError = _signupName.text.trim().isEmpty ? 'الاسم الكامل مطلوب' : null);
+
+  // Checks that the username is present and at least 3 characters
   void _validateUsername() {
     final v = _signupUsername.text.trim();
     setState(() => _usernameError = v.isEmpty ? 'اسم المستخدم مطلوب' : (v.length < 3 ? 'يجب أن يكون 3 أحرف على الأقل' : null));
   }
+
+  // Checks that the signup email is present and correctly formatted
   void _validateEmail() {
     final v = _signupEmail.text.trim();
     final reg = RegExp(r'^[^@]+@[^@]+\.[^@]+');
     setState(() => _emailError = v.isEmpty ? 'البريد الإلكتروني مطلوب' : (!reg.hasMatch(v) ? 'صيغة البريد غير صحيحة' : null));
   }
+
+  // Checks that the signup password is present and at least 6 characters, then re-validates the confirm field
   void _validatePassword() {
     final v = _signupPass.text;
     setState(() => _passError = v.isEmpty ? 'كلمة المرور مطلوبة' : (v.length < 6 ? 'يجب أن تكون 6 أحرف على الأقل' : null));
     if (_signupConfirm.text.isNotEmpty) _validateConfirm();
   }
+
+  // Checks that the confirm password matches the signup password
   void _validateConfirm() {
     setState(() => _confirmError = _signupConfirm.text.isEmpty ? 'تأكيد كلمة المرور مطلوب' : (_signupConfirm.text != _signupPass.text ? 'كلمة المرور غير متطابقة' : null));
   }
 
-  // --- UI Components ---
+  // A red box that displays an error message to the user
   Widget _errorBox(String message) {
     return Container(
       width: double.infinity,
@@ -147,12 +152,13 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     );
   }
 
+  // A small right-aligned label shown above each input field
   Widget _label(String text) => Align(
     alignment: Alignment.centerRight,
     child: Text(text, style: const TextStyle(fontSize: 14, color: Color(0xFF374151), fontWeight: FontWeight.w500)),
   );
 
-  // --- Logic ---
+  // Validates fields then logs the user in, sets them online, and navigates to the home screen
   Future<void> _login() async {
     if (_loginEmail.text.trim().isEmpty || _loginPass.text.isEmpty) {
       setState(() => _error = 'يرجى ملء جميع الحقول');
@@ -196,6 +202,8 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     }
   }
 
+
+  // Validates all signup fields then creates the account and navigates to the email verification screen
   Future<void> _signup() async {
     _validateName(); _validateUsername(); _validateEmail(); _validatePassword(); _validateConfirm();
     if (_nameError != null || _usernameError != null || _emailError != null || _passError != null || _confirmError != null) return;
@@ -217,6 +225,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     }
   }
 
+  // Shows a dialog where the user can enter their email to receive a password reset link
   void _forgotPassword() {
     final ctrl = TextEditingController();
     showDialog(
@@ -251,11 +260,11 @@ class _UserAuthScreenState extends State<UserAuthScreen>
     );
   }
 
+  // Builds the user auth screen with two tabs: login and sign up
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0FDF4),
-      // KEY FIX: resizeToAvoidBottomInset keeps the layout stable when keyboard appears
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Directionality(
@@ -302,7 +311,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
                           ),
                         ),
 
-                        if (_tab.index == 0) // --- LOGIN TAB ---
+                        if (_tab.index == 0)
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
@@ -341,7 +350,7 @@ class _UserAuthScreenState extends State<UserAuthScreen>
                             ),
                           ),
 
-                        if (_tab.index == 1) // --- SIGNUP TAB ---
+                        if (_tab.index == 1)
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(

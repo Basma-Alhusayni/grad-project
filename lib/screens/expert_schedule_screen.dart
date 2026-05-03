@@ -19,7 +19,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
   String _editStart = '09:00';
   String _editEnd = '17:00';
 
-  // scheduleData: key = 'yyyy-MM-dd', value = {isAvailable, startTime, endTime}
   Map<String, Map<String, dynamic>> _scheduleData = {};
 
   final List<String> _monthNames = [
@@ -32,13 +31,14 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     'الخميس', 'الجمعة', 'السبت',
   ];
 
+  // Load the specialist's saved schedule when the screen opens
   @override
   void initState() {
     super.initState();
     _loadSchedule();
   }
 
-  // ── تحميل الجدول من Firestore ──────────────────────────────
+  // Fetches the specialist's schedule from Firestore and stores it in local state
   Future<void> _loadSchedule() async {
     final doc =
     await _db.collection('expertSchedules').doc(_uid).get();
@@ -51,21 +51,22 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     }
   }
 
-  // ── حفظ الجدول في Firestore ────────────────────────────────
+  // Saves the current schedule data to Firestore
   Future<void> _saveToFirestore() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // This ensures the schedule is locked to THIS specific expert
     await _db
         .collection('expertSchedules')
         .doc(uid)
         .set(_scheduleData);
   }
 
+  // Converts a date to a consistent string key like "2026-05-03" used to store schedule entries
   String _dateKey(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
+  // Returns true if the given date is today
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -73,18 +74,19 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
         date.day == now.day;
   }
 
+  // Returns true if the given date is before today
   bool _isPast(DateTime date) {
     final today = DateTime.now();
     return date
         .isBefore(DateTime(today.year, today.month, today.day));
   }
 
+  // Returns a list of dates for the current month with leading nulls to align the first day correctly
   List<DateTime?> _getDaysInMonth(DateTime date) {
     final first = DateTime(date.year, date.month, 1);
     final last = DateTime(date.year, date.month + 1, 0);
     final List<DateTime?> days = [];
 
-    // خلايا فارغة قبل بداية الشهر
     for (int i = 0; i < first.weekday % 7; i++) {
       days.add(null);
     }
@@ -94,7 +96,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     return days;
   }
 
-  // ── حفظ/تحديث يوم ──────────────────────────────────────────
+  // Saves the selected day as available or unavailable with the chosen start and end times
   void _saveDay(bool isAvailable) {
     if (_selectedDate == null) return;
     final key = _dateKey(_selectedDate!);
@@ -110,7 +112,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     _showSnack(isAvailable ? 'تم تفعيل اليوم' : 'تم إغلاق اليوم');
   }
 
-  // ── حذف يوم ────────────────────────────────────────────────
+  // Removes the schedule entry for the selected day
   void _deleteDay() {
     if (_selectedDate == null) return;
     final key = _dateKey(_selectedDate!);
@@ -122,6 +124,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     _showSnack('تم إزالة الجدول');
   }
 
+  // Shows a short green snackbar message at the bottom of the screen
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content:
@@ -131,7 +134,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     ));
   }
 
-  // ── ديالوج تعديل اليوم ─────────────────────────────────────
+  // Opens a dialog where the specialist can set start/end times and mark a day as available or closed
   void _showEditDialog(DateTime date) {
     final key = _dateKey(date);
     final existing = _scheduleData[key];
@@ -155,7 +158,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // الحالة الحالية
                 if (existing != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -174,7 +176,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                   ),
                 const SizedBox(height: 14),
 
-                // وقت البداية
                 const Text('وقت البداية',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 6),
@@ -218,7 +219,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // وقت النهاية
                 const Text('وقت النهاية',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 6),
@@ -298,7 +298,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     );
   }
 
-  // ── Build ───────────────────────────────────────────────────
+  // Builds the schedule screen with stat boxes, a monthly calendar grid, and a legend
   @override
   Widget build(BuildContext context) {
     final days = _getDaysInMonth(_currentDate);
@@ -315,7 +315,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // ── العنوان ─────────────────────────────────────
             const Text('جدول الأوقات',
                 style: TextStyle(
                     fontSize: 20,
@@ -327,7 +326,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                 TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 14),
 
-            // ── إحصائيات ────────────────────────────────────
             Row(
               children: [
                 _statBox('$availableDays', 'أيام متاحة',
@@ -339,7 +337,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
             ),
             const SizedBox(height: 14),
 
-            // ── التقويم ──────────────────────────────────────
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -354,7 +351,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  // التنقل بين الأشهر
                   Row(
                     mainAxisAlignment:
                     MainAxisAlignment.spaceBetween,
@@ -389,7 +385,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                   ),
                   const SizedBox(height: 6),
 
-                  // أسماء الأيام
                   Row(
                     children: _dayNames
                         .map((d) => Expanded(
@@ -406,7 +401,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                   ),
                   const SizedBox(height: 6),
 
-                  // شبكة الأيام
                   GridView.builder(
                     shrinkWrap: true,
                     physics:
@@ -508,7 +502,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // مفتاح الألوان
                   Wrap(
                     spacing: 12,
                     runSpacing: 6,
@@ -529,7 +522,6 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ── تلميح ───────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -560,6 +552,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     );
   }
 
+  // A small colored box showing a count and label — used for available and closed day counts
   Widget _statBox(
       String value, String label, MaterialColor color) {
     return Expanded(
@@ -586,6 +579,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     );
   }
 
+  // A small colored square with a label used in the calendar legend
   Widget _legendItem(Color bg, Color border, String label,
       {bool isToday = false}) {
     return Row(

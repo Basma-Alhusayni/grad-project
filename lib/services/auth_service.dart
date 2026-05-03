@@ -9,17 +9,18 @@ class AuthService {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
 
-  // Firebase Console → Project Settings → General → Web API Key
   static const String _firebaseWebApiKey = 'AIzaSyCMExWm5DRSPHLmo0IuaM_YUpptRcNTtLM';
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+
+// Fetches the role of a user from the accounts collection by their uid
   Future<String?> getUserRole(String uid) async {
     final doc = await _db.collection('accounts').doc(uid).get();
     return doc.data()?['role'];
   }
 
-  // ── تسجيل مستخدم عادي ──────────────────────────────────────
+  // Creates a new user account in Firebase Auth and Firestore, then sends a verification email
   Future<String?> registerUser({
     required String email,
     required String password,
@@ -47,8 +48,6 @@ class AuthService {
         'email': email,
         'username': username,
         'fullName': fullName,
-        'profileImage': null,
-        'userReportId': null,
         'isOnline': true,
       });
 
@@ -59,7 +58,7 @@ class AuthService {
     }
   }
 
-  // ── تسجيل مسؤول (كود داخلي) ───────────────────────────────
+  // Creates a new admin account in Firebase Auth and Firestore, then sends a verification email
   Future<String?> registerAdmin({
     required String email,
     required String password,
@@ -94,7 +93,7 @@ class AuthService {
     }
   }
 
-  // ── تقديم طلب انضمام خبير ──────────────────────────────────
+// Submits a specialist join request after checking there are no duplicate pending or approved requests
   Future<String?> submitSpecialistRequest({
     required String email,
     required String fullName,
@@ -133,7 +132,7 @@ class AuthService {
     }
   }
 
-  // ── توليد كلمة مرور مؤقتة ──────────────────────────────────
+  // Generates a random secure temporary password using a word, number, and symbol
   String _generateTempPassword() {
     const words = ['Plant', 'Green', 'Bloom', 'Leaf', 'Bio', 'Flora', 'Crop', 'Herb', 'Seed', 'Field'];
     const symbols = ['!', '@', '#', r'$', '&'];
@@ -144,7 +143,7 @@ class AuthService {
     return '$word$digits$symbol';
   }
 
-  // ── اعتماد طلب الخبير من قبل الأدمن ────────────────────────
+  // Creates a Firebase Auth account for the specialist, sets up their Firestore documents, and sends an approval email
   Future<String?> approveSpecialistRequest({
     required Map<String, dynamic> requestData,
     required String requestDocId,
@@ -238,7 +237,7 @@ class AuthService {
     }
   }
 
-  // ── رفض طلب خبير ───────────────────────────────────────────
+  // Marks the request as rejected in Firestore and sends a rejection email with the reason
   Future<String?> rejectSpecialistRequest({
     required String requestDocId,
     required String expertEmail,
@@ -265,7 +264,7 @@ class AuthService {
     }
   }
 
-  // ── تسجيل دخول (مستخدم / أدمن) مع التحقق من الدور ────────────
+  // Signs the user in, checks their role and account status, and handles unverified emails
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -284,7 +283,6 @@ class AuthService {
 
       final role = doc.data()!['role'];
 
-      // 🔥 الإصلاح: التحقق الصارم من الدور المخصص لكل شاشة
       if (role != expectedRole) {
         await _auth.signOut();
         String roleLabel = expectedRole == 'admin' ? 'مدير' : 'مستخدم';
@@ -308,7 +306,7 @@ class AuthService {
     }
   }
 
-  // ── تسجيل دخول الخبير مع التحقق من الدور والدخول الأول ───────
+  // Signs the specialist in, checks their role and status, and returns whether it's their first login
   Future<Map<String, dynamic>> specialistLogin({
     required String email,
     required String password,
@@ -326,7 +324,6 @@ class AuthService {
 
       final role = doc.data()!['role'];
 
-      // 🔥 الإصلاح: منع الأدمن أو المستخدم من دخول واجهة الخبير
       if (role != 'specialist') {
         await _auth.signOut();
         return {'error': 'هذا الحساب ليس حساب خبير'};
@@ -345,7 +342,7 @@ class AuthService {
     }
   }
 
-  // ── تغيير كلمة المرور عند الدخول الأول ─────────────────────
+  // Updates the specialist's password on first login and marks isFirstLogin as false in Firestore
   Future<String?> changePasswordFirstTime({
     required String newPassword,
   }) async {
@@ -367,7 +364,7 @@ class AuthService {
     }
   }
 
-  // ── استعادة كلمة المرور ────────────────────────────────────
+  // Sends a password reset email to the given address
   Future<String?> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -377,9 +374,10 @@ class AuthService {
     }
   }
 
+  // Signs the current user out of Firebase Auth
   Future<void> signOut() => _auth.signOut();
 
-  // ── استخدام REST API لإنشاء حساب بدون التأثير على جلسة الأدمن ──
+  // Creates a Firebase Auth account directly via the REST API — used when the admin SDK is not available
   Future<Map<String, String>> _createAuthAccountViaRestApi({
     required String email,
     required String password,
@@ -403,7 +401,7 @@ class AuthService {
     return {'error': data['error']?['message'] ?? 'Unknown'};
   }
 
-  // ── تحويل رموز الخطأ لرسائل عربية مفهومة ─────────────────────
+  // Converts Firebase Auth error codes into readable Arabic error messages
   String _mapError(String code) {
     switch (code) {
       case 'user-not-found': return 'البريد الإلكتروني غير مسجل';

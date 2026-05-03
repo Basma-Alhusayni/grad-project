@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +14,7 @@ class ExpertSelectionScreen extends StatelessWidget {
   static const Color darkGreen = Color(0xFF14532D);
   static const Color bgGreen = Color(0xFFF0FDF4);
 
+  // Fetches all specialists and filters to only those available right now based on today's schedule
   Future<List<QueryDocumentSnapshot>> _getAvailableExperts() async {
     final now = DateTime.now();
     final todayKey = DateFormat('yyyy-MM-dd').format(now);
@@ -71,7 +71,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     }
   }
 
-  // ── Fetch certificate images ─────────────────────────────────
+  // Gets the specialist's certificate images from their profile or from their original join request
   Future<List<String>> _fetchCertificateImages(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -106,7 +106,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     }
   }
 
-  // ── Fetch reviews ────────────────────────────────────────────
+  // Fetches the latest 10 reviews for a specialist ordered by newest first
   Future<List<Map<String, dynamic>>> _fetchReviews(String docId) async {
     try {
       final snap = await FirebaseFirestore.instance
@@ -122,7 +122,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     }
   }
 
-  // ── Fetch reports ────────────────────────────────────────────
+  // Fetches the latest 5 reports submitted by a specialist
   Future<List<Map<String, dynamic>>> _fetchReports(String docId) async {
     try {
       final snap = await FirebaseFirestore.instance
@@ -137,7 +137,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     }
   }
 
-  // ── Show full certificate image ──────────────────────────────
+  // Opens a zoomable full-screen preview of a certificate image
   void _showFullCertImage(BuildContext context, String url) {
     showDialog(
       context: context,
@@ -224,6 +224,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
+  // Builds the available experts screen — shows a loading indicator, error, or list of expert cards
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -277,6 +278,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
+  // Builds one expert list card showing name, rating, and availability — tapping opens full details
   Widget _buildExpertCard(
     BuildContext context,
     Map<String, dynamic> data,
@@ -341,6 +343,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
+  // Opens a bottom sheet with the expert's full profile: bio, certificates, reviews, reports, and a start chat button
   void _showExpertDetails(
     BuildContext context,
     Map<String, dynamic> data,
@@ -366,7 +369,6 @@ class ExpertSelectionScreen extends StatelessWidget {
               children: [
                 const SizedBox(height: 12),
 
-                // ── Drag handle ──────────────────────────────────
                 Container(
                   width: 40,
                   height: 4,
@@ -376,14 +378,12 @@ class ExpertSelectionScreen extends StatelessWidget {
                   ),
                 ),
 
-                // ── Scrollable content ───────────────────────────
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Avatar + Name + Rating ───────────────
                         Center(
                           child: Column(
                             children: [
@@ -408,7 +408,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              // ── Stars + review count ─────────
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -437,7 +436,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // ── About ────────────────────────────────
                         const Text(
                           'حول الخبير',
                           style: TextStyle(
@@ -453,7 +451,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
 
-                        // ── Qualifications ───────────────────────
                         const Text(
                           'المؤهلات العلمية',
                           style: TextStyle(
@@ -466,7 +463,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                         Text(data['certificates'] ?? '—'),
                         const SizedBox(height: 20),
 
-                        // ── Certificate Images ───────────────────
                         const Text(
                           'الشهادات الموثقة',
                           style: TextStyle(
@@ -600,7 +596,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // ── Reviews ──────────────────────────────
                         FutureBuilder<List<Map<String, dynamic>>>(
                           future: _fetchReviews(specId),
                           builder: (context, snap) {
@@ -641,7 +636,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                // ── fix: .toList() on the map ────
                                 ...reviews.take(5).map((r) {
                                   final rRating = (r['rating'] ?? 5).toInt();
                                   final userName = r['userName'] ?? 'مستخدم';
@@ -723,15 +717,13 @@ class ExpertSelectionScreen extends StatelessWidget {
                                       ],
                                     ),
                                   );
-                                }).toList(), // ← fix applied here
+                                }).toList(),
                                 const SizedBox(height: 8),
                               ],
                             );
                           },
                         ),
 
-                        // ── Recent Reports ────────────────────────
-                        // ── Recent Reports ────────────────────────────────────────
                         FutureBuilder<List<Map<String, dynamic>>>(
                           future: _fetchReports(specId),
                           builder: (context, snap) {
@@ -796,7 +788,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        // ── Header ──────────────────────────────
                                         Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Row(
@@ -855,7 +846,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                           ),
                                         ),
 
-                                        // ── Plant Image ──────────────────────────
                                         if (hasImage) ...[
                                           ClipRRect(
                                             borderRadius:
@@ -874,7 +864,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                           const SizedBox(height: 10),
                                         ],
 
-                                        // ── Diagnosis ────────────────────────────
                                         Padding(
                                           padding: const EdgeInsets.fromLTRB(
                                             12,
@@ -920,7 +909,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                                           ),
                                         ),
 
-                                        // ── Treatment ────────────────────────────
                                         Padding(
                                           padding: const EdgeInsets.fromLTRB(
                                             12,
@@ -975,7 +963,6 @@ class ExpertSelectionScreen extends StatelessWidget {
                           },
                         ),
 
-                        // ── Start Chat Button ────────────────────────────
                         SafeArea(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -1022,6 +1009,7 @@ class ExpertSelectionScreen extends StatelessWidget {
     );
   }
 
+  // Creates a new chat document in Firestore, uploads the failed image if present, then navigates to the chat screen
   Future<void> _handleStartChat(
     BuildContext context,
     Map<String, dynamic> data,

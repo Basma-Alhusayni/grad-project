@@ -20,6 +20,7 @@ class AuthTextField extends StatelessWidget {
     this.enabled = true,
   });
 
+  // Builds a right-aligned text input field with an icon, green focus border, and optional validation
   @override
   Widget build(BuildContext context) {
     return TextFormField(

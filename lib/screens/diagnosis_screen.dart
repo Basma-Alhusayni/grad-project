@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
-import '../models/diagnosis_result.dart';
 import '../services/diagnosis_service.dart';
 import '../widgets/common_widgets.dart';
 import 'diagnosis_result_screen.dart';
@@ -24,7 +23,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
   int? _selectedCategoryIndex;
   final ImagePicker _picker = ImagePicker();
 
-  // ─── Plant Categories ───────────────────────────────────────
   final List<Map<String, String>> _categories = [
     {'label': 'خضار\nوفواكه', 'emoji': '🥦'},
     {'label': 'سعف\nالنخل',   'emoji': '🌴'},
@@ -32,6 +30,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     {'label': 'أخرى',         'emoji': '🔍'},
   ];
 
+  // Shows a confirmation dialog when the user tries to exit the app
   Future<bool> _onWillPop() async {
     final shouldExit = await showDialog<bool>(
       context: context,
@@ -59,6 +58,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     return false;
   }
 
+  // Requests camera or gallery permission then lets the user pick a plant image
   Future<void> _pickImage(ImageSource source) async {
     PermissionStatus status;
 
@@ -113,6 +113,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     }
   }
 
+  // Sends the selected image to the diagnosis service and navigates to the results screen
   Future<void> _analyzeImage() async {
     if (_imageFile == null) return;
 
@@ -161,6 +162,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     }
   }
 
+  // Builds the main diagnosis screen: category row, image picker card, and tips card
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -171,7 +173,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // ─── Category Buttons Row ───────────────────────────
                 SizedBox(
                   height: 80,
                   child: _CategoryRow(
@@ -179,7 +180,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                     selectedIndex: _selectedCategoryIndex,
                     onSelected: (index) {
                       setState(() => _selectedCategoryIndex = index);
-                      // immediately launch camera when category is tapped
                       _pickImage(ImageSource.camera);
                     },
                   ).animate().fadeIn(duration: 350.ms),
@@ -200,7 +200,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // --- Action Buttons Section ---
                           if (_imageFile == null) ...[
                             Row(
                               children: [
@@ -339,6 +338,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     );
   }
 
+  // A tappable placeholder shown before the user picks an image
   Widget _buildPlaceholder() {
     return GestureDetector(
       onTap: () => _pickImage(ImageSource.gallery),
@@ -391,6 +391,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     );
   }
 
+  // Shows the selected image with a loading overlay while analysis is running
   Widget _buildImagePreview() {
     return Stack(
       children: [
@@ -433,7 +434,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
   }
 }
 
-// ─── Category Buttons Row ─────────────────────────────────────
 class _CategoryRow extends StatelessWidget {
   final List<Map<String, String>> categories;
   final int? selectedIndex;
@@ -445,6 +445,7 @@ class _CategoryRow extends StatelessWidget {
     required this.onSelected,
   });
 
+  // Builds a row of plant category buttons that highlight when selected
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -509,8 +510,9 @@ class _CategoryRow extends StatelessWidget {
   }
 }
 
-// ─── Tips Card ────────────────────────────────────────────────
 class _TipsCard extends StatelessWidget {
+
+  // A blue card showing photography tips to help the user get better diagnosis results
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -546,6 +548,7 @@ class _Tip extends StatelessWidget {
   final String text;
   const _Tip(this.text);
 
+  // A single bullet point tip row
   @override
   Widget build(BuildContext context) {
     return Padding(

@@ -14,6 +14,8 @@ enum DiagnosisStep {
 }
 
 extension DiagnosisStepLabel on DiagnosisStep {
+
+  // Returns the Arabic label for each diagnosis step — shown to the user during analysis
   String get labelAr {
     switch (this) {
       case DiagnosisStep.identifyingPlant:  return 'جاري تحديد نوع النبات...';
@@ -23,6 +25,7 @@ extension DiagnosisStepLabel on DiagnosisStep {
     }
   }
 
+  // Returns an emoji icon for each diagnosis step
   String get icon {
     switch (this) {
       case DiagnosisStep.identifyingPlant:  return '🔍';
@@ -38,13 +41,13 @@ class DiagnosisService {
   static DiagnosisService get instance => _instance ??= DiagnosisService._();
   DiagnosisService._();
 
+  // Runs the full diagnosis pipeline: identifies the plant, detects disease, gets treatment, and returns a result
   Future<DiagnosisResult> analyze({
     required File imageFile,
     ProgressCallback? onProgress,
   }) async {
     final imageBytes = await imageFile.readAsBytes();
 
-    // ── STEP 1: Plant identification — PlantNet + OpenAI in parallel ──────────
     onProgress?.call(DiagnosisStep.identifyingPlant);
 
     String plantNamePlantNet   = 'نبات';
@@ -83,7 +86,6 @@ class DiagnosisService {
     final String finalPlantName = openAIPlantConf >= plantNetConf
         ? plantNameOpenAI : plantNamePlantNet;
 
-    // ── Always use OpenAI's Arabic name for display ───────────────────────────
     final String finalPlantNameAr = plantNameArOpenAI.isNotEmpty && plantNameArOpenAI != 'نبات'
         ? plantNameArOpenAI
         : _translateToArabic(plantNamePlantNet);
@@ -91,7 +93,6 @@ class DiagnosisService {
     debugPrint('🌿 PlantNet: $plantNamePlantNet (${plantNetConf.toStringAsFixed(1)}%)');
     debugPrint('🌿 OpenAI:   $plantNameOpenAI / $plantNameArOpenAI (${openAIPlantConf.toStringAsFixed(1)}%)');
 
-    // ── Check if plant is outside supported categories ────────────────────────
     final category = openAIPlantResult['category'] as String? ?? 'other';
     debugPrint('🗂️  Category: $category');
 
@@ -123,7 +124,6 @@ class DiagnosisService {
     detectedType = _categoryToPlantType(category);
     debugPrint('🗂️  Model selected: $detectedType');
 
-    // ── STEP 2: Disease diagnosis — TFLite + OpenAI in parallel ──────────────
     onProgress?.call(DiagnosisStep.checkingDisease);
 
     bool   tfliteIsHealthy      = false;
@@ -213,7 +213,6 @@ class DiagnosisService {
 
     onProgress?.call(DiagnosisStep.fetchingTreatment);
 
-    // ── STEP 3: Weighted majority vote ────────────────────────────────────────
     final healthyScore  = (tfliteIsHealthy  ? tfliteDiseaseConf : 0.0)
         + (openAIIsHealthy  ? openAIDiseaseConf : 0.0);
     final diseasedScore = (!tfliteIsHealthy ? tfliteDiseaseConf : 0.0)
@@ -286,7 +285,7 @@ class DiagnosisService {
     );
   }
 
-  // ── Map OpenAI category string → PlantType ────────────────────────────────
+  // Converts the category string returned by OpenAI into the matching PlantType enum value
   PlantType _categoryToPlantType(String category) {
     switch (category.toLowerCase().trim()) {
       case 'palm':       return PlantType.palm;
@@ -296,9 +295,11 @@ class DiagnosisService {
     }
   }
 
+  // Removes square brackets from a string — used to clean up OpenAI response text
   String _stripBrackets(String text) =>
       text.replaceAll('[', '').replaceAll(']', '').trim();
 
+  // Tries to translate a scientific plant name to Arabic using a genus lookup map
   String _translateToArabic(String scientificName) {
     final name = scientificName.toLowerCase();
     const Map<String, String> genusMap = {

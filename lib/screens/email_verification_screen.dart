@@ -23,6 +23,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   static const _green900 = Color(0xFF14532D);
   static const _green50 = Color(0xFFF0FDF4);
 
+  // Start a timer that checks every 3 seconds if the user has verified their email
   @override
   void initState() {
     super.initState();
@@ -35,6 +36,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
   }
 
+  // Cancel both timers when the screen is removed to avoid memory leaks
   @override
   void dispose() {
     _pollTimer?.cancel();
@@ -42,6 +44,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     super.dispose();
   }
 
+  // Goes to the splash screen and clears the navigation stack after verification
   void _navigateForward() {
     Navigator.pushAndRemoveUntil(
       context,
@@ -50,6 +53,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     );
   }
 
+  // Resends the verification email and starts a 60-second cooldown to prevent spam
   Future<void> _resendEmail() async {
     if (_cooldown > 0 || _resending) return;
     setState(() => _resending = true);
@@ -82,6 +86,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
   }
 
+  // Reloads the user's auth state and navigates forward if email is now verified
   Future<void> _checkManually() async {
     setState(() => _checking = true);
     await FirebaseAuth.instance.currentUser?.reload();
@@ -99,6 +104,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
   }
 
+  // Cancels the poll timer, signs the user out, and goes back to the splash screen
   Future<void> _signOut() async {
     _pollTimer?.cancel();
     await FirebaseAuth.instance.signOut();
@@ -110,11 +116,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     );
   }
 
+  // Builds the verification screen with the user's email, info box, verify button, resend button, and sign out option
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _green50,
-      // KEY FIX: allows content to scroll when keyboard appears
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Directionality(
@@ -189,7 +195,6 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ]),
                   ),
                   const SizedBox(height: 40),
-                  // Check manually
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -217,7 +222,6 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Resend
                   SizedBox(
                     width: double.infinity,
                     height: 52,

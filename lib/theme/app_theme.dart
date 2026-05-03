@@ -19,6 +19,7 @@ class AppTheme {
   static const Color grey = Color(0xFF6B7280);
   static const Color lightGrey = Color(0xFFF9FAFB);
 
+  // Builds and returns the app's global Material theme with Cairo font, green color scheme, and styled components
   static ThemeData get theme {
     final cairoBase = GoogleFonts.cairoTextTheme();
 

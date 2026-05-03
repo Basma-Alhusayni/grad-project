@@ -24,12 +24,14 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
 
   late Stream<QuerySnapshot> _reportsStreamVar;
 
+  // Set up the reports stream when the screen opens
   @override
   void initState() {
     super.initState();
     _reportsStreamVar = _getReportsStream();
   }
 
+  // Returns a real-time stream of the current user's reports ordered by newest first
   Stream<QuerySnapshot> _getReportsStream() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();
@@ -40,12 +42,14 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
         .snapshots();
   }
 
+  // Clean up the search controller
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  // A filter chip that highlights when active — used to filter reports by status
   Widget _filterChip(String label, int count) {
     final active = _filter == label;
     return GestureDetector(
@@ -69,6 +73,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
     );
   }
 
+  // Returns an emoji icon matching the plant type
   String _iconForPlant(String type) {
     switch (type) {
       case 'vegetables': return '🥬';
@@ -79,6 +84,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
     }
   }
 
+  // Builds the reports screen with stat cards, search bar, filter chips, and a list of report cards
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
@@ -110,7 +116,6 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
             'imageUrl':            data['imageUrl'] ?? '',
             'userName':            data['userName'] ?? '',
             'userId':              data['userId'] ?? '',
-            // ← NEW: read the adminBlocked flag
             'adminBlocked':        data['adminBlocked'] ?? false,
           };
         }).toList();
@@ -191,6 +196,7 @@ class _UserReportsScreenState extends State<UserReportsScreen> {
     );
   }
 
+  // Shows a centered empty state when no reports match the current filter or search
   Widget _buildEmptyState() {
     return Center(child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -206,6 +212,7 @@ class _ReportCard extends StatelessWidget {
   final Map<String, dynamic> report;
   const _ReportCard({super.key, required this.report});
 
+  // Builds one report list card showing plant image, name, diagnosis, date, status badge, and share/block badges
   @override
   Widget build(BuildContext context) {
     final isHealthy = report['status'] == 'سليم';
@@ -245,7 +252,6 @@ class _ReportCard extends StatelessWidget {
             Row(children: [
               Text(report['date'], style: TextStyle(color: Colors.grey[400], fontSize: 11)),
               if (isShared) ...[const SizedBox(width: 8), _SharedBadge()],
-              // ← NEW: show a small blocked badge in the list card
               if (isBlocked) ...[const SizedBox(width: 8), _BlockedBadge()],
             ]),
           ])),
@@ -263,6 +269,8 @@ class _ReportCard extends StatelessWidget {
 }
 
 class _SharedBadge extends StatelessWidget {
+
+  // A small purple badge shown when a report has been shared to the community
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -277,8 +285,9 @@ class _SharedBadge extends StatelessWidget {
   }
 }
 
-// ← NEW: small badge shown in the list card when a report is admin-blocked
 class _BlockedBadge extends StatelessWidget {
+
+  // A small red badge shown when a report has been blocked by the admin
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -296,9 +305,6 @@ class _BlockedBadge extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  REPORT DETAIL PAGE
-// ═══════════════════════════════════════════════════════════════
 class ReportDetailPage extends StatefulWidget {
   final Map<String, dynamic> report;
   const ReportDetailPage({super.key, required this.report});
@@ -320,9 +326,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   Color get _sc => _isHealthy ? _green600 : const Color(0xFFDC2626);
   Color get _sb => _isHealthy ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
 
-  // ← NEW: convenience getter
   bool get _isAdminBlocked => widget.report['adminBlocked'] == true;
 
+  // Load the current share state from the report data
   @override
   void initState() {
     super.initState();
@@ -330,9 +336,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     _isShared = _feedDocId != null && _feedDocId!.isNotEmpty;
   }
 
-  // ─── Share / Unshare ────────────────────────────────────────
+  // Shares or unshares the report to the community feed — shows a blocked dialog if the admin restricted it
   Future<void> _shareToggle() async {
-    // ── NEW: Guard — admin has blocked this report ─────────────
     if (_isAdminBlocked) {
       showDialog(
         context: context,
@@ -372,7 +377,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           ),
         ),
       );
-      return; // stop here — do not proceed with sharing
+      return;
     }
 
     if (_sharingLoading) return;
@@ -382,7 +387,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       if (user == null) return;
 
       if (_isShared && _feedDocId != null) {
-        // ── UNSHARE: delete only from community_feed ──
         await FirebaseFirestore.instance
             .collection('community_feed')
             .doc(_feedDocId)
@@ -403,7 +407,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   textDirection: TextDirection.rtl)));
         }
       } else {
-        // ── SHARE: write only to community_feed ──
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -465,6 +468,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
   }
 
+  // Generates a PDF with the report details and plant image then shares it
   Future<void> _exportPDF() async {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -545,6 +549,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
   }
 
+  // A single label-value row used inside the PDF layout
   pw.Widget _pdfRow(String label, String value) =>
       pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4),
           child: pw.Row(children: [
@@ -553,6 +558,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             pw.Text(value, style: const pw.TextStyle(fontSize: 12)),
           ]));
 
+  // A confidence bar block used inside the PDF showing percentage and a progress bar
   pw.Widget _pdfConfidenceBlock({
     required pw.Font arabicFont,
     required String label,
@@ -596,6 +602,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     ]);
   }
 
+  // Confirms with the user then deletes the report from Firestore — blocked if the report is shared
   Future<void> _deleteReport() async {
     if (_isShared) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -636,6 +643,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
   }
 
+  // Builds the full report detail page with image, status, confidence bars, diagnosis, treatment, and action buttons
   @override
   Widget build(BuildContext context) {
     final imageUrl            = widget.report['imageUrl'] ?? '';
@@ -675,7 +683,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   child: Image.network(imageUrl, height: 180, fit: BoxFit.cover)),
             const SizedBox(height: 12),
 
-            // ── Status card ──
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18),
@@ -691,7 +698,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     child: Text(widget.report['status'], style: TextStyle(color: _sc, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 16),
 
-                // ── Admin blocked notice ──────────────────────
                 if (_isAdminBlocked) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -718,7 +724,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   const SizedBox(height: 12),
                 ],
 
-                // ─── Two confidence bars ──────────────────────
                 _ConfidenceRow(
                   label: '🌿 دقة تحديد اسم النبات',
                   value: plantNameConf,
@@ -773,15 +778,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               Expanded(child: _ActionBtn(icon: Icons.picture_as_pdf, label: 'PDF', color: Colors.blue, onTap: _exportPDF)),
               const SizedBox(width: 10),
 
-              // ── NEW: share button — locked when admin-blocked ──
               Expanded(
                 child: _isAdminBlocked
-                // Blocked: grey button that opens the explanation dialog
                     ? _ActionBtn(
                   icon: Icons.block,
                   label: 'مشاركة مقيّدة',
                   color: Colors.grey,
-                  onTap: _shareToggle, // dialog fires inside _shareToggle
+                  onTap: _shareToggle,
                 )
                     : _sharingLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -803,7 +806,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 }
 
-// ─── Reusable confidence bar with sublabel ────────────────────
 class _ConfidenceRow extends StatelessWidget {
   final String label;
   final String sublabel;
@@ -816,6 +818,7 @@ class _ConfidenceRow extends StatelessWidget {
     this.sublabel = '',
   });
 
+  // Builds a labeled progress bar showing a confidence percentage with an optional sublabel
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -848,11 +851,13 @@ class _ConfidenceRow extends StatelessWidget {
   }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────
+
 class _StatCard extends StatelessWidget {
   final String value, label;
   final Color color, bgColor;
   const _StatCard({required this.value, required this.label, required this.color, required this.bgColor});
+
+  // A small colored stat box showing a count and a label — used in the reports summary row
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
@@ -876,6 +881,7 @@ class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.title, required this.child, required this.icon,
     required this.titleColor, required this.backgroundColor, required this.borderColor});
 
+  // A colored card section with a title, icon, and content — used for diagnosis, details, and treatment
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
@@ -900,6 +906,8 @@ class _InfoCard extends StatelessWidget {
 class _ActionBtn extends StatelessWidget {
   final IconData icon; final String label; final Color color; final VoidCallback onTap;
   const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
+
+  // A tappable action button with an icon and label — used for PDF export, share, and delete
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,

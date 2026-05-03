@@ -3,11 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AppUser {
   final String uid;
   final String accountId;
-  final String role; // 'user' | 'specialist' | 'admin'
-  final String status; // 'active' | 'suspended' | 'pending'
+  final String role;
+  final String status;
   final String email;
   final String username;
-  final String? profileImage;
   final DateTime createdAt;
   final bool isFirstLogin;
 
@@ -18,11 +17,11 @@ class AppUser {
     required this.status,
     required this.email,
     required this.username,
-    this.profileImage,
     required this.createdAt,
     this.isFirstLogin = false,
   });
 
+  // Creates an AppUser from a Firestore document map and the user's uid
   factory AppUser.fromMap(Map<String, dynamic> map, String uid) {
     return AppUser(
       uid: uid,
@@ -31,7 +30,6 @@ class AppUser {
       status: map['status'] ?? 'active',
       email: map['email'] ?? '',
       username: map['username'] ?? '',
-      profileImage: map['profileImage'],
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
@@ -39,13 +37,13 @@ class AppUser {
     );
   }
 
+  // Converts the AppUser to a map for storing in Firestore
   Map<String, dynamic> toMap() => {
     'accountId': accountId,
     'role': role,
     'status': status,
     'email': email,
     'username': username,
-    'profileImage': profileImage,
     'createdAt': Timestamp.fromDate(createdAt),
     'isFirstLogin': isFirstLogin,
   };

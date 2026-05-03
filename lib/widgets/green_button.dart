@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 
 class GreenButton extends StatelessWidget {
   final String label;
-  final IconData? icon; // Made optional
+  final IconData? icon;
   final VoidCallback? onPressed;
   final bool isLoading;
 
   const GreenButton({
     super.key,
     required this.label,
-    this.icon, // Removed required
+    this.icon,
     this.onPressed,
     this.isLoading = false,
   });
 
+  // Builds a full-width green button with an optional icon — shows a spinner when loading and dims when disabled
   @override
   Widget build(BuildContext context) {
     return SizedBox(

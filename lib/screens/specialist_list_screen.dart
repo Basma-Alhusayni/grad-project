@@ -19,6 +19,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
   String _availabilityFilter = 'الكل';
   String _chatFilter = 'all';
 
+  // Set up the tab controller and listen for tab changes
   @override
   void initState() {
     super.initState();
@@ -26,6 +27,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     _tabController.addListener(() => setState(() {}));
   }
 
+  // Clean up the search controller and tab controller
   @override
   void dispose() {
     _searchController.dispose();
@@ -33,6 +35,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     super.dispose();
   }
 
+  // Creates a new chat document in Firestore and navigates to the chat screen with the selected expert
   Future<void> _openChat(Map<String, dynamic> data, String expertId, bool isAvailable) async {
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? '';
@@ -81,7 +84,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     }
   }
 
-  // ── Fetch certificate images ─────────────────────────────────
+  // Gets the specialist's certificate images from their profile or from their original join request
   Future<List<String>> _fetchCertificateImages(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -112,7 +115,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     }
   }
 
-  // ── Fetch reviews ────────────────────────────────────────────
+  // Fetches the latest 10 reviews for a specialist ordered by newest first
   Future<List<Map<String, dynamic>>> _fetchReviews(String docId) async {
     try {
       final snap = await FirebaseFirestore.instance
@@ -128,7 +131,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     }
   }
 
-  // ── Fetch reports ────────────────────────────────────────────
+  // Fetches the latest 5 reports submitted by a specialist
   Future<List<Map<String, dynamic>>> _fetchReports(String docId) async {
     try {
       final snap = await FirebaseFirestore.instance
@@ -143,7 +146,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     }
   }
 
-  // ── Show full certificate image ──────────────────────────────
+  // Opens a zoomable full-screen preview of a certificate image
   void _showFullCertImage(String url) {
     showDialog(
       context: context,
@@ -218,6 +221,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // Opens a scrollable bottom sheet with the expert's full profile, certificates, reviews, reports, and a contact button
   void _showExpertDetails(Map<String, dynamic> data, String docId, bool isAvailable) {
     final rating = ((data['rating'] ?? 0) as num).toDouble();
     final name = data['fullName'] ?? '';
@@ -254,7 +258,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ── Drag handle ──────────────────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Container(
@@ -267,7 +270,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       ),
                     ),
 
-                    // ── Header ───────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -282,7 +284,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Avatar + Name + Status ───────────────────
                     Row(
                       children: [
                         CircleAvatar(
@@ -326,7 +327,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Rating Box ───────────────────────────────
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -353,8 +353,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Cases + Experience ───────────────────────
-                    // ── Cases + Experience ───────────────────────────────────────
                     IntrinsicHeight(
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -376,7 +374,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       ),
                     ),
 
-                    // ── Specialties ──────────────────────────────
                     if (specialties.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -418,7 +415,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       ),
                     ],
 
-                    // ── Available Hours ──────────────────────────
                     if (availableHours.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -460,7 +456,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       ),
                     ],
 
-                    // ── Certificate Images ───────────────────────
                     const SizedBox(height: 12),
                     FutureBuilder<List<String>>(
                       future: _fetchCertificateImages(docId),
@@ -604,7 +599,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       },
                     ),
 
-                    // ── Reviews ──────────────────────────────────
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: _fetchReviews(docId),
                       builder: (context, snap) {
@@ -734,7 +728,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       },
                     ),
 
-                    // ── Recent Reports ────────────────────────────────────────
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: _fetchReports(docId),
                       builder: (context, snap) {
@@ -811,7 +804,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          // ── Header ────────────────────────
                                           Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: Row(
@@ -858,7 +850,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                                             ),
                                           ),
 
-                                          // ── Plant Image ──────────────────
                                           if (hasImage) ...[
                                             ClipRRect(
                                               borderRadius: BorderRadius.zero,
@@ -874,7 +865,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                                             const SizedBox(height: 10),
                                           ],
 
-                                          // ── Diagnosis ────────────────────
                                           Padding(
                                             padding: const EdgeInsets.fromLTRB(
                                                 12, 0, 12, 8),
@@ -914,7 +904,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                                             ),
                                           ),
 
-                                          // ── Treatment ────────────────────
                                           Padding(
                                             padding: const EdgeInsets.fromLTRB(
                                                 12, 0, 12, 12),
@@ -966,7 +955,6 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
                       },
                     ),
 
-                    // ── Contact Button ───────────────────────────
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1005,6 +993,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // Confirms with the user then deletes the chat and all its linked reports and feed posts
   Future<void> _confirmDeleteChat(String chatId, String expertName) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1070,6 +1059,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     }
   }
 
+  // A small colored box showing an icon, a value, and a label — used for case count and experience
   Widget _infoBox(IconData icon, String value, String label, Color bg, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -1096,6 +1086,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // Builds the main screen with a tab switcher, search bar, and two tabs for experts and chats
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1157,6 +1148,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // A tab button that highlights with a green border when selected
   Widget _tabBtn(String label, int index) {
     final selected = _tabController.index == index;
     return GestureDetector(
@@ -1184,6 +1176,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // Fetches all specialists and their schedules, checks who is available right now, and shows a filtered list
   Widget _buildExpertsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('specialists').snapshots(),
@@ -1453,6 +1446,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // Listens to the user's chats in real time, sorts them by latest update, and shows a filtered list
   Widget _buildChatsList(String uid) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1699,6 +1693,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // A filter chip that highlights when active — used to filter by availability or chat status
   Widget _availChip(String label, bool isActive, VoidCallback onTap,
       {required Color activeColor}) {
     return GestureDetector(
@@ -1724,6 +1719,7 @@ class _SpecialistListScreenState extends State<SpecialistListScreen>
     );
   }
 
+  // A lighter styled filter chip used for secondary filtering options
   Widget _filterChip(String label, bool isSelected, VoidCallback onTap,
       {Color activeColor = const Color(0xFF16A34A)}) {
     return GestureDetector(

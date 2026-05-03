@@ -15,12 +15,14 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
   String _filter = 'الكل';
   final TextEditingController _searchCtrl = TextEditingController();
 
+  // Clean up the search controller when the screen is removed
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
 
+  // Asks admin to confirm, then deletes the post from community feed and blocks the user from re-sharing it
   Future<void> _deletePost(Map<String, dynamic> data, String feedDocId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -48,13 +50,11 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     if (confirm != true) return;
 
     try {
-      // 1. Delete from community_feed
       await FirebaseFirestore.instance
           .collection('community_feed')
           .doc(feedDocId)
           .delete();
 
-      // 2. AI report — update the original report doc
       final reportId = data['reportId'] as String?;
       if (reportId != null && reportId.isNotEmpty) {
         await FirebaseFirestore.instance
@@ -63,11 +63,10 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
             .update({
           'feedDocId': '',
           'isSharedToCommunity': false,
-          'adminBlocked': true, // ← user cannot re-share this AI report
+          'adminBlocked': true,
         }).catchError((_) {});
       }
 
-      // 3. Specialist/chat report — update the chat document
       final chatId = data['chatId'] as String?;
       if (chatId != null && chatId.isNotEmpty) {
         await FirebaseFirestore.instance
@@ -75,7 +74,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
             .doc(chatId)
             .update({
           'report.sharedToDashboard': false,
-          'report.adminBlocked': true, // ← user cannot re-share this specialist report
+          'report.adminBlocked': true,
         }).catchError((_) {});
       }
 
@@ -98,6 +97,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     }
   }
 
+  // Builds the full posts screen: stat boxes, search bar, filter chips, and the list of posts
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -229,6 +229,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     );
   }
 
+  // A small colored box showing a count and a label (total, healthy, sick)
   Widget _statBox(String value, String label, Color color, Color bg) {
     return Expanded(
       child: Container(
@@ -247,6 +248,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     );
   }
 
+  // A filter button that highlights when selected and filters posts by status
   Widget _chip(String label, int count) {
     final active = _filter == label;
     return GestureDetector(
@@ -268,6 +270,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     );
   }
 
+  // Opens a bottom sheet showing the full details of a post
   void _showPostDetail(Map<String, dynamic> post, String docId) {
     showModalBottomSheet(
       context: context,
@@ -284,7 +287,6 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
   }
 }
 
-// ─── Card widget ──────────────────────────────────────────────
 class _SharedPostCard extends StatelessWidget {
   final Map<String, dynamic> post;
   final VoidCallback onDelete;
@@ -292,6 +294,7 @@ class _SharedPostCard extends StatelessWidget {
   const _SharedPostCard(
       {required this.post, required this.onDelete, required this.onTap});
 
+  // Builds one post card with plant image, name, shared-by info, confidence badges, status, and delete button
   @override
   Widget build(BuildContext context) {
     final isHealthy = post['status'] == 'سليم' || post['isHealthy'] == true;
@@ -415,12 +418,14 @@ class _SharedPostCard extends StatelessWidget {
     );
   }
 
+  // A simple colored box shown when the post has no image
   Widget _placeholder(Color bg) => Container(
       width: 60,
       height: 60,
       color: bg,
       child: const Center(child: Icon(Icons.eco_outlined, color: Colors.grey)));
 
+  // A small badge showing a confidence percentage with a matching color
   Widget _confBadge(String text, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
@@ -431,7 +436,6 @@ class _SharedPostCard extends StatelessWidget {
   );
 }
 
-// ─── Detail bottom sheet ──────────────────────────────────────
 class _PostDetailSheet extends StatelessWidget {
   final Map<String, dynamic> post;
   final String docId;
@@ -439,6 +443,7 @@ class _PostDetailSheet extends StatelessWidget {
   const _PostDetailSheet(
       {required this.post, required this.docId, required this.onDelete});
 
+  // Returns true if the disease label is not a healthy/fresh label
   bool _isDiseased(String label) {
     final l = label.toLowerCase();
     return l.isNotEmpty &&
@@ -448,6 +453,7 @@ class _PostDetailSheet extends StatelessWidget {
         !l.contains('طازج');
   }
 
+  // Builds the full detail sheet: image, plant name, status, confidence bars, diagnosis, treatment, and delete button
   @override
   Widget build(BuildContext context) {
     final isHealthy = post['status'] == 'سليم' || post['isHealthy'] == true;
@@ -603,6 +609,7 @@ class _PostDetailSheet extends StatelessWidget {
     );
   }
 
+  // A labeled progress bar showing a confidence percentage for plant name or disease detection
   Widget _detailConfBar(
       {required String label,
         required int value,
@@ -648,6 +655,7 @@ class _PostDetailSheet extends StatelessWidget {
     ]);
   }
 
+  // A colored card section showing a title with an icon and a block of text (used for diagnosis and treatment)
   Widget _section(String title, String content, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),

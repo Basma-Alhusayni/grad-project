@@ -3,15 +3,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ImageUploadService {
-  // 💡 استبدلي هذه القيم ببيانات حسابك في Cloudinary
   static const String cloudName = "dicojx5rg";
   static const String uploadPreset = "bioshield_preset";
 
+  // Uploads an image file to Cloudinary and returns the secure URL, or null if the upload fails
   static Future<String?> uploadImage(File imageFile) async {
     try {
       final url = Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
 
-      // إنشاء طلب الرفع
       var request = http.MultipartRequest("POST", url)
         ..fields['upload_preset'] = uploadPreset
         ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
@@ -22,7 +21,7 @@ class ImageUploadService {
       final jsonResponse = jsonDecode(responseString);
 
       if (response.statusCode == 200) {
-        return jsonResponse["secure_url"]; // رابط الصورة المشفر (HTTPS)
+        return jsonResponse["secure_url"];
       } else {
         print("Cloudinary Error: ${jsonResponse["error"]["message"]}");
         return null;

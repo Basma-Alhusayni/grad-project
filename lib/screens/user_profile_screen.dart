@@ -22,6 +22,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   static const _green50 = Color(0xFFF0FDF4);
   static const _green100 = Color(0xFFDCFCE7);
 
+  // Register the lifecycle observer and load user data when the screen opens
   @override
   void initState() {
     super.initState();
@@ -29,12 +30,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     _fetchUserData();
   }
 
+  // Remove the lifecycle observer when the screen is removed
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  // Reload user data when the app comes back to the foreground — useful after email changes
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -42,11 +45,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
   }
 
+  // Loads the user's name and email from Firestore and syncs the email if it changed in Firebase Auth
   Future<void> _fetchUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // reload to get latest Auth state
     await user.reload();
     final authEmail = FirebaseAuth.instance.currentUser?.email ?? '';
 
@@ -55,7 +58,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         .doc(user.uid)
         .get();
 
-    // sync email from Auth to Firestore if different
     final firestoreEmail = userDoc.data()?['email'] ?? '';
     if (authEmail.isNotEmpty && authEmail != firestoreEmail) {
       await FirebaseFirestore.instance
@@ -91,6 +93,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     });
   }
 
+  // Shows a dialog where the user can update their display name
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
     bool saving = false;
@@ -172,6 +175,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
+  // Lets the user enter a new email and sends a verification link to it
   void _showChangeEmailDialog() {
     final emailController = TextEditingController();
     String? emailError;
@@ -271,7 +275,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     final user = FirebaseAuth.instance.currentUser!;
                     final uid = user.uid;
 
-                    // 1. إرسال رابط تحقق للبريد الجديد
                     await user.verifyBeforeUpdateEmail(newEmail);
 
                     if (!mounted) return;
@@ -319,10 +322,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  // ── Delete user's account ────────────────
 
+  // Confirms with the user, re-authenticates, then deletes all their data and account
   Future<void> _deleteAccount() async {
-    // Step 1 — Confirm dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -390,7 +392,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     if (confirm != true) return;
 
-    // Step 2 — Password re-authentication dialog (required by Firebase)
     final passwordController = TextEditingController();
     bool obscure = true;
     String? authError;
@@ -465,7 +466,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     if (password == null || password.isEmpty) return;
 
-    // Step 3 — Show loading
     if (mounted) {
       showDialog(
         context: context,
@@ -480,40 +480,30 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       final user = FirebaseAuth.instance.currentUser!;
       final uid = user.uid;
 
-      // Step 4 — Re-authenticate
       final credential = EmailAuthProvider.credential(
         email: _email,
         password: password,
       );
       await user.reauthenticateWithCredential(credential);
 
-      // Step 5 — Delete all Firestore data in parallel
       await Future.wait([
-        // Delete user doc
         FirebaseFirestore.instance.collection('users').doc(uid).delete(),
 
-        // Delete account doc
         FirebaseFirestore.instance.collection('accounts').doc(uid).delete(),
 
-        // Delete user's AI reports
         _deleteCollection('reports', 'userId', uid),
 
-        // Delete user's specialist reports
         _deleteCollection('specialist_reports', 'userId', uid),
 
-        // Delete community feed posts shared by user
         _deleteCollection('community_feed', 'userId', uid),
 
-        // Delete shared_reports entries by user
         _deleteCollection('shared_reports', 'userId', uid),
       ]);
 
-      // Step 6 — Delete Firebase Auth account
       await user.delete();
 
-      // Step 7 — Navigate to splash
       if (mounted) {
-        Navigator.pop(context); // close loading
+        Navigator.pop(context);
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const SplashScreen()),
@@ -521,7 +511,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) Navigator.pop(context); // close loading
+      if (mounted) Navigator.pop(context);
       String msg = 'حدث خطأ أثناء الحذف';
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
         msg = 'كلمة المرور غير صحيحة';
@@ -536,7 +526,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // close loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('❌ خطأ: $e', textDirection: TextDirection.rtl),
           backgroundColor: Colors.red,
@@ -545,7 +535,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
   }
 
-// ── Helper: delete all docs in a collection matching a field ──
+  // Deletes all documents in a collection where a specific field matches the user's uid
   Future<void> _deleteCollection(
       String collection, String field, String uid) async {
     final snap = await FirebaseFirestore.instance
@@ -557,7 +547,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
   }
 
-// ── Helper: bullet point row in confirm dialog ────────────────
+  // A small row with a red icon used to list what will be deleted in the delete account dialog
   Widget _deleteItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -569,7 +559,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-// ── changing password ────────────────
+  // Sends a password reset email to the user's current email address
   Future<void> _showChangePasswordDialog() async {
     bool sending = false;
     await showDialog(
@@ -622,7 +612,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
 
-
+// Builds the profile screen with avatar, personal info, security options, delete account, and logout buttons
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -636,14 +626,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _green50,
-        // هذه الخاصية تضمن أن الشاشة لا تضغط العناصر بشكل سيء عند ظهور الكيبورد
         resizeToAvoidBottomInset: true,
         body: SafeArea(
           child: LayoutBuilder(
-            // يستخدم لضمان توزيع العناصر بشكل صحيح في المساحات المختلفة
             builder: (context, constraints) {
               return SingleChildScrollView(
-                // نعيد السكرول ولكن نجعله يعمل فقط إذا ضاقت الشاشة (مثل عند ظهور الكيبورد)
                 physics: const ClampingScrollPhysics(),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -654,7 +641,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                         children: [
 
 
-                          // ── بطاقة معلومات المستخدم ──
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(20),
@@ -710,7 +696,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
                           const SizedBox(height: 16),
 
-                          // ── قسم المعلومات التفصيلية ──
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -760,7 +745,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
                           const SizedBox(height: 16),
 
-                          // ── قسم الأمان ──
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -799,7 +783,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
                           const Spacer(),
 
-                          // ── زر حذف الحساب ──
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
                             child: SizedBox(
@@ -824,7 +807,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               ),
                             ),
                           ),
-                          // ── زر تسجيل الخروج ──
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: SizedBox(
@@ -832,7 +814,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               height: 55,
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  // 🔥 NEW: Set user to offline before logging out
                                   final uid =
                                       FirebaseAuth.instance.currentUser?.uid;
                                   if (uid != null) {
@@ -890,6 +871,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
+  // A row showing an icon, a label, and a value — used inside the personal info card
   Widget _buildInfoRow(String label, String value, IconData icon) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
