@@ -69,6 +69,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     required String toEmail,
     required String toName,
     required String templateId,
+    String deadlineDate = '',
   }) async {
     try {
       final response = await http.post(
@@ -82,6 +83,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             'to_email': toEmail,
             'to_name': toName,
             'admin_email': _adminContactEmail,
+            'deadline_date': deadlineDate,
           },
         }),
       );
@@ -402,6 +404,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       'uid': uid,
                       'status': accData['status'] ?? 'active',
                       'createdAt': accData['createdAt'],
+                      'reactivateDeadline': accData['reactivateDeadline'],
                     };
                   }).toList();
 
@@ -521,10 +524,76 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                     alignment: Alignment.centerRight,
                                     child: Text(
                                       "تاريخ الانضمام • $formattedDate",
-                                      style: const TextStyle(
-                                          fontSize: 11, color: Colors.grey),
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                                     ),
                                   ),
+
+                                  if (status == 'suspended' && user['reactivateDeadline'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Builder(
+                                        builder: (_) {
+                                          final deadlineRaw = (user['reactivateDeadline'] as Timestamp).toDate();
+                                          final deadline = DateTime(deadlineRaw.year, deadlineRaw.month, deadlineRaw.day);
+                                          final now = DateTime.now();
+                                          final today = DateTime(now.year, now.month, now.day);
+
+                                          final isPast = today.isAfter(deadline);
+                                          final isToday = today.isAtSameMomentAs(deadline);
+                                          final daysLeft = deadline.difference(today).inDays;
+                                          final deadlineStr = '${deadline.day}/${deadline.month}/${deadline.year}';
+
+                                          Color badgeColor;
+                                          String badgeText;
+                                          if (isPast) {
+                                            badgeColor = Colors.red;
+                                            badgeText = 'انتهت المهلة • $deadlineStr';
+                                          } else if (isToday) {
+                                            badgeColor = Colors.orange;
+                                            badgeText = 'اليوم آخر يوم • $deadlineStr';
+                                          } else if (daysLeft <= 10) {
+                                            badgeColor = Colors.deepPurpleAccent;
+                                            badgeText = 'باقي $daysLeft أيام • $deadlineStr';
+                                          } else {
+                                            badgeColor = Colors.blue;
+                                            badgeText = 'باقي $daysLeft يوم • $deadlineStr';
+                                          }
+
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: badgeColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: badgeColor.withOpacity(0.4)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: BoxDecoration(
+                                                    color: badgeColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  badgeText,
+                                                  style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: badgeColor,
+                                                      fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -746,23 +815,192 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         String userName = '',
         String userEmail = '',
       }) async {
-    final newStatus = status == 'active' ? 'suspended' : 'active';
+    if (status == 'active') {
+      // ── DEACTIVATING: show date picker dialog ──────────────
+      DateTime selectedDeadline =
+      DateTime.now().add(const Duration(days: 14));
 
-    await FirebaseFirestore.instance
-        .collection('accounts')
-        .doc(uid)
-        .update({'status': newStatus});
-
-    // Send email only when deactivating
-    if (newStatus == 'suspended' && userEmail.isNotEmpty) {
-      await _sendEmailJS(
-        toEmail: userEmail,
-        toName: userName,
-        templateId: _emailJSDeactivateTemplateId,
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: StatefulBuilder(
+            builder: (ctx, setDialog) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'تعطيل الحساب',
+                style: TextStyle(
+                    color: Color(0xFF14532D),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('سيتم تعطيل حساب: $userName'),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'حدد الموعد النهائي للرد:',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: selectedDeadline,
+                        firstDate: DateTime.now()
+                            .add(const Duration(days: 1)),
+                        lastDate: DateTime.now()
+                            .add(const Duration(days: 365)),
+                        builder: (context, child) => Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: Color(0xFF16A34A),
+                            ),
+                          ),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) {
+                        setDialog(() => selectedDeadline = picked);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFF16A34A)),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.calendar_today,
+                            color: Color(0xFF16A34A), size: 18),
+                        const SizedBox(width: 10),
+                        StatefulBuilder(
+                          builder: (ctx, _) => Text(
+                            '${selectedDeadline.day}/${selectedDeadline.month}/${selectedDeadline.year}',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF14532D)),
+                          ),
+                        ),
+                        const Spacer(),
+                        const Text('اضغط للتغيير',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(children: [
+                      Icon(Icons.email_outlined,
+                          color: Colors.orange, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          ' سيتم إرسال بريد إلكتروني للمستخدم يتضمن المهلة المحددة',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.orange),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('تعطيل',
+                      style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
-    }
 
-    setState(() {});
+      if (confirmed != true) return;
+
+      final deadlineStr =
+          '${selectedDeadline.day}/${selectedDeadline.month}/${selectedDeadline.year}';
+
+      // Update Firestore
+      await FirebaseFirestore.instance
+          .collection('accounts')
+          .doc(uid)
+          .update({
+        'status': 'suspended',
+        'suspendedAt': Timestamp.now(),
+        'reactivateDeadline': Timestamp.fromDate(selectedDeadline),
+      });
+
+      // Send suspension email with deadline date
+      if (userEmail.isNotEmpty) {
+        await _sendEmailJS(
+          toEmail: userEmail,
+          toName: userName,
+          templateId: _emailJSDeactivateTemplateId,
+          deadlineDate: deadlineStr,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '✅ تم تعطيل حساب $userName — المهلة: $deadlineStr',
+              textDirection: TextDirection.rtl),
+          backgroundColor: Colors.orange[700],
+        ));
+        setState(() {});
+      }
+    } else {
+      // ── RE-ENABLING ─────────────────────────────────────────
+      await FirebaseFirestore.instance
+          .collection('accounts')
+          .doc(uid)
+          .update({
+        'status': 'active',
+        'suspendedAt': FieldValue.delete(),
+        'reactivateDeadline': FieldValue.delete(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ تم تفعيل الحساب بنجاح',
+              textDirection: TextDirection.rtl),
+          backgroundColor: Color(0xFF16A34A),
+        ));
+        setState(() {});
+      }
+    }
   }
 
   // ── Delete account (with deletion email) ────────────────────────
@@ -1008,7 +1246,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     final data = spec.data() as Map<String, dynamic>;
                     final accountId = data['accountId'];
                     final accList = accounts
-                        .where((a) => a['accountId'] == accountId)
+                        .where((a) => a.id == accountId)
                         .toList();
                     final accData = accList.isNotEmpty
                         ? accList.first.data() as Map<String, dynamic>
@@ -1016,6 +1254,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     return {
                       ...data,
                       'status': accData['status'] ?? 'active',
+                      'reactivateDeadline': accData['reactivateDeadline'],
                     };
                   }).toList();
 
@@ -1139,6 +1378,73 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                           fontSize: 11, color: Colors.grey),
                                     ),
                                   ),
+
+                                  if (status == 'suspended' && spec['reactivateDeadline'] != null) ...[
+                                    const SizedBox(height: 4),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Builder(
+                                        builder: (_) {
+                                          final deadlineRaw = (spec['reactivateDeadline'] as Timestamp).toDate();
+                                          final deadline = DateTime(deadlineRaw.year, deadlineRaw.month, deadlineRaw.day);
+                                          final now = DateTime.now();
+                                          final today = DateTime(now.year, now.month, now.day);
+
+                                          final isPast = today.isAfter(deadline);
+                                          final isToday = today.isAtSameMomentAs(deadline);
+                                          final daysLeft = deadline.difference(today).inDays;
+                                          final deadlineStr = '${deadline.day}/${deadline.month}/${deadline.year}';
+
+                                          Color badgeColor;
+                                          String badgeText;
+                                          if (isPast) {
+                                            badgeColor = Colors.red;
+                                            badgeText = 'انتهت المهلة • $deadlineStr';
+                                          } else if (isToday) {
+                                            badgeColor = Colors.orange;
+                                            badgeText = 'اليوم آخر يوم • $deadlineStr';
+                                          } else if (daysLeft <= 10) {
+                                            badgeColor = Colors.deepPurpleAccent;
+                                            badgeText = 'باقي $daysLeft أيام • $deadlineStr';
+                                          } else {
+                                            badgeColor = Colors.blue;
+                                            badgeText = 'باقي $daysLeft يوم • $deadlineStr';
+                                          }
+
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: badgeColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: badgeColor.withOpacity(0.4)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: BoxDecoration(
+                                                    color: badgeColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  badgeText,
+                                                  style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: badgeColor,
+                                                      fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
