@@ -357,7 +357,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(
-                            Icons.chevron_right,
+                            Icons.chevron_left,
                             color: Color(0xFF16a34a)),
                         onPressed: () => setState(() {
                           _currentDate = DateTime(
@@ -373,7 +373,7 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
                       ),
                       IconButton(
                         icon: const Icon(
-                            Icons.chevron_left,
+                            Icons.chevron_right,
                             color: Color(0xFF16a34a)),
                         onPressed: () => setState(() {
                           _currentDate = DateTime(
