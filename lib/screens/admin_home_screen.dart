@@ -3001,7 +3001,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           Icon(Icons.edit_outlined,
                               color: Color(0xFF16A34A), size: 17),
                           SizedBox(width: 4),
-                          Text('تعديل',
+                          Text('تعديل الاسم',
                               style: TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF16A34A))),
@@ -3407,7 +3407,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // Dialog to edit the admin's display name and email directly
   void _showEditDialog() {
     final nameController = TextEditingController(text: _name);
-    final emailController = TextEditingController(text: _email);
     bool saving = false;
     showDialog(
       context: context,
@@ -3422,49 +3421,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF14532D))),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  textAlign: TextAlign.right,
-                  textDirection: TextDirection.rtl,
-                  keyboardType: TextInputType.name,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: 'الاسم',
-                    labelStyle:
-                    const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.person_outline,
-                        color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF16A34A), width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  textDirection: TextDirection.ltr,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'البريد الإلكتروني',
-                    labelStyle:
-                    const TextStyle(color: Color(0xFF16A34A)),
-                    prefixIcon: const Icon(Icons.email_outlined,
-                        color: Color(0xFF16A34A)),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF16A34A), width: 2)),
-                  ),
-                ),
-              ],
+            content: TextField(
+              controller: nameController,
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              keyboardType: TextInputType.name,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'الاسم',
+                labelStyle: const TextStyle(color: Color(0xFF16A34A)),
+                prefixIcon: const Icon(Icons.person_outline,
+                    color: Color(0xFF16A34A)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                        color: Color(0xFF16A34A), width: 2)),
+              ),
             ),
             actions: [
               TextButton(
@@ -3477,45 +3451,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     : () async {
                   setDialogState(() => saving = true);
                   try {
-                    final uid = FirebaseAuth
-                        .instance.currentUser?.uid;
-                    final newName =
-                    nameController.text.trim();
-                    final newEmail =
-                    emailController.text.trim();
+                    final uid =
+                        FirebaseAuth.instance.currentUser?.uid;
+                    final newName = nameController.text.trim();
                     if (uid != null) {
                       await FirebaseFirestore.instance
                           .collection('admins')
                           .doc(uid)
-                          .update({
-                        'username': newName,
-                        'email': newEmail
-                      });
+                          .update({'username': newName});
                       await FirebaseFirestore.instance
                           .collection('accounts')
                           .doc(uid)
-                          .update({
-                        'username': newName,
-                        'email': newEmail
-                      });
-                      if (newEmail != _email)
-                        await FirebaseAuth.instance
-                            .currentUser
-                            ?.verifyBeforeUpdateEmail(
-                            newEmail);
+                          .update({'username': newName});
                     }
                     if (!mounted) return;
-                    setState(() {
-                      _name = newName;
-                      _email = newEmail;
-                    });
+                    setState(() => _name = newName);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context)
                         .showSnackBar(const SnackBar(
-                        content: Text(
-                            'تم حفظ التعديلات بنجاح ✓'),
-                        backgroundColor:
-                        Color(0xFF16A34A)));
+                        content: Text('تم حفظ التعديلات بنجاح ✓'),
+                        backgroundColor: Color(0xFF16A34A)));
                   } catch (e) {
                     setDialogState(() => saving = false);
                   }

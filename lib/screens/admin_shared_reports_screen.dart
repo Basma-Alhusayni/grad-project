@@ -14,6 +14,16 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
   String _search = '';
   String _filter = 'الكل';
   final TextEditingController _searchCtrl = TextEditingController();
+  late final Stream<QuerySnapshot> _feedStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _feedStream = FirebaseFirestore.instance
+        .collection('community_feed')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
 
   // Clean up the search controller when the screen is removed
   @override
@@ -103,10 +113,7 @@ class _AdminSharedReportsScreenState extends State<AdminSharedReportsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('community_feed')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: _feedStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: _green600));
